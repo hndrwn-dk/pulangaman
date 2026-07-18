@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgis/postgis:15-3.4
+    container_name: pulangaman-postgres
+    environment:
+      POSTGRES_USER: pulangaman
+      POSTGRES_PASSWORD: pulangaman
+      POSTGRES_DB: pulangaman
+    ports:
+      - '5432:5432'
+    volumes:
+      - pulangaman_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pulangaman -d pulangaman']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: pulangaman-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - pulangaman_redis:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pulangaman_pg:
+  pulangaman_redis:
