@@ -4,7 +4,8 @@ services:
     runtime: node
     plan: free
     rootDir: services/api
-    buildCommand: npm ci && npm run build
+    # NODE_ENV=production would skip @types/*; include devDeps for tsc + migrate
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run migrate && node dist/index.js
     healthCheckPath: /health
     autoDeploy: true

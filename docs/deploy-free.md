@@ -46,7 +46,7 @@ tetap utuh (Express + WebSocket + timer panic + PostGIS + Redis presence).
 ### Opsi B - Manual
 - New > Web Service, pilih repo.
 - Root Directory: `services/api`
-- Build: `npm ci && npm run build`
+- Build: `npm ci --include=dev && npm run build`
 - Start: `npm run migrate && node dist/index.js`
 - Health Check Path: `/health`
 - Tambahkan env var yang sama seperti di `render.yaml`.
