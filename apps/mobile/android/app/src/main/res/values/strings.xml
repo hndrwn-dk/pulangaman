@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PulangAman</string>
+    <string name="accessibility_service_description">Membatasi aplikasi sesuai aturan keluarga sambil selalu mengizinkan PulangAman, telepon, pesan, dan panggilan darurat.</string>
+</resources>

@@ -54,7 +54,7 @@ locationRouter.post('/', async (req: AuthedRequest, res, next) => {
 
     await pool.query(
       `UPDATE child_profiles
-       SET last_seen_at = $2, commute_status = 'commuting'
+       SET last_seen_at = $2
        WHERE user_id = $1`,
       [childId, recordedAt],
     );

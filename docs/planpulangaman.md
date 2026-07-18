@@ -97,6 +97,14 @@ You are the lead developer for **PulangAman**, a community-driven child safety a
 - Community report pins (manual), expire 72h unless verified
 - Safe route v1: Google Directions + avoid report pins / simple static layers — no ML
 
+### Phase 3.5 — Premium UX + differentiators
+
+- Playful family UI (bright colors, soft gamification) for parent/child shells
+- Durable school attendance ledger (geofence check-in/out) with parent timeline
+- Rewards/streaks for safe check-ins (idempotent ledger)
+- Android screen-time: UsageStats + Accessibility soft-blocking, parent PIN policy, emergency allowlist (PulangAman / dialer / messages)
+- Details: [premium-ux-plan.md](premium-ux-plan.md)
+
 ### Phase 4 — Explicitly deferred
 
 BLE mesh, stealth panic, WebRTC audio stream, on-device TFLite, FastAPI route ML, Mapbox, Firestore, reputation badges, public 500m guardian discovery, SIS integrations, 10k concurrent load as a release gate.

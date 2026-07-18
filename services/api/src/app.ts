@@ -16,6 +16,10 @@ import { guardiansRouter } from './routes/guardians.js';
 import { schoolsRouter } from './routes/schools.js';
 import { reportsRouter } from './routes/reports.js';
 import { routesRouter } from './routes/routes.js';
+import { attendanceRouter } from './routes/attendance.js';
+import { rewardsRouter } from './routes/rewards.js';
+import { policiesRouter } from './routes/policies.js';
+import { telemetryRouter } from './routes/telemetry.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +51,10 @@ export function createApp() {
   app.use('/api/v1/schools', schoolsRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/routes', routesRouter);
+  app.use('/api/v1/attendance', attendanceRouter);
+  app.use('/api/v1/rewards', rewardsRouter);
+  app.use('/api/v1/policies', policiesRouter);
+  app.use('/api/v1/telemetry', telemetryRouter);
 
   // Phase 3 light school admin UI (static).
   app.use(

@@ -9,7 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
+import '../screentime/screen_time_channel.dart';
 
 final offlineQueueProvider = Provider<OfflineQueue>((ref) => OfflineQueue());
 
@@ -28,13 +30,62 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
   int _panicTaps = 0;
   DateTime? _lastTapAt;
   String? _status;
+  int _points = 0;
+  int _streak = 0;
+  bool _usageAccess = false;
+  bool _accessibility = false;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(_startTracking);
+    Future.microtask(_setupScreenTimeAndRewards);
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
+  }
+
+  Future<void> _setupScreenTimeAndRewards() async {
+    final auth = ref.read(authControllerProvider);
+    final userId = auth.userId;
+    if (userId == null) return;
+    final channel = ScreenTimeChannel();
+    try {
+      final usage = await channel.hasUsageAccess();
+      final accessibility = await channel.isAccessibilityEnabled();
+      setState(() {
+        _usageAccess = usage;
+        _accessibility = accessibility;
+      });
+      final installationId = 'android-$userId';
+      await ref.read(apiClientProvider).post('/api/v1/policies/device', body: {
+        'installationId': installationId,
+        'deviceName': 'Android child device',
+        'appVersion': '0.3.0',
+        'usageAccessGranted': usage,
+        'accessibilityEnabled': accessibility,
+      });
+      final policyData = await ref.read(apiClientProvider).get('/api/v1/policies/current/me');
+      final policy = policyData['policy'] as Map<String, dynamic>?;
+      if (policy != null) {
+        await channel.applyPolicy(policy);
+        await channel.startEnforcement();
+        await ref.read(apiClientProvider).post('/api/v1/policies/ack', body: {
+          'installationId': installationId,
+          'policyId': policy['id'],
+          'version': policy['version'],
+        });
+      }
+    } catch (_) {
+      // Native screen-time APIs are Android-only.
+    }
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/rewards/$userId');
+      final balance = data['balance'] as Map<String, dynamic>? ?? {};
+      setState(() {
+        _points = (balance['points'] as num?)?.toInt() ?? 0;
+        _streak = (balance['current_streak'] as num?)?.toInt() ?? 0;
+      });
+    } catch (_) {}
   }
 
   Future<void> _startTracking() async {
@@ -200,44 +251,94 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _tracking ? AppStrings.trackingOn : AppStrings.trackingOff,
-              style: Theme.of(context).textTheme.titleLarge,
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        children: [
+          Text(
+            'Hai, ${auth.name ?? 'Sahabat'}!',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const Text('Tetap aman, kumpulkan poin, dan beri kabar keluarga.'),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              PaStatusPill(
+                label: _tracking ? 'Lokasi aktif' : 'Lokasi mati',
+                icon: _tracking ? Icons.location_on : Icons.location_off,
+                color: _tracking ? AppColors.success : AppColors.danger,
+              ),
+              PaStatusPill(
+                label: '$_points poin · $_streak hari',
+                icon: Icons.star,
+                color: AppColors.coral,
+              ),
+              PaStatusPill(
+                label: _usageAccess && _accessibility ? 'Aturan layar aktif' : 'Izin layar belum lengkap',
+                icon: Icons.hourglass_bottom,
+                color: AppColors.lavender,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          PaSectionCard(
+            color: AppColors.coral.withValues(alpha: 0.12),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: 180,
+                  child: FilledButton(
+                    onPressed: _onPanicTap,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.danger,
+                      shape: const CircleBorder(),
+                    ),
+                    child: Text(
+                      AppStrings.panicButton,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                  ),
+                ),
+                const Text(AppStrings.panicConfirm, textAlign: TextAlign.center),
+                const SizedBox(height: 4),
+                Text(_status ?? '', textAlign: TextAlign.center),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(_status ?? ''),
-            const Spacer(),
-            SizedBox(
-              height: 180,
-              child: FilledButton(
-                onPressed: _onPanicTap,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.danger,
-                  shape: const CircleBorder(),
-                ),
-                child: Text(
-                  AppStrings.panicButton,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
+          ),
+          if (!_usageAccess || !_accessibility) ...[
+            const SizedBox(height: AppSpacing.md),
+            PaSectionCard(
+              color: AppColors.lavender.withValues(alpha: 0.16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text('Aktifkan perlindungan waktu layar',
+                      style: TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 6),
+                  const Text('PulangAman, Telepon, dan Pesan tidak pernah diblokir.'),
+                  const SizedBox(height: 10),
+                  if (!_usageAccess)
+                    OutlinedButton(
+                      onPressed: () => ScreenTimeChannel().openUsageAccessSettings(),
+                      child: const Text('Izinkan akses pemakaian'),
+                    ),
+                  if (!_accessibility)
+                    OutlinedButton(
+                      onPressed: () => ScreenTimeChannel().openAccessibilitySettings(),
+                      child: const Text('Aktifkan pemblokiran aplikasi'),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              AppStrings.panicConfirm,
-              textAlign: TextAlign.center,
-            ),
-            const Spacer(),
           ],
-        ),
+        ],
       ),
     );
   }

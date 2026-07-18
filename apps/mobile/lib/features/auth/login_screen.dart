@@ -35,31 +35,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.sand, AppColors.canvas, Color(0xFFD9EBE4)],
+            colors: [AppColors.sand, AppColors.canvas, AppColors.mint],
           ),
         ),
         child: SafeArea(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
             children: [
-              Text(
-                AppStrings.brand,
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: AppColors.tealDeep,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.86),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: const BoxDecoration(
+                        color: AppColors.amber,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.home_rounded, color: AppColors.tealDeep, size: 34),
                     ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                AppStrings.tagline,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppColors.ink.withValues(alpha: 0.8),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppStrings.brand,
+                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                  color: AppColors.tealDeep,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1,
+                                ),
+                          ),
+                          const Text(AppStrings.tagline),
+                        ],
+                      ),
                     ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _FeatureBubble(icon: Icons.school, label: 'Check-in', color: AppColors.sky),
+                  const SizedBox(width: 8),
+                  _FeatureBubble(icon: Icons.star, label: 'Hadiah', color: AppColors.amber),
+                  const SizedBox(width: 8),
+                  _FeatureBubble(icon: Icons.hourglass_bottom, label: 'Waktu layar', color: AppColors.lavender),
+                ],
+              ),
+              const SizedBox(height: 28),
               Text(AppStrings.loginTitle,
-                  style: Theme.of(context).textTheme.headlineSmall),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      )),
               const SizedBox(height: 16),
               TextField(
                 controller: _nameCtrl,
@@ -112,6 +146,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeatureBubble extends StatelessWidget {
+  const _FeatureBubble({required this.icon, required this.label, required this.color});
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.tealDeep),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+          ],
         ),
       ),
     );

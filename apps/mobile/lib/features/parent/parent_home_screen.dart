@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
+import '../attendance/attendance_screen.dart';
 import '../auth/auth_controller.dart';
-import '../community/reports_screen.dart';
-import '../community/safe_route_screen.dart';
+import '../rewards/rewards_screen.dart';
+import '../screentime/screen_time_screen.dart';
 import 'children_controller.dart';
 import 'live_map_screen.dart';
-import 'zones_screen.dart';
-import 'guardians_screen.dart';
+import 'more_screen.dart';
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   const ParentHomeScreen({super.key});
@@ -46,13 +47,58 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(AppStrings.childrenTitle,
-                style: Theme.of(context).textTheme.titleLarge),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.tealDeep, AppColors.teal],
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Halo, ${auth.name ?? 'Keluarga'}!',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const Text(
+                          'Semua perjalanan aman, dalam satu tempat.',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppColors.amber,
+                    child: Icon(Icons.family_restroom, color: AppColors.ink),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              AppStrings.childrenTitle,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
             const SizedBox(height: 12),
             if (children.loading)
               const Center(child: CircularProgressIndicator())
             else if (children.items.isEmpty)
-              Text(AppStrings.noChildren)
+              const PaEmptyState(
+                icon: Icons.child_care,
+                title: 'Belum ada anak',
+                message: 'Hubungkan perangkat anak untuk mulai menjaga perjalanan mereka.',
+              )
             else
               ...children.items.map((child) {
                 return Card(
@@ -127,34 +173,37 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
   }
 }
 
-class ParentShell extends ConsumerWidget {
+class ParentShell extends ConsumerStatefulWidget {
   const ParentShell({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        body: const TabBarView(
-          children: [
-            ParentHomeScreen(),
-            ZonesEntryScreen(),
-            GuardiansEntryScreen(),
-            ReportsScreen(),
-            SafeRouteScreen(),
-          ],
-        ),
-        bottomNavigationBar: const TabBar(
-          isScrollable: true,
-          labelColor: AppColors.tealDeep,
-          tabs: [
-            Tab(icon: Icon(Icons.family_restroom), text: 'Anak'),
-            Tab(icon: Icon(Icons.fence), text: 'Zona'),
-            Tab(icon: Icon(Icons.shield), text: 'Wali'),
-            Tab(icon: Icon(Icons.report), text: 'Lapor'),
-            Tab(icon: Icon(Icons.route), text: 'Rute'),
-          ],
-        ),
+  ConsumerState<ParentShell> createState() => _ParentShellState();
+}
+
+class _ParentShellState extends ConsumerState<ParentShell> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    const pages = [
+      ParentHomeScreen(),
+      AttendanceScreen(),
+      ScreenTimeScreen(),
+      RewardsScreen(),
+      MoreScreen(),
+    ];
+    return Scaffold(
+      body: IndexedStack(index: _index, children: pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (value) => setState(() => _index = value),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.family_restroom_outlined), selectedIcon: Icon(Icons.family_restroom), label: 'Anak'),
+          NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Sekolah'),
+          NavigationDestination(icon: Icon(Icons.hourglass_empty), selectedIcon: Icon(Icons.hourglass_bottom), label: 'Layar'),
+          NavigationDestination(icon: Icon(Icons.star_outline), selectedIcon: Icon(Icons.star), label: 'Hadiah'),
+          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Lainnya'),
+        ],
       ),
     );
   }

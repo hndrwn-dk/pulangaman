@@ -33,6 +33,11 @@ const envSchema = z.object({
   GOOGLE_MAPS_API_KEY: z.string().optional().default(''),
   COMMUNITY_REPORT_TTL_HOURS: z.coerce.number().default(72),
   ROUTE_AVOID_RADIUS_M: z.coerce.number().default(120),
+  USAGE_RETENTION_DAYS: z.coerce.number().int().min(1).max(90).default(14),
+  KILL_SWITCH_POLICY_ENFORCE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 });
 
 const parsed = envSchema.safeParse(process.env);

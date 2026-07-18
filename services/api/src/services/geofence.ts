@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { sendFcmToUser } from './fcm.js';
 import { broadcastToRoom, childRoom } from '../ws/server.js';
 import { nextPresence, shouldEmitZoneEvent, type Presence } from './geofenceLogic.js';
+import { recordSchoolAttendance } from './attendance.js';
 
 type ZoneRow = {
   id: string;
@@ -126,5 +127,18 @@ export async function evaluateGeofences(params: {
        VALUES (NULL, $1, 'zone.event', $2::jsonb)`,
       [params.childId, JSON.stringify(payload)],
     );
+
+    if (zone.type === 'school') {
+      await recordSchoolAttendance({
+        childId: params.childId,
+        zoneId: zone.id,
+        event,
+      });
+    } else if (zone.type === 'home') {
+      await pool.query(
+        `UPDATE child_profiles SET commute_status = $2 WHERE user_id = $1`,
+        [params.childId, event === 'enter' ? 'home' : 'commuting'],
+      );
+    }
   }
 }
