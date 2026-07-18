@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 
 class ScreenTimeChannel {
-  static const _channel = MethodChannel('id.pulangaman/screen_time');
+  static const _channel = MethodChannel('com.tursinalabs.pulangaman/screen_time');
 
   Future<bool> hasUsageAccess() async {
     return await _channel.invokeMethod<bool>('hasUsageAccess') ?? false;

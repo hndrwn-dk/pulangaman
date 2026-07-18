@@ -1,4 +1,4 @@
-package id.pulangaman.pulangaman
+package com.tursinalabs.pulangaman
 
 import android.app.AppOpsManager
 import android.content.Context
@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Process
 import android.provider.Settings
 import android.text.TextUtils
-import android.view.accessibility.AccessibilityManager
 import android.app.usage.UsageStatsManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -15,7 +14,7 @@ import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 
 class MainActivity : FlutterActivity() {
-    private val channelName = "id.pulangaman/screen_time"
+    private val channelName = "com.tursinalabs.pulangaman/screen_time"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

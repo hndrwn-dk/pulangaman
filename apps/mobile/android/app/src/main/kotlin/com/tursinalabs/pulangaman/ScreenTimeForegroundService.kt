@@ -1,4 +1,4 @@
-package id.pulangaman.pulangaman
+package com.tursinalabs.pulangaman
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

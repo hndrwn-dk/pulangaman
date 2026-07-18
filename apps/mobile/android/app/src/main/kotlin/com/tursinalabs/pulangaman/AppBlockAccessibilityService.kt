@@ -1,4 +1,4 @@
-package id.pulangaman.pulangaman
+package com.tursinalabs.pulangaman
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
@@ -8,7 +8,7 @@ import org.json.JSONArray
 
 class AppBlockAccessibilityService : AccessibilityService() {
     private val alwaysAllowed = setOf(
-        "id.pulangaman.pulangaman",
+        "com.tursinalabs.pulangaman",
         "com.android.dialer",
         "com.google.android.dialer",
         "com.android.messaging",

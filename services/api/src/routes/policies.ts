@@ -11,7 +11,7 @@ export const policiesRouter = Router();
 policiesRouter.use(requireAuth, rateLimit);
 
 const mandatoryAllowlist = [
-  'id.pulangaman.pulangaman',
+  'com.tursinalabs.pulangaman',
   'com.android.dialer',
   'com.google.android.dialer',
   'com.android.messaging',
