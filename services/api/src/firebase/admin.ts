@@ -22,6 +22,18 @@ export function getFirebaseAuth(): admin.auth.Auth | null {
   return admin.auth();
 }
 
+export function getFirebaseMessaging(): admin.messaging.Messaging | null {
+  if (!isFirebaseConfigured) {
+    return null;
+  }
+  initFirebase();
+  return admin.messaging();
+}
+
+export function isMessagingAvailable(): boolean {
+  return isFirebaseConfigured;
+}
+
 export async function verifyIdToken(idToken: string): Promise<{ uid: string; phone?: string }> {
   const auth = getFirebaseAuth();
   if (!auth) {
@@ -37,4 +49,38 @@ export async function verifyIdToken(idToken: string): Promise<{ uid: string; pho
     uid: decoded.uid,
     phone: typeof decoded.phone_number === 'string' ? decoded.phone_number : undefined,
   };
+}
+
+export async function createChildCustomToken(
+  firebaseUid: string,
+): Promise<{ customToken: string | null; firebaseUid: string }> {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return { customToken: `dev-custom:${firebaseUid}`, firebaseUid };
+  }
+  const customToken = await auth.createCustomToken(firebaseUid, { role: 'child' });
+  return { customToken, firebaseUid };
+}
+
+export async function ensureFirebaseUser(params: {
+  uid: string;
+  phone?: string;
+  displayName: string;
+}): Promise<string> {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return params.uid;
+  }
+
+  try {
+    await auth.getUser(params.uid);
+    return params.uid;
+  } catch {
+    const created = await auth.createUser({
+      uid: params.uid,
+      displayName: params.displayName,
+      phoneNumber: params.phone,
+    });
+    return created.uid;
+  }
 }

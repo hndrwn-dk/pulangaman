@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 export const devicesRouter = Router();
 
-devicesRouter.use(requireAuth);
+devicesRouter.use(requireAuth, rateLimit);
 
 const deviceSchema = z.object({
   fcmToken: z.string().min(1),

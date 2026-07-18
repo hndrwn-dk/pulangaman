@@ -2,7 +2,7 @@
   "name": "@pulangaman/api",
   "version": "0.1.0",
   "private": true,
-  "description": "PulangAman API (Phase 0)",
+  "description": "PulangAman API (Phase 1–2)",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -15,7 +15,8 @@
     "migrate": "node-pg-migrate -m migrations up",
     "migrate:down": "node-pg-migrate -m migrations down",
     "migrate:create": "node-pg-migrate -m migrations create",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

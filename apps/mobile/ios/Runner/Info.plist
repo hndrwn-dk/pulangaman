@@ -66,5 +66,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>PulangAman membutuhkan lokasi untuk pelacakan aman dan tombol panik.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>PulangAman membutuhkan lokasi latar belakang saat perjalanan aktif.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>PulangAman membutuhkan lokasi latar belakang saat perjalanan aktif.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
+	<key>GMSApiKey</key>
+	<string>$(GOOGLE_MAPS_API_KEY)</string>
 </dict>
 </plist>

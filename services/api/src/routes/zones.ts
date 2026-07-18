@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 export const zonesRouter = Router();
 
-zonesRouter.use(requireAuth);
+zonesRouter.use(requireAuth, rateLimit);
 
 const zoneSchema = z.object({
   childId: z.string().uuid(),
