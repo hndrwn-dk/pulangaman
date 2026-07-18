@@ -26,19 +26,41 @@ authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) =
     try {
       await client.query('BEGIN');
 
-      const upsert = await client.query<{ id: string }>(
-        `INSERT INTO users (firebase_uid, phone, email, name)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (firebase_uid) DO UPDATE
-           SET phone = EXCLUDED.phone,
-               email = COALESCE(EXCLUDED.email, users.email),
-               name = EXCLUDED.name,
-               updated_at = now()
-         RETURNING id`,
-        [firebaseUid, phone, body.email ?? null, body.name],
+      // Claim pending invite placeholder (pending:{phone}) onto this Firebase identity.
+      const pending = await client.query<{ id: string }>(
+        `SELECT id FROM users
+         WHERE phone = $1 AND firebase_uid = $2
+         LIMIT 1`,
+        [phone, `pending:${phone}`],
       );
 
-      const userId = upsert.rows[0].id;
+      let userId: string;
+
+      if (pending.rowCount && pending.rows[0]) {
+        userId = pending.rows[0].id;
+        await client.query(
+          `UPDATE users
+           SET firebase_uid = $2,
+               email = COALESCE($3, email),
+               name = $4,
+               updated_at = now()
+           WHERE id = $1`,
+          [userId, firebaseUid, body.email ?? null, body.name],
+        );
+      } else {
+        const upsert = await client.query<{ id: string }>(
+          `INSERT INTO users (firebase_uid, phone, email, name)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (firebase_uid) DO UPDATE
+             SET phone = EXCLUDED.phone,
+                 email = COALESCE(EXCLUDED.email, users.email),
+                 name = EXCLUDED.name,
+                 updated_at = now()
+           RETURNING id`,
+          [firebaseUid, phone, body.email ?? null, body.name],
+        );
+        userId = upsert.rows[0].id;
+      }
 
       await client.query(
         `INSERT INTO user_roles (user_id, role)

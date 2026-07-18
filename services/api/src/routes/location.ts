@@ -4,10 +4,13 @@ import { pool } from '../db/pool.js';
 import { childLocationKey, getRedis } from '../redis/client.js';
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { rateLimit } from '../middleware/rateLimit.js';
+import { evaluateGeofences } from '../services/geofence.js';
+import { broadcastToRoom, childRoom } from '../ws/server.js';
 
 export const locationRouter = Router();
 
-locationRouter.use(requireAuth);
+locationRouter.use(requireAuth, rateLimit);
 
 const locationSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -56,18 +59,36 @@ locationRouter.post('/', async (req: AuthedRequest, res, next) => {
       [childId, recordedAt],
     );
 
-    const payload = JSON.stringify({
+    const payload = {
+      childId,
       lat: body.lat,
       lng: body.lng,
       accuracyM: body.accuracyM ?? null,
       recordedAt,
-    });
+      timestamp: recordedAt,
+      accuracy: body.accuracyM ?? null,
+    };
 
     const redis = getRedis();
     if (redis.status !== 'ready') {
       await redis.connect();
     }
-    await redis.set(childLocationKey(childId), payload, 'EX', config.LOCATION_TTL_SECONDS);
+    await redis.set(
+      childLocationKey(childId),
+      JSON.stringify(payload),
+      'EX',
+      config.LOCATION_TTL_SECONDS,
+    );
+
+    broadcastToRoom(childRoom(childId), 'child:location_update', payload);
+
+    void evaluateGeofences({
+      childId,
+      lat: body.lat,
+      lng: body.lng,
+    }).catch((error) => {
+      console.error('geofence_eval_failed', error);
+    });
 
     res.status(202).json({ accepted: true });
   } catch (error) {
