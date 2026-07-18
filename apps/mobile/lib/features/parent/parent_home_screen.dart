@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../auth/auth_controller.dart';
+import '../community/reports_screen.dart';
+import '../community/safe_route_screen.dart';
 import 'children_controller.dart';
 import 'live_map_screen.dart';
 import 'zones_screen.dart';
@@ -131,21 +133,26 @@ class ParentShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 3,
+      length: 5,
       child: Scaffold(
         body: const TabBarView(
           children: [
             ParentHomeScreen(),
             ZonesEntryScreen(),
             GuardiansEntryScreen(),
+            ReportsScreen(),
+            SafeRouteScreen(),
           ],
         ),
         bottomNavigationBar: const TabBar(
+          isScrollable: true,
           labelColor: AppColors.tealDeep,
           tabs: [
             Tab(icon: Icon(Icons.family_restroom), text: 'Anak'),
             Tab(icon: Icon(Icons.fence), text: 'Zona'),
             Tab(icon: Icon(Icons.shield), text: 'Wali'),
+            Tab(icon: Icon(Icons.report), text: 'Lapor'),
+            Tab(icon: Icon(Icons.route), text: 'Rute'),
           ],
         ),
       ),

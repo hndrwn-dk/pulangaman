@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PulangAman — Admin Sekolah</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <h1>PulangAman</h1>
+        <p>Panel ringan admin sekolah (Fase 3)</p>
+      </header>
+
+      <section class="card">
+        <h2>Sesi pengembang</h2>
+        <label>Bearer token (contoh: <code>dev:school_62812</code>)</label>
+        <input id="token" placeholder="dev:school_admin_1" />
+        <label>Nama admin</label>
+        <input id="adminName" value="Admin Sekolah" />
+        <label>Telepon</label>
+        <input id="adminPhone" value="+6281299990001" />
+        <button id="btnSession">Buat / pulihkan sesi</button>
+        <p id="sessionStatus" class="muted"></p>
+      </section>
+
+      <section class="card">
+        <h2>Sekolah</h2>
+        <label>Nama sekolah</label>
+        <input id="schoolName" value="SD Contoh" />
+        <label>Kontak panik (telepon)</label>
+        <input id="panicPhone" value="+6281210002000" />
+        <label>Nama kontak</label>
+        <input id="panicName" value="Satpam Sekolah" />
+        <button id="btnCreateSchool">Buat sekolah</button>
+        <button id="btnLoadSchools" class="secondary">Muat sekolah saya</button>
+        <ul id="schoolList"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Roster</h2>
+        <label>School ID</label>
+        <input id="schoolId" />
+        <label>Child user ID (UUID)</label>
+        <input id="childId" />
+        <button id="btnAddRoster">Tambah ke roster</button>
+        <button id="btnLoadRoster" class="secondary">Muat roster</button>
+        <button id="btnNotify" class="danger">Kirim SMS kontak panik</button>
+        <pre id="rosterOut"></pre>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

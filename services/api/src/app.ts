@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,12 +13,21 @@ import { zonesRouter } from './routes/zones.js';
 import { locationRouter } from './routes/location.js';
 import { panicRouter } from './routes/panic.js';
 import { guardiansRouter } from './routes/guardians.js';
+import { schoolsRouter } from './routes/schools.js';
+import { reportsRouter } from './routes/reports.js';
+import { routesRouter } from './routes/routes.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function createApp() {
   const app = express();
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
   app.use(
     cors({
       origin: config.CORS_ORIGIN === '*' ? true : config.CORS_ORIGIN.split(','),
@@ -33,6 +44,15 @@ export function createApp() {
   app.use('/api/v1/location', locationRouter);
   app.use('/api/v1/panic', panicRouter);
   app.use('/api/v1/guardians', guardiansRouter);
+  app.use('/api/v1/schools', schoolsRouter);
+  app.use('/api/v1/reports', reportsRouter);
+  app.use('/api/v1/routes', routesRouter);
+
+  // Phase 3 light school admin UI (static).
+  app.use(
+    '/school-admin',
+    express.static(path.join(__dirname, '../public/school-admin')),
+  );
 
   app.use(notFoundHandler);
   app.use(errorHandler);

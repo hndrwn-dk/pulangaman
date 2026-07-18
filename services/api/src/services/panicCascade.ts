@@ -172,12 +172,45 @@ async function notifyGuardians(params: {
   }
 }
 
+async function notifySchoolContact(alertId: string, childId: string): Promise<void> {
+  const school = await pool.query<{
+    school_id: string;
+    panic_contact_phone: string | null;
+    name: string;
+  }>(
+    `SELECT s.id AS school_id, s.panic_contact_phone, s.name
+     FROM child_profiles cp
+     JOIN schools s ON s.id = cp.school_id
+     WHERE cp.user_id = $1
+     LIMIT 1`,
+    [childId],
+  );
+  const phone = school.rows[0]?.panic_contact_phone;
+  if (!phone) {
+    return;
+  }
+
+  await sendSms(
+    phone,
+    `PulangAman PANIK: siswa terkait sekolah ${school.rows[0].name} memicu peringatan.`,
+  );
+  await pool.query(
+    `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+     VALUES (NULL, $1, 'panic.school_notify', $2::jsonb)`,
+    [
+      childId,
+      JSON.stringify({ alertId, schoolId: school.rows[0].school_id }),
+    ],
+  );
+}
+
 async function escalate(alertId: string, childId: string, lat: number, lng: number): Promise<void> {
   if (!(await alertStillActive(alertId))) {
     return;
   }
 
   await notifyEmergencyContacts(alertId, childId);
+  await notifySchoolContact(alertId, childId);
   await notifyGuardians({ alertId, childId, lat, lng });
 }
 

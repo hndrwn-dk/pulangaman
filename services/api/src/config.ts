@@ -30,6 +30,9 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  GOOGLE_MAPS_API_KEY: z.string().optional().default(''),
+  COMMUNITY_REPORT_TTL_HOURS: z.coerce.number().default(72),
+  ROUTE_AVOID_RADIUS_M: z.coerce.number().default(120),
 });
 
 const parsed = envSchema.safeParse(process.env);

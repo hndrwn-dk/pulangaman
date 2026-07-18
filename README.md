@@ -12,6 +12,7 @@ Community safety network for parents and children (Indonesia).
 |------|---------|
 | `apps/mobile` | Flutter app (Android & iOS) |
 | `services/api` | Node.js 20 + Express API |
+| `services/api/public/school-admin` | Phase 3 light school admin web |
 | `docker-compose.yml` | Local Postgres (PostGIS) + Redis |
 | `docs/` | Architecture and product docs |
 
@@ -44,16 +45,18 @@ flutter run \
 ```
 
 API health: `http://localhost:3000/health`  
+School admin UI: `http://localhost:3000/school-admin/`  
 Local auth stub (no Firebase): `Authorization: Bearer dev:<firebaseUid>`
 
 ## Phase status
 
-- **Phase 0:** foundation scaffold — schema, Docker, Flutter shell
-- **Phase 1 (implemented):** parent–child session, live location + WS, geofence enter/exit with debounce, panic cascade (FCM stub + SMS console/http), offline queue, 7-day location purge, stale-location warning
-- **Phase 2 (implemented):** pre-approved guardian invite/accept/revoke, distance-ranked guardian notify on panic escalate, guardian ack / share location / need backup, kill switches
+- **Phase 0–2:** foundation, parent–child tracking/panic/geofences, pre-approved guardians
+- **Phase 3:** school admin light (roster, panic contact, geofence attendance signal), community report pins (72h expiry), safe route v1 (Directions optional + report avoidance)
+- **Phase 4:** explicitly deferred (BLE mesh, stealth panic, WebRTC, TFLite/ML, Mapbox, Firestore, public stranger dispatch, etc.)
 
 ## Safety notes
 
 - Guardians are invite-only for a specific child — no public stranger dispatch
-- SMS/FCM use console stubs until Firebase Messaging + Indonesian SMS provider credentials are configured
-- Set `KILL_SWITCH_GUARDIAN_NOTIFY=true` or `KILL_SWITCH_LOCATION_SHARE=true` to disable those paths regionally
+- SMS/FCM/Maps Directions use stubs or optional keys until credentials are configured
+- Google Maps tiles/Directions are optional for local dev; coordinates and straight-line/detour routing still work
+- Set `KILL_SWITCH_GUARDIAN_NOTIFY=true` or `KILL_SWITCH_LOCATION_SHARE=true` to disable those paths

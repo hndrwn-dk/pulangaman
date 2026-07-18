@@ -9,7 +9,7 @@ const sessionBodySchema = z.object({
   name: z.string().min(1).max(120),
   phone: z.string().min(8).max(20).optional(),
   email: z.string().email().optional(),
-  role: z.enum(['parent', 'child', 'guardian']).default('parent'),
+  role: z.enum(['parent', 'child', 'guardian', 'school_admin']).default('parent'),
 });
 
 authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) => {
