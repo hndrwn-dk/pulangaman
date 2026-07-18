@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: pulangaman-api
+    runtime: node
+    plan: free
+    rootDir: services/api
+    buildCommand: npm ci && npm run build
+    startCommand: npm run migrate && node dist/index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "20"
+      - key: PORT
+        value: "3000"
+      # Neon (Postgres + PostGIS). Must include ?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      # Upstash Redis. Use the rediss:// (TLS) URL
+      - key: REDIS_URL
+        sync: false
+      # Restrict to your app/web origin in production if possible
+      - key: CORS_ORIGIN
+        value: "*"
+      # Firebase Auth + FCM (leave empty until configured)
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: SMS_PROVIDER
+        value: console
+      - key: KILL_SWITCH_GUARDIAN_NOTIFY
+        value: "false"
+      - key: KILL_SWITCH_LOCATION_SHARE
+        value: "false"
+      - key: KILL_SWITCH_POLICY_ENFORCE
+        value: "false"

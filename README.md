@@ -6,6 +6,7 @@ Community safety network for parents and children (Indonesia).
 
 - [Product & architecture plan](docs/planpulangaman.md)
 - [Premium UX + differentiators plan](docs/premium-ux-plan.md)
+- [Free deploy guide (Render + Neon + Upstash)](docs/deploy-free.md)
 
 ## Monorepo layout
 
