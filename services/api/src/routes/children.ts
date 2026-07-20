@@ -40,6 +40,25 @@ async function assertParentOfChild(parentId: string, childId: string): Promise<b
   return (link.rowCount ?? 0) > 0;
 }
 
+function resolveBatteryAlert(input: {
+  batteryLevel: number | null;
+  batteryCharging: boolean;
+  ageSeconds: number | null;
+  isStale: boolean;
+}): 'none' | 'low' | 'dead' | 'stale' {
+  const { batteryLevel, batteryCharging, ageSeconds, isStale } = input;
+  if (batteryLevel !== null && batteryLevel <= 2 && !batteryCharging) return 'dead';
+  if (batteryLevel !== null && batteryLevel <= 15 && !batteryCharging) return 'low';
+  if (
+    isStale &&
+    ageSeconds !== null &&
+    ageSeconds > config.STALE_LOCATION_SECONDS * 2
+  ) {
+    return 'stale';
+  }
+  return 'none';
+}
+
 childrenRouter.post('/', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -342,6 +361,19 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
       if (last.rowCount && last.rows[0]) {
         const row = last.rows[0];
         const recordedAt = row.recorded_at.toISOString();
+        const profile = await pool.query<{
+          last_battery_level: number | null;
+          last_battery_charging: boolean | null;
+        }>(
+          `SELECT last_battery_level, last_battery_charging
+           FROM child_profiles WHERE user_id = $1`,
+          [childId],
+        );
+        const batteryLevel =
+          typeof profile.rows[0]?.last_battery_level === 'number'
+            ? profile.rows[0].last_battery_level
+            : null;
+        const batteryCharging = profile.rows[0]?.last_battery_charging === true;
         const location = {
           childId,
           lat: row.lat,
@@ -350,8 +382,8 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
           recordedAt,
           timestamp: recordedAt,
           accuracy: row.accuracy_m,
-          batteryLevel: null as number | null,
-          batteryCharging: null as boolean | null,
+          batteryLevel,
+          batteryCharging,
         };
         const ageSeconds = Math.floor(
           (Date.now() - row.recorded_at.getTime()) / 1000,
@@ -363,6 +395,12 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
           'EX',
           config.LOCATION_TTL_SECONDS,
         );
+        const batteryAlert = resolveBatteryAlert({
+          batteryLevel,
+          batteryCharging,
+          ageSeconds,
+          isStale: true,
+        });
         res.json({
           childId,
           location,
@@ -370,9 +408,9 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
           ageSeconds,
           isStale: true,
           staleAfterSeconds: config.STALE_LOCATION_SECONDS,
-          batteryLevel: null,
-          batteryCharging: false,
-          batteryAlert: ageSeconds > config.STALE_LOCATION_SECONDS * 2 ? 'stale' : 'none',
+          batteryLevel,
+          batteryCharging,
+          batteryAlert,
           fromHistory: true,
         });
         return;
@@ -403,19 +441,32 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
     const isStale =
       ageSeconds === null || ageSeconds > config.STALE_LOCATION_SECONDS;
 
-    const batteryLevel =
+    let batteryLevel =
       typeof location.batteryLevel === 'number' ? location.batteryLevel : null;
-    const batteryCharging = location.batteryCharging === true;
-    const batteryLow =
-      batteryLevel !== null && batteryLevel <= 15 && !batteryCharging;
-    const batteryDead =
-      batteryLevel !== null && batteryLevel <= 2 && !batteryCharging;
-    let batteryAlert: 'none' | 'low' | 'dead' | 'stale' = 'none';
-    if (batteryDead) batteryAlert = 'dead';
-    else if (batteryLow) batteryAlert = 'low';
-    else if (isStale && ageSeconds !== null && ageSeconds > config.STALE_LOCATION_SECONDS * 2) {
-      batteryAlert = 'stale';
+    let batteryCharging = location.batteryCharging === true;
+    if (batteryLevel === null) {
+      const profile = await pool.query<{
+        last_battery_level: number | null;
+        last_battery_charging: boolean | null;
+      }>(
+        `SELECT last_battery_level, last_battery_charging
+         FROM child_profiles WHERE user_id = $1`,
+        [childId],
+      );
+      if (typeof profile.rows[0]?.last_battery_level === 'number') {
+        batteryLevel = profile.rows[0].last_battery_level;
+        batteryCharging = profile.rows[0].last_battery_charging === true;
+        location.batteryLevel = batteryLevel;
+        location.batteryCharging = batteryCharging;
+      }
     }
+
+    const batteryAlert = resolveBatteryAlert({
+      batteryLevel,
+      batteryCharging,
+      ageSeconds,
+      isStale,
+    });
 
     res.json({
       childId,

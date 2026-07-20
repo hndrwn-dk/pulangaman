@@ -142,3 +142,52 @@ telemetryRouter.get('/:childId/summary', async (req: AuthedRequest, res, next) =
     next(error);
   }
 });
+
+/** Last 7 Jakarta calendar days of total screen time (seconds per day). */
+telemetryRouter.get('/:childId/weekly', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const childId = z.string().uuid().parse(req.params.childId);
+    if (!parentId) {
+      res.status(403).json({ error: 'parent_profile_required' });
+      return;
+    }
+    const link = await pool.query(
+      `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
+      [parentId, childId],
+    );
+    if (link.rowCount === 0) {
+      res.status(403).json({ error: 'parent_access_required' });
+      return;
+    }
+    const result = await pool.query(
+      `WITH days AS (
+         SELECT generate_series(
+           (date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta')
+             - interval '6 days',
+           date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta',
+           interval '1 day'
+         ) AS day_start
+       )
+       SELECT to_char(d.day_start AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS day,
+              COALESCE(SUM(t.duration_seconds), 0)::integer AS total_seconds
+       FROM days d
+       LEFT JOIN usage_telemetry t
+         ON t.child_id = $1
+        AND t.kind = 'usage'
+        AND t.recorded_at >= d.day_start
+        AND t.recorded_at < d.day_start + interval '1 day'
+       GROUP BY d.day_start
+       ORDER BY d.day_start`,
+      [childId],
+    );
+    res.json({
+      days: result.rows.map((row) => ({
+        day: row.day,
+        totalSeconds: Number(row.total_seconds) || 0,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});

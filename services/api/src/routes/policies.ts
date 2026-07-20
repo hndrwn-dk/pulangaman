@@ -85,6 +85,7 @@ policiesRouter.put('/:childId', async (req: AuthedRequest, res, next) => {
               days: z.array(z.number().int().min(1).max(7)).min(1),
               start: z.string().regex(/^\d{2}:\d{2}$/),
               end: z.string().regex(/^\d{2}:\d{2}$/),
+              limitMinutes: z.number().int().min(15).max(1440).optional(),
             }),
           )
           .max(20)

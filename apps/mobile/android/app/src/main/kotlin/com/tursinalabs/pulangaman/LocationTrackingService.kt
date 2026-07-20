@@ -211,19 +211,36 @@ class LocationTrackingService : Service(), LocationListener {
 
     private fun readBattery(): Pair<Int, Boolean>? {
         return try {
-            val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-                ?: return null
-            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-            if (level < 0 || scale <= 0) return null
-            val pct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
-            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-            val charging =
-                status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                    status == BatteryManager.BATTERY_STATUS_FULL
-            Pair(pct, charging)
+            val bm = getSystemService(BATTERY_SERVICE) as BatteryManager
+            val pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            if (pct < 0) return null
+            val charging = bm.isCharging
+            Pair(pct.coerceIn(0, 100), charging)
         } catch (_: Exception) {
-            null
+            // Fallback for older/quirky devices.
+            try {
+                val intent = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    registerReceiver(
+                        null,
+                        IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                        Context.RECEIVER_NOT_EXPORTED,
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                } ?: return null
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                if (level < 0 || scale <= 0) return null
+                val pct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
+                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                val charging =
+                    status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL
+                Pair(pct, charging)
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
