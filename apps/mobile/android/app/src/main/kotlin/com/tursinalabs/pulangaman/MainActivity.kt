@@ -31,7 +31,11 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         result.success(null)
                     }
-                    "getTodayUsage" -> result.success(getTodayUsage())
+                    "getTodayUsage" -> result.success(getUsageStats("today"))
+                    "getUsageStats" -> {
+                        val period = call.argument<String>("period") ?: "today"
+                        result.success(getUsageStats(period))
+                    }
                     "applyPolicy" -> {
                         savePolicy(call.arguments as? Map<*, *> ?: emptyMap<String, Any>())
                         result.success(null)
@@ -69,26 +73,48 @@ class MainActivity : FlutterActivity() {
         return splitter.any { it.equals(expected, ignoreCase = true) }
     }
 
-    private fun getTodayUsage(): List<Map<String, Any>> {
+    private fun getUsageStats(period: String): List<Map<String, Any>> {
         if (!hasUsageAccess()) return emptyList()
         val now = System.currentTimeMillis()
-        val calendar = java.util.Calendar.getInstance().apply {
-            set(java.util.Calendar.HOUR_OF_DAY, 0)
-            set(java.util.Calendar.MINUTE, 0)
-            set(java.util.Calendar.SECOND, 0)
-            set(java.util.Calendar.MILLISECOND, 0)
+        val calendar = java.util.Calendar.getInstance()
+        when (period.lowercase()) {
+            "week" -> {
+                calendar.set(java.util.Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+            }
+            "month" -> {
+                calendar.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            }
+            else -> {
+                calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            }
         }
+        calendar.set(java.util.Calendar.MINUTE, 0)
+        calendar.set(java.util.Calendar.SECOND, 0)
+        calendar.set(java.util.Calendar.MILLISECOND, 0)
+        if (period.lowercase() == "today") {
+            calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        }
+
         val manager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        return manager.queryUsageStats(
+        val stats = manager.queryUsageStats(
             UsageStatsManager.INTERVAL_DAILY,
             calendar.timeInMillis,
             now,
-        ).filter { it.totalTimeInForeground > 0 }
-            .sortedByDescending { it.totalTimeInForeground }
-            .map {
+        )
+
+        val totals = linkedMapOf<String, Long>()
+        for (entry in stats) {
+            if (entry.totalTimeInForeground <= 0) continue
+            totals[entry.packageName] =
+                (totals[entry.packageName] ?: 0L) + entry.totalTimeInForeground
+        }
+
+        return totals.entries
+            .sortedByDescending { it.value }
+            .map { (packageName, millis) ->
                 mapOf(
-                    "packageName" to it.packageName,
-                    "durationSeconds" to it.totalTimeInForeground / 1000,
+                    "packageName" to packageName,
+                    "durationSeconds" to millis / 1000,
                 )
             }
     }

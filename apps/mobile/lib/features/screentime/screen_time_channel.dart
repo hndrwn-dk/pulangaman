@@ -16,7 +16,14 @@ class ScreenTimeChannel {
   Future<void> openAccessibilitySettings() => _channel.invokeMethod('openAccessibilitySettings');
 
   Future<List<Map<String, dynamic>>> getTodayUsage() async {
-    final result = await _channel.invokeListMethod<Map<dynamic, dynamic>>('getTodayUsage');
+    return getUsageStats('today');
+  }
+
+  Future<List<Map<String, dynamic>>> getUsageStats(String period) async {
+    final result = await _channel.invokeListMethod<Map<dynamic, dynamic>>(
+      'getUsageStats',
+      {'period': period},
+    );
     return (result ?? [])
         .map((item) => item.map((key, value) => MapEntry('$key', value)))
         .toList();

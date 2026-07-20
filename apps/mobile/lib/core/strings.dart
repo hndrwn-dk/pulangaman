@@ -45,4 +45,9 @@ abstract final class AppStrings {
   static const mapKeyMissing =
       'Peta Google belum dikonfigurasi. Tambahkan GOOGLE_MAPS_API_KEY di android/local.properties lalu rebuild.';
   static const lastKnownCoords = 'Koordinat terakhir';
+  static const childTabHome = 'Beranda';
+  static const childTabScreen = 'Layar';
+  static const childTabMessages = 'Kabar';
+  static const childMessageSent = 'Kabar terkirim';
+  static const childMessageFailed = 'Gagal mengirim kabar. Coba lagi.';
 }

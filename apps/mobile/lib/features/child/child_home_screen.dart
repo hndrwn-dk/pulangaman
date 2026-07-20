@@ -9,9 +9,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import '../screentime/screen_time_channel.dart';
+import 'child_beranda_tab.dart';
+import 'child_kabar_tab.dart';
+import 'child_layar_tab.dart';
+import 'child_usage_utils.dart';
 import 'panic_tap_counter.dart';
 
 final offlineQueueProvider = Provider<OfflineQueue>((ref) => OfflineQueue());
@@ -36,6 +39,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   int _streak = 0;
   bool _usageAccess = false;
   bool _accessibility = false;
+  int _todayUsageSeconds = 0;
+  int _tabIndex = 0;
+  UsagePeriod _usagePeriod = UsagePeriod.today;
+  List<UsageAppEntry> _usageApps = [];
+  bool _usageLoading = false;
+  String? _sendingPresetId;
   final ScreenTimeChannel _screenTimeChannel = ScreenTimeChannel();
 
   @override
@@ -60,6 +69,38 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Future<void> _refreshScreenTimeAndRewards() async {
     await _syncScreenTimePermissions();
     await _loadRewards();
+    await _loadUsageStats(_usagePeriod);
+  }
+
+  Future<void> _loadUsageStats(UsagePeriod period) async {
+    if (!_usageAccess) {
+      if (!mounted) return;
+      setState(() {
+        _usageApps = [];
+        _todayUsageSeconds = 0;
+      });
+      return;
+    }
+
+    setState(() => _usageLoading = true);
+    try {
+      final raw = await _screenTimeChannel.getUsageStats(period.apiValue);
+      final apps = raw.map(UsageAppEntry.fromJson).toList()
+        ..sort((a, b) => b.durationSeconds.compareTo(a.durationSeconds));
+      final total = apps.fold(0, (sum, app) => sum + app.durationSeconds);
+      if (!mounted) return;
+      setState(() {
+        _usageApps = apps;
+        if (period == UsagePeriod.today) {
+          _todayUsageSeconds = total;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _usageApps = []);
+    } finally {
+      if (mounted) setState(() => _usageLoading = false);
+    }
   }
 
   Future<void> _syncScreenTimePermissions() async {
@@ -266,6 +307,27 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     }
   }
 
+  Future<void> _sendMessagePreset(ChildMessagePreset preset) async {
+    setState(() => _sendingPresetId = preset.id);
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/messages', body: {
+        'text': preset.text,
+        'preset': preset.id,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kabar terkirim: ${preset.label}')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mengirim kabar. Coba lagi.')),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingPresetId = null);
+    }
+  }
+
   Future<void> _smsFallback() async {
     final uri = Uri.parse(
       'sms:?body=${Uri.encodeComponent('PulangAman PANIK — butuh bantuan sekarang.')}',
@@ -273,6 +335,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
+  }
+
+  void _onUsagePeriodChanged(UsagePeriod period) {
+    setState(() => _usagePeriod = period);
+    unawaited(_loadUsageStats(period));
   }
 
   @override
@@ -286,10 +353,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
+    final childName = auth.name ?? 'Sahabat';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${AppStrings.brand} · ${auth.name ?? ''}'),
+        title: Text('${AppStrings.brand} · $childName'),
         actions: [
           IconButton(
             onPressed: () => ref.read(authControllerProvider.notifier).logout(),
@@ -297,97 +365,64 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+      body: IndexedStack(
+        index: _tabIndex,
         children: [
-          Text(
-            'Hai, ${auth.name ?? 'Sahabat'}!',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+          ChildBerandaTab(
+            childName: childName,
+            tracking: _tracking,
+            points: _points,
+            streak: _streak,
+            usageAccess: _usageAccess,
+            accessibility: _accessibility,
+            todayUsageSeconds: _todayUsageSeconds,
+            status: _status,
+            panicInFlight: _panicInFlight,
+            panicOnCooldown: _panicTapCounter.isOnCooldown,
+            onPanicTap: _onPanicTap,
+            onOpenUsageSettings: _screenTimeChannel.openUsageAccessSettings,
+            onOpenAccessibilitySettings:
+                _screenTimeChannel.openAccessibilitySettings,
           ),
-          const Text('Tetap aman, kumpulkan poin, dan beri kabar keluarga.'),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              PaStatusPill(
-                label: _tracking ? 'Lokasi aktif' : 'Lokasi mati',
-                icon: _tracking ? Icons.location_on : Icons.location_off,
-                color: _tracking ? AppColors.success : AppColors.danger,
-              ),
-              PaStatusPill(
-                label: '$_points poin · $_streak hari',
-                icon: Icons.star,
-                color: AppColors.coral,
-              ),
-              PaStatusPill(
-                label: _usageAccess && _accessibility ? 'Aturan layar aktif' : 'Izin layar belum lengkap',
-                icon: Icons.hourglass_bottom,
-                color: AppColors.lavender,
-              ),
-            ],
+          ChildLayarTab(
+            usageAccess: _usageAccess,
+            period: _usagePeriod,
+            apps: _usageApps,
+            loading: _usageLoading,
+            onPeriodChanged: _onUsagePeriodChanged,
+            onRefresh: () => _loadUsageStats(_usagePeriod),
+            onOpenUsageSettings: _screenTimeChannel.openUsageAccessSettings,
           ),
-          const SizedBox(height: AppSpacing.lg),
-          PaSectionCard(
-            color: AppColors.coral.withValues(alpha: 0.12),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 180,
-                  child: FilledButton(
-                    onPressed: (_panicInFlight || _panicTapCounter.isOnCooldown)
-                        ? null
-                        : _onPanicTap,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.danger,
-                      shape: const CircleBorder(),
-                    ),
-                    child: Text(
-                      AppStrings.panicButton,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                  ),
-                ),
-                const Text(AppStrings.panicConfirm, textAlign: TextAlign.center),
-                const SizedBox(height: 4),
-                Text(_status ?? '', textAlign: TextAlign.center),
-              ],
-            ),
+          ChildKabarTab(
+            sendingPresetId: _sendingPresetId,
+            onSendPreset: _sendMessagePreset,
           ),
-          if (!_usageAccess || !_accessibility) ...[
-            const SizedBox(height: AppSpacing.md),
-            PaSectionCard(
-              color: AppColors.lavender.withValues(alpha: 0.16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Aktifkan perlindungan waktu layar',
-                      style: TextStyle(fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 6),
-                  const Text('PulangAman, Telepon, dan Pesan tidak pernah diblokir.'),
-                  const SizedBox(height: 10),
-                  if (!_usageAccess)
-                    OutlinedButton(
-                      onPressed: () =>
-                          _screenTimeChannel.openUsageAccessSettings(),
-                      child: const Text('Izinkan akses pemakaian'),
-                    ),
-                  if (!_accessibility)
-                    OutlinedButton(
-                      onPressed: () =>
-                          _screenTimeChannel.openAccessibilitySettings(),
-                      child: const Text('Aktifkan pemblokiran aplikasi'),
-                    ),
-                ],
-              ),
-            ),
-          ],
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (index) {
+          setState(() => _tabIndex = index);
+          if (index == 1) {
+            unawaited(_loadUsageStats(_usagePeriod));
+          }
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Beranda',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.hourglass_empty_outlined),
+            selectedIcon: Icon(Icons.hourglass_bottom),
+            label: 'Layar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Kabar',
+          ),
         ],
       ),
     );
