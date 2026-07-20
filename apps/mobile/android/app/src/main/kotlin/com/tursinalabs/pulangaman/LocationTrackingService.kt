@@ -6,10 +6,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.BatteryManager
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
@@ -176,12 +178,16 @@ class LocationTrackingService : Service(), LocationListener {
         val token = prefs.getString(KEY_TOKEN, null) ?: return
         if (token.isBlank() || apiBase.isBlank()) return
 
+        val battery = readBattery()
         val body = JSONObject()
             .put("lat", location.latitude)
             .put("lng", location.longitude)
             .put("accuracyM", location.accuracy.toDouble())
             .put("source", if (isPanic()) "panic" else "background")
-            .toString()
+        if (battery != null) {
+            body.put("batteryLevel", battery.first)
+            body.put("batteryCharging", battery.second)
+        }
 
         val url = URL("$apiBase/api/v1/location")
         val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -193,13 +199,31 @@ class LocationTrackingService : Service(), LocationListener {
             setRequestProperty("Authorization", "Bearer $token")
         }
         try {
-            OutputStreamWriter(conn.outputStream).use { it.write(body) }
+            OutputStreamWriter(conn.outputStream).use { it.write(body.toString()) }
             val code = conn.responseCode
             if (code !in 200..299) {
                 Log.w(TAG, "location POST status=$code")
             }
         } finally {
             conn.disconnect()
+        }
+    }
+
+    private fun readBattery(): Pair<Int, Boolean>? {
+        return try {
+            val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                ?: return null
+            val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (level < 0 || scale <= 0) return null
+            val pct = ((level * 100f) / scale).toInt().coerceIn(0, 100)
+            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val charging =
+                status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    status == BatteryManager.BATTERY_STATUS_FULL
+            Pair(pct, charging)
+        } catch (_: Exception) {
+            null
         }
     }
 

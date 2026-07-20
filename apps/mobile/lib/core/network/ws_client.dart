@@ -18,9 +18,20 @@ class WsClient {
   void removeHandler(WsHandler handler) => _handlers.remove(handler);
 
   Future<void> connect(String token) async {
-    await disconnect();
+    await disconnect().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {
+        _sub = null;
+        _channel = null;
+      },
+    );
     final uri = Uri.parse('${AppConfig.wsBaseUrl}/ws?token=${Uri.encodeComponent(token)}');
     _channel = WebSocketChannel.connect(uri);
+    try {
+      await _channel!.ready.timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // Keep channel; stream errors handled by listen / next reconnect.
+    }
     _sub = _channel!.stream.listen((raw) {
       try {
         final message = jsonDecode(raw as String) as Map<String, dynamic>;
@@ -32,7 +43,7 @@ class WsClient {
       } catch (_) {
         // Ignore malformed frames.
       }
-    });
+    }, onError: (_) {}, onDone: () {});
   }
 
   void subscribe(String room) {

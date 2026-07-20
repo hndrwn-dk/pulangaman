@@ -48,10 +48,15 @@ placesRouter.get('/search', async (req: AuthedRequest, res, next) => {
     };
 
     if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      const denied =
+        data.status === 'REQUEST_DENIED' ||
+        (data.error_message ?? '').toLowerCase().includes('not authorized');
       res.status(502).json({
-        error: 'places_upstream',
+        error: denied ? 'maps_key_restricted' : 'places_upstream',
         status: data.status,
-        message: data.error_message ?? data.status,
+        message: denied
+          ? 'Key Google Maps di server kena batasan (Android/HTTP). Buat key terpisah untuk server: API restriction Places + Geocoding, tanpa batasan aplikasi Android.'
+          : (data.error_message ?? data.status),
       });
       return;
     }

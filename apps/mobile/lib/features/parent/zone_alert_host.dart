@@ -214,34 +214,47 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
       if (next.items.isNotEmpty) _syncSubscriptions();
     });
 
-    return Column(
-      children: [
-        if (_banner != null)
-          Material(
-            color: _banner!.isEnter
-                ? const Color(0xFFE8F8F2)
-                : const Color(0xFFFFF4E5),
-            child: SafeArea(
-              bottom: false,
-              child: ListTile(
-                leading: Icon(
-                  _banner!.icon,
-                  color: _banner!.isEnter ? AppColors.tealDeep : AppColors.amber,
-                ),
-                title: Text(
-                  _banner!.isEnter ? 'Zona aman' : 'Update zona',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                subtitle: Text(_banner!.message),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => setState(() => _banner = null),
+    // Stack (not Column) so a zone banner never blocks the shell layout.
+    return Material(
+      color: AppColors.canvas,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          widget.child,
+          if (_banner != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Material(
+                  elevation: 2,
+                  color: _banner!.isEnter
+                      ? const Color(0xFFE8F8F2)
+                      : const Color(0xFFFFF4E5),
+                  child: ListTile(
+                    leading: Icon(
+                      _banner!.icon,
+                      color: _banner!.isEnter
+                          ? AppColors.tealDeep
+                          : AppColors.amber,
+                    ),
+                    title: Text(
+                      _banner!.isEnter ? 'Zona aman' : 'Update zona',
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    subtitle: Text(_banner!.message),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => setState(() => _banner = null),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        Expanded(child: widget.child),
-      ],
+        ],
+      ),
     );
   }
 }

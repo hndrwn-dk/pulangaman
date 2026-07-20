@@ -6,6 +6,13 @@ import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { createChildCustomToken, ensureFirebaseUser } from '../firebase/admin.js';
+import {
+  buildActivityTimeline,
+  jakartaDayBounds,
+  todayJakartaDay,
+  type ActivityPoint,
+  type ActivityZone,
+} from '../services/activityTimeline.js';
 
 export const childrenRouter = Router();
 
@@ -204,6 +211,97 @@ childrenRouter.get('/:id/location/history', async (req: AuthedRequest, res, next
   }
 });
 
+childrenRouter.get('/:id/activity', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const childId = String(req.params.id);
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    if (!(await assertParentOfChild(parentId, childId))) {
+      res.status(404).json({ error: 'child_not_found' });
+      return;
+    }
+
+    const dayRaw = typeof req.query.day === 'string' ? req.query.day : todayJakartaDay();
+    let bounds: { start: Date; end: Date };
+    try {
+      bounds = jakartaDayBounds(dayRaw);
+    } catch {
+      res.status(400).json({ error: 'invalid_day' });
+      return;
+    }
+
+    const [pointsResult, zonesResult] = await Promise.all([
+      pool.query<{
+        lat: number;
+        lng: number;
+        recorded_at: Date;
+        accuracy_m: number | null;
+      }>(
+        `SELECT
+           ST_Y(location::geometry) AS lat,
+           ST_X(location::geometry) AS lng,
+           recorded_at,
+           accuracy_m
+         FROM location_history
+         WHERE child_id = $1
+           AND recorded_at >= $2
+           AND recorded_at <= $3
+         ORDER BY recorded_at ASC
+         LIMIT 5000`,
+        [childId, bounds.start.toISOString(), bounds.end.toISOString()],
+      ),
+      pool.query<{
+        id: string;
+        type: string;
+        name: string | null;
+        lat: number;
+        lng: number;
+        radius_m: number;
+      }>(
+        `SELECT
+           id,
+           type,
+           name,
+           ST_Y(center::geometry) AS lat,
+           ST_X(center::geometry) AS lng,
+           radius_m
+         FROM zones
+         WHERE child_id = $1`,
+        [childId],
+      ),
+    ]);
+
+    const points: ActivityPoint[] = pointsResult.rows.map((row) => ({
+      lat: row.lat,
+      lng: row.lng,
+      recordedAt: row.recorded_at,
+      accuracyM: row.accuracy_m,
+    }));
+    const zones: ActivityZone[] = zonesResult.rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      name: row.name,
+      lat: row.lat,
+      lng: row.lng,
+      radiusM: row.radius_m,
+    }));
+
+    const timeline = buildActivityTimeline({ points, zones });
+    res.json({
+      childId,
+      day: dayRaw,
+      summary: timeline.summary,
+      events: timeline.events,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -241,11 +339,27 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
       lng: number;
       recordedAt?: string;
       accuracyM?: number | null;
+      batteryLevel?: number | null;
+      batteryCharging?: boolean | null;
     };
     const recordedAt = location.recordedAt ? new Date(location.recordedAt).getTime() : 0;
     const ageSeconds = recordedAt ? Math.floor((Date.now() - recordedAt) / 1000) : null;
     const isStale =
       ageSeconds === null || ageSeconds > config.STALE_LOCATION_SECONDS;
+
+    const batteryLevel =
+      typeof location.batteryLevel === 'number' ? location.batteryLevel : null;
+    const batteryCharging = location.batteryCharging === true;
+    const batteryLow =
+      batteryLevel !== null && batteryLevel <= 15 && !batteryCharging;
+    const batteryDead =
+      batteryLevel !== null && batteryLevel <= 2 && !batteryCharging;
+    let batteryAlert: 'none' | 'low' | 'dead' | 'stale' = 'none';
+    if (batteryDead) batteryAlert = 'dead';
+    else if (batteryLow) batteryAlert = 'low';
+    else if (isStale && ageSeconds !== null && ageSeconds > config.STALE_LOCATION_SECONDS * 2) {
+      batteryAlert = 'stale';
+    }
 
     res.json({
       childId,
@@ -254,6 +368,9 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
       ageSeconds,
       isStale,
       staleAfterSeconds: config.STALE_LOCATION_SECONDS,
+      batteryLevel,
+      batteryCharging,
+      batteryAlert,
     });
   } catch (error) {
     next(error);

@@ -5,6 +5,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import '../child/child_usage_utils.dart';
+import '../parent/child_avatar.dart';
 import '../parent/children_controller.dart';
 
 class _UsageAppRow {
@@ -19,7 +20,6 @@ class _UsageAppRow {
   final int durationSeconds;
 }
 
-/// Preset batas yang mudah dipilih ortu (bukan slider teknis).
 const _limitPresets = <({int minutes, String label})>[
   (minutes: 30, label: '30 menit'),
   (minutes: 60, label: '1 jam'),
@@ -28,6 +28,7 @@ const _limitPresets = <({int minutes, String label})>[
   (minutes: 180, label: '3 jam'),
 ];
 
+/// Daftar anak (avatar) → tap untuk atur waktu HP.
 class ScreenTimeScreen extends ConsumerStatefulWidget {
   const ScreenTimeScreen({super.key});
 
@@ -36,7 +37,184 @@ class ScreenTimeScreen extends ConsumerStatefulWidget {
 }
 
 class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
-  String? _childId;
+  final Map<String, ChildGender> _genders = {};
+  bool _genderLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadGenders);
+  }
+
+  Future<void> _loadGenders() async {
+    final children = ref.read(childrenControllerProvider).items;
+    final map = <String, ChildGender>{};
+    for (final c in children) {
+      var g = await ChildGenderStore.instance.get(c.id);
+      if (g == ChildGender.unknown) {
+        g = ChildGenderStore.guessFromName(c.name);
+      }
+      map[c.id] = g;
+    }
+    if (!mounted) return;
+    setState(() {
+      _genders
+        ..clear()
+        ..addAll(map);
+      _genderLoaded = true;
+    });
+  }
+
+  Future<void> _editGender(ChildSummary child) async {
+    final current = _genders[child.id] ?? ChildGender.unknown;
+    final picked = await showChildGenderPicker(
+      context: context,
+      childName: child.name,
+      current: current,
+    );
+    if (picked == null || !mounted) return;
+    await ChildGenderStore.instance.set(child.id, picked);
+    setState(() => _genders[child.id] = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final children = ref.watch(childrenControllerProvider);
+    if (!_genderLoaded && children.items.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadGenders());
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Waktu HP')),
+      body: ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          Text(
+            'Pilih anak',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Ketuk anak untuk atur berapa lama boleh main HP. '
+            'Ketuk ikon pensil kecil untuk ganti wajah.',
+            style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (children.items.isEmpty)
+            const PaEmptyState(
+              icon: Icons.child_care,
+              title: 'Belum ada anak',
+              message: 'Tambah anak dulu di tab Anak.',
+            )
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: children.items.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 12,
+                childAspectRatio: 0.85,
+              ),
+              itemBuilder: (context, index) {
+                final child = children.items[index];
+                final gender = _genders[child.id] ??
+                    ChildGenderStore.guessFromName(child.name);
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ScreenTimeRulesScreen(child: child),
+                        ),
+                      );
+                    },
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Center(
+                                child: ChildAvatar(
+                                  name: child.name,
+                                  gender: gender,
+                                  size: 72,
+                                ),
+                              ),
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Material(
+                                  color: AppColors.teal,
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    customBorder: const CircleBorder(),
+                                    onTap: () => _editGender(child),
+                                    child: Container(
+                                      width: 28,
+                                      height: 28,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.edit,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          child.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class ScreenTimeRulesScreen extends ConsumerStatefulWidget {
+  const ScreenTimeRulesScreen({super.key, required this.child});
+
+  final ChildSummary child;
+
+  @override
+  ConsumerState<ScreenTimeRulesScreen> createState() =>
+      _ScreenTimeRulesScreenState();
+}
+
+class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
   int _limitMinutes = 120;
   bool _enabled = true;
   bool _saving = false;
@@ -44,16 +222,13 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   final Set<String> _blocked = {};
   List<_UsageAppRow> _apps = [];
 
-  String get _childName {
-    final children = ref.read(childrenControllerProvider).items;
-    for (final c in children) {
-      if (c.id == _childId) return c.name;
-    }
-    return 'anak';
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => _load(widget.child.id));
   }
 
   Future<void> _load(String childId) async {
-    _childId = childId;
     setState(() => _loading = true);
     try {
       final policy =
@@ -115,12 +290,11 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   }
 
   Future<void> _save() async {
-    final childId = _childId;
-    if (childId == null || _saving) return;
+    if (_saving) return;
     setState(() => _saving = true);
     try {
       await ref.read(apiClientProvider).put(
-        '/api/v1/policies/$childId',
+        '/api/v1/policies/${widget.child.id}',
         body: {
           'enabled': _enabled,
           'dailyLimitMinutes': _limitMinutes,
@@ -140,12 +314,12 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
         SnackBar(
           content: Text(
             _enabled
-                ? 'Aturan tersimpan. Buka PulangAman di HP $_childName supaya aktif.'
-                : 'Batas waktu dimatikan untuk $_childName.',
+                ? 'Aturan tersimpan. Buka PulangAman di HP ${widget.child.name} supaya aktif.'
+                : 'Batas waktu dimatikan untuk ${widget.child.name}.',
           ),
         ),
       );
-      await _load(childId);
+      await _load(widget.child.id);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -168,13 +342,6 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final children = ref.watch(childrenControllerProvider);
-    if (_childId == null && children.items.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _childId == null) _load(children.items.first.id);
-      });
-    }
-
     final usedMinutes =
         (_apps.fold<int>(0, (sum, a) => sum + a.durationSeconds) / 60).round();
     final over = usedMinutes > _limitMinutes;
@@ -182,11 +349,11 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Batas main HP'),
+        title: Text('Waktu HP · ${widget.child.name}'),
         actions: [
           IconButton(
             tooltip: 'Muat ulang',
-            onPressed: _childId == null ? null : () => _load(_childId!),
+            onPressed: () => _load(widget.child.id),
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -194,27 +361,6 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          if (children.items.isNotEmpty)
-            DropdownButtonFormField<String>(
-              initialValue: _childId ?? children.items.first.id,
-              decoration: const InputDecoration(
-                labelText: 'Aturan untuk anak',
-              ),
-              items: children.items
-                  .map(
-                    (child) => DropdownMenuItem(
-                      value: child.id,
-                      child: Text(child.name),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) _load(value);
-              },
-            ),
-          const SizedBox(height: AppSpacing.md),
-
-          // Status pemakaian — bahasa orang tua, bukan "X dari Y"
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -271,10 +417,9 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                   !_enabled
                       ? 'Anak bisa main HP tanpa batas dari PulangAman.'
                       : over
-                          ? 'Batas kamu: $_limitMinutes menit. '
-                              'Kelebihan ${usedMinutes - _limitMinutes} menit '
-                              '(app yang diblokir akan ditahan).'
-                          : 'Batas kamu: $_limitMinutes menit. '
+                          ? 'Batas: $_limitMinutes menit. '
+                              'Kelebihan ${usedMinutes - _limitMinutes} menit.'
+                          : 'Batas: $_limitMinutes menit. '
                               'Sisa sekitar $remaining menit.',
                   style: const TextStyle(
                     color: AppColors.inkSoft,
@@ -287,7 +432,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
           const SizedBox(height: AppSpacing.lg),
           Text(
-            '1. Nyalakan batas waktu?',
+            'Nyalakan batas waktu?',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -312,7 +457,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
           const SizedBox(height: AppSpacing.lg),
           Text(
-            '2. Berapa lama boleh main per hari?',
+            'Berapa lama boleh main per hari?',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -346,26 +491,19 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                 ),
             ],
           ),
-          if (!_limitPresets.any((p) => p.minutes == _limitMinutes)) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Batas saat ini: $_limitMinutes menit (dari pengaturan lama)',
-              style: const TextStyle(color: AppColors.inkSoft, fontSize: 12),
-            ),
-          ],
 
           const SizedBox(height: AppSpacing.lg),
           Text(
-            '3. App mana yang mau ditahan?',
+            'App mana yang ditahan?',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
           ),
           const SizedBox(height: 4),
-          Text(
-            'Geser ke "Tahan" untuk app yang tidak boleh dipakai berlebihan '
-            '(misalnya YouTube, game). Telepon & pesan tetap boleh.',
-            style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35),
+          const Text(
+            'Geser ke "Tahan" untuk app yang tidak boleh berlebihan '
+            '(YouTube, game). Telepon & pesan tetap boleh.',
+            style: TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 10),
           if (_loading)
@@ -379,7 +517,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
               child: const Text(
                 'Daftar app belum muncul.\n\n'
                 'Minta anak buka PulangAman di HP-nya sekali, '
-                'lalu di sini tekan ikon segarkan di pojok kanan atas.',
+                'lalu tekan ikon segarkan di pojok kanan atas.',
                 style: TextStyle(color: AppColors.inkSoft, height: 1.4),
               ),
             )
@@ -390,7 +528,8 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: blocked
                         ? AppColors.coral.withValues(alpha: 0.08)
@@ -466,7 +605,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
           const SizedBox(height: AppSpacing.lg),
           FilledButton(
-            onPressed: _childId == null || _saving ? null : _save,
+            onPressed: _saving ? null : _save,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(56),
               backgroundColor: AppColors.teal,

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:battery_plus/battery_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -366,6 +367,21 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>> _batteryFields() async {
+    try {
+      final battery = Battery();
+      final level = await battery.batteryLevel;
+      final state = await battery.batteryState;
+      return {
+        'batteryLevel': level.clamp(0, 100),
+        'batteryCharging':
+            state == BatteryState.charging || state == BatteryState.full,
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
   Future<void> _pushLocationOnce() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
@@ -373,11 +389,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           accuracy: LocationAccuracy.high,
         ),
       );
-      final body = {
+      final body = <String, dynamic>{
         'lat': pos.latitude,
         'lng': pos.longitude,
         'accuracyM': pos.accuracy,
         'source': _panicMode ? 'panic' : 'active',
+        ...await _batteryFields(),
       };
 
       final online = await _isOnline();

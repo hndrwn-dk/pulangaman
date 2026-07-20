@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
   static const teal = Color(0xFF087F6D);
@@ -41,17 +40,45 @@ ThemeData buildAppTheme() {
     surface: AppColors.surface,
   );
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);
+  // Larger type for parents who wear glasses / are less technical.
+  final textTheme = base.textTheme
+      .apply(
+        bodyColor: AppColors.ink,
+        displayColor: AppColors.ink,
+        fontFamily: 'sans-serif',
+      )
+      .copyWith(
+        bodyLarge: base.textTheme.bodyLarge?.copyWith(fontSize: 17, height: 1.4),
+        bodyMedium: base.textTheme.bodyMedium?.copyWith(fontSize: 16, height: 1.4),
+        bodySmall: base.textTheme.bodySmall?.copyWith(fontSize: 14, height: 1.35),
+        titleLarge: base.textTheme.titleLarge?.copyWith(
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+        ),
+        titleMedium: base.textTheme.titleMedium?.copyWith(
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
+        headlineSmall: base.textTheme.headlineSmall?.copyWith(
+          fontSize: 24,
+          fontWeight: FontWeight.w900,
+        ),
+        labelLarge: base.textTheme.labelLarge?.copyWith(fontSize: 15),
+      );
   return base.copyWith(
     scaffoldBackgroundColor: AppColors.canvas,
-    textTheme: GoogleFonts.plusJakartaSansTextTheme(base.textTheme).apply(
-      bodyColor: AppColors.ink,
-      displayColor: AppColors.ink,
-    ),
+    textTheme: textTheme,
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.canvas,
       foregroundColor: AppColors.ink,
       elevation: 0,
       centerTitle: false,
+      titleTextStyle: TextStyle(
+        color: AppColors.ink,
+        fontSize: 20,
+        fontWeight: FontWeight.w800,
+        fontFamily: 'sans-serif',
+      ),
     ),
     cardTheme: CardThemeData(
       color: AppColors.surface,
@@ -62,9 +89,14 @@ ThemeData buildAppTheme() {
         side: const BorderSide(color: Color(0x14075A4F)),
       ),
     ),
+    listTileTheme: const ListTileThemeData(
+      minVerticalPadding: 12,
+      iconColor: AppColors.tealDeep,
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide.none,
@@ -76,19 +108,32 @@ ThemeData buildAppTheme() {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(48, 52),
+        minimumSize: const Size(48, 56),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: Colors.white,
       indicatorColor: AppColors.mint,
-      labelTextStyle: WidgetStateProperty.all(
-        const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-      ),
+      height: 72,
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        final selected = states.contains(WidgetState.selected);
+        return IconThemeData(
+          size: selected ? 30 : 28,
+          color: selected ? AppColors.tealDeep : AppColors.inkSoft,
+        );
+      }),
+      labelTextStyle: WidgetStateProperty.resolveWith((states) {
+        final selected = states.contains(WidgetState.selected);
+        return TextStyle(
+          fontSize: 13,
+          fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+          color: selected ? AppColors.tealDeep : AppColors.inkSoft,
+        );
+      }),
     ),
   );
 }

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
+import 'child_avatar.dart';
 import 'children_controller.dart';
 
 class ChildReminder {
@@ -63,26 +66,78 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   String? _childId;
   List<ChildReminder> _items = [];
   bool _loading = false;
+  String? _error;
+  Future<void>? _inFlight;
+  int _loadGen = 0;
+  final Map<String, ChildGender> _genders = {};
+  static const _timeout = Duration(seconds: 20);
 
-  Future<void> _load(String childId) async {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_hydrateGenders);
+  }
+
+  Future<void> _hydrateGenders() async {
+    final children = ref.read(childrenControllerProvider).items;
+    final map = <String, ChildGender>{};
+    for (final c in children) {
+      var g = await ChildGenderStore.instance.get(c.id);
+      if (g == ChildGender.unknown) {
+        g = ChildGenderStore.guessFromName(c.name);
+      }
+      map[c.id] = g;
+    }
+    if (!mounted) return;
+    setState(() {
+      _genders
+        ..clear()
+        ..addAll(map);
+    });
+  }
+
+  Future<void> _load(String childId, {bool force = false}) {
+    if (!force && _inFlight != null && _childId == childId) {
+      return _inFlight!;
+    }
+    final run = _loadBody(childId);
+    _inFlight = run.whenComplete(() {
+      if (identical(_inFlight, run)) _inFlight = null;
+    });
+    return _inFlight!;
+  }
+
+  Future<void> _loadBody(String childId) async {
+    final gen = ++_loadGen;
+    final showSpinner = _childId != childId || _items.isEmpty;
     setState(() {
       _childId = childId;
-      _loading = true;
+      _loading = showSpinner;
+      _error = null;
     });
     try {
-      final data =
-          await ref.read(apiClientProvider).get('/api/v1/reminders/$childId');
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/reminders/$childId')
+          .timeout(_timeout);
+      if (!mounted || gen != _loadGen) return;
       final list = (data['reminders'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(ChildReminder.fromJson)
           .toList();
-      if (!mounted) return;
-      setState(() => _items = list);
+      setState(() {
+        _items = list;
+        _loading = false;
+        _error = null;
+      });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _items = []);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (!mounted || gen != _loadGen) return;
+      setState(() {
+        _loading = false;
+        if (_items.isEmpty) {
+          _error = 'Gagal memuat jadwal. Periksa koneksi, lalu coba lagi.';
+        }
+      });
     }
   }
 
@@ -118,7 +173,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
           duration: const Duration(seconds: 5),
         ),
       );
-      await _load(childId);
+      await _load(childId, force: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -159,40 +214,114 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                       maxLines: 2,
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            initialValue: hour,
-                            decoration: const InputDecoration(labelText: 'Jam'),
-                            items: List.generate(
-                              24,
-                              (i) => DropdownMenuItem(
-                                value: i,
-                                child: Text(i.toString().padLeft(2, '0')),
-                              ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Jam berapa?',
+                        style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
                             ),
-                            onChanged: (v) => setLocal(() => hour = v ?? hour),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: DropdownButtonFormField<int>(
-                            initialValue: minute,
-                            decoration: const InputDecoration(labelText: 'Menit'),
-                            items: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
-                                .map(
-                                  (m) => DropdownMenuItem(
-                                    value: m,
-                                    child: Text(m.toString().padLeft(2, '0')),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Material(
+                      color: AppColors.mint.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () async {
+                          final picked = await showTimePicker(
+                            context: ctx,
+                            initialTime: TimeOfDay(hour: hour, minute: minute),
+                            initialEntryMode: TimePickerEntryMode.dial,
+                            helpText: 'Pilih jam pengingat',
+                            cancelText: 'Batal',
+                            confirmText: 'Pakai jam ini',
+                            hourLabelText: 'Jam',
+                            minuteLabelText: 'Menit',
+                            builder: (context, child) {
+                              return MediaQuery(
+                                data: MediaQuery.of(context).copyWith(
+                                  alwaysUse24HourFormat: true,
+                                ),
+                                child: Theme(
+                                  data: Theme.of(context).copyWith(
+                                    timePickerTheme: TimePickerThemeData(
+                                      dialHandColor: AppColors.teal,
+                                      dialBackgroundColor: AppColors.mint
+                                          .withValues(alpha: 0.35),
+                                      hourMinuteColor: AppColors.teal
+                                          .withValues(alpha: 0.12),
+                                      hourMinuteTextColor: AppColors.tealDeep,
+                                      dayPeriodColor: AppColors.mint,
+                                      helpTextStyle: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    colorScheme: Theme.of(context)
+                                        .colorScheme
+                                        .copyWith(primary: AppColors.teal),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (v) =>
-                                setLocal(() => minute = v ?? minute),
+                                  child: child!,
+                                ),
+                              );
+                            },
+                          );
+                          if (picked != null) {
+                            setLocal(() {
+                              hour = picked.hour;
+                              minute = picked.minute;
+                            });
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule_rounded,
+                                color: AppColors.tealDeep,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1,
+                                    color: AppColors.tealDeep,
+                                  ),
+                                ),
+                              ),
+                              const Text(
+                                'Ubah',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.teal,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Ketuk untuk buka jam putar (lebih mudah dari angka).',
+                        style: TextStyle(
+                          color: AppColors.inkSoft,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     SegmentedButton<String>(
@@ -250,6 +379,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
                   child: const Text('Simpan'),
                 ),
               ],
@@ -280,7 +410,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
           'enabled': true,
         },
       );
-      await _load(childId);
+      await _load(childId, force: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -303,7 +433,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
           'enabled': enabled,
         },
       );
-      if (_childId != null) await _load(_childId!);
+      if (_childId != null) await _load(_childId!, force: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -315,7 +445,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   Future<void> _delete(ChildReminder item) async {
     try {
       await ref.read(apiClientProvider).delete('/api/v1/reminders/${item.id}');
-      if (_childId != null) await _load(_childId!);
+      if (_childId != null) await _load(_childId!, force: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -341,7 +471,10 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     final children = ref.watch(childrenControllerProvider);
     if (_childId == null && children.items.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _childId == null) _load(children.items.first.id);
+        if (mounted && _childId == null) {
+          unawaited(_hydrateGenders());
+          unawaited(_load(children.items.first.id));
+        }
       });
     }
 
@@ -356,7 +489,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
               'Buat pengingat supaya HP anak menampilkan pesan besar di jam tertentu '
               '(misalnya belajar jam 7 malam, tidur jam 9 malam). '
               'Anak cukup tekan Mengerti untuk menutup.',
-              style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+              style: TextStyle(color: AppColors.inkSoft, height: 1.35, fontSize: 15),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
@@ -367,17 +500,70 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
               message: 'Hubungkan anak dulu sebelum membuat pengingat.',
             )
           else ...[
-            DropdownButtonFormField<String>(
-              initialValue: _childId ?? children.items.first.id,
-              decoration: const InputDecoration(labelText: 'Pilih anak'),
-              items: children.items
-                  .map(
-                    (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) _load(v);
-              },
+            Text(
+              'Untuk anak',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: children.items.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final child = children.items[index];
+                  final selected = child.id == (_childId ?? children.items.first.id);
+                  final gender = _genders[child.id] ??
+                      ChildGenderStore.guessFromName(child.name);
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      if (child.id == _childId) return;
+                      unawaited(_load(child.id));
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 88,
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? AppColors.mint.withValues(alpha: 0.45)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: selected ? AppColors.teal : const Color(0x22075A4F),
+                          width: selected ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ChildAvatar(
+                            name: child.name,
+                            gender: gender,
+                            size: 48,
+                            selected: selected,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            child.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: selected ? AppColors.tealDeep : AppColors.ink,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -432,7 +618,29 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
             ),
             const SizedBox(height: 8),
             if (_loading)
-              const Center(child: CircularProgressIndicator())
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_error != null && _items.isEmpty)
+              PaSectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.inkSoft, height: 1.35),
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: _childId == null
+                          ? null
+                          : () => _load(_childId!, force: true),
+                      child: const Text('Coba lagi'),
+                    ),
+                  ],
+                ),
+              )
             else if (_items.isEmpty)
               const PaSectionCard(
                 child: Text(

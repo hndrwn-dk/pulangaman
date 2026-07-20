@@ -18,6 +18,8 @@ const locationSchema = z.object({
   accuracyM: z.number().positive().optional(),
   recordedAt: z.string().datetime().optional(),
   source: z.string().max(40).default('device'),
+  batteryLevel: z.number().min(0).max(100).optional(),
+  batteryCharging: z.boolean().optional(),
 });
 
 locationRouter.post('/', async (req: AuthedRequest, res, next) => {
@@ -67,6 +69,8 @@ locationRouter.post('/', async (req: AuthedRequest, res, next) => {
       recordedAt,
       timestamp: recordedAt,
       accuracy: body.accuracyM ?? null,
+      batteryLevel: body.batteryLevel ?? null,
+      batteryCharging: body.batteryCharging ?? null,
     };
 
     const redis = getRedis();

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import '../attendance/attendance_screen.dart';
 import '../community/reports_screen.dart';
+import '../rewards/rewards_screen.dart';
 import 'guardians_screen.dart';
 import 'reminders_screen.dart';
-import 'zones_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -17,10 +18,16 @@ class MoreScreen extends StatelessWidget {
         page: const RemindersScreen(),
       ),
       (
-        icon: Icons.home_work_outlined,
-        title: 'Lokasi penting',
-        subtitle: 'Rumah, sekolah, dan rute aman (cari nama tempat)',
-        page: const PlacesEntryScreen(),
+        icon: Icons.place_outlined,
+        title: 'Di mana anak',
+        subtitle: 'Ringkasan rumah / sekolah / perjalanan',
+        page: const AttendanceScreen(),
+      ),
+      (
+        icon: Icons.star_outline,
+        title: 'Hadiah & poin',
+        subtitle: 'Poin anak karena tiba tepat waktu',
+        page: const RewardsScreen(),
       ),
       (
         icon: Icons.shield_outlined,
@@ -40,18 +47,31 @@ class MoreScreen extends StatelessWidget {
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final item = items[index];
           return Card(
             child: ListTile(
-              leading: CircleAvatar(child: Icon(item.icon)),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              leading: CircleAvatar(
+                radius: 26,
+                child: Icon(item.icon, size: 26),
+              ),
               title: Text(
                 item.title,
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 17,
+                ),
               ),
-              subtitle: Text(item.subtitle),
-              trailing: const Icon(Icons.chevron_right),
+              subtitle: Text(
+                item.subtitle,
+                style: const TextStyle(fontSize: 14, height: 1.35),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 28),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => item.page),
               ),
