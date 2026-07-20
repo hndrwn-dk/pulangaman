@@ -198,11 +198,16 @@ class ChildrenController extends StateNotifier<ChildrenState> {
     }
   }
 
-  Future<ChildInvite> createInvite({String? childDisplayName}) async {
+  Future<ChildInvite> createInvite({
+    String? childDisplayName,
+    String? relinkChildId,
+  }) async {
     final api = _ref.read(apiClientProvider);
     final data = await api.post('/api/v1/child-invites', body: {
       if (childDisplayName != null && childDisplayName.trim().isNotEmpty)
         'childDisplayName': childDisplayName.trim(),
+      if (relinkChildId != null && relinkChildId.isNotEmpty)
+        'relinkChildId': relinkChildId,
     });
     final invite = ChildInvite(
       id: data['id'] as String,
@@ -218,6 +223,17 @@ class ChildrenController extends StateNotifier<ChildrenState> {
     );
     unawaited(refresh(force: true));
     return invite;
+  }
+
+  Future<void> unlinkChild(String childId) async {
+    final api = _ref.read(apiClientProvider);
+    await api.delete('/api/v1/children/$childId');
+    state = ChildrenState(
+      items: state.items.where((c) => c.id != childId).toList(),
+      invites: state.invites,
+      fromCache: false,
+    );
+    unawaited(refresh(force: true));
   }
 
   Future<void> clearCache() async {

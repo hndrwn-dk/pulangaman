@@ -17,6 +17,8 @@ class ChildHomeMapCard extends StatelessWidget {
     required this.onOpenMap,
     this.kabar,
     this.onOpenKabar,
+    this.onRelinkCode,
+    this.onRemove,
   });
 
   final ChildSummary child;
@@ -25,6 +27,8 @@ class ChildHomeMapCard extends StatelessWidget {
   final VoidCallback onOpenMap;
   final ChildKabarMessage? kabar;
   final VoidCallback? onOpenKabar;
+  final VoidCallback? onRelinkCode;
+  final VoidCallback? onRemove;
 
   String get _where {
     final label = commuteStatusLabel(child.commuteStatus);
@@ -172,12 +176,38 @@ class ChildHomeMapCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            child.name,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  child.name,
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              if (onRelinkCode != null || onRemove != null)
+                                PopupMenuButton<String>(
+                                  tooltip: 'Opsi',
+                                  onSelected: (value) {
+                                    if (value == 'relink') onRelinkCode?.call();
+                                    if (value == 'remove') onRemove?.call();
+                                  },
+                                  itemBuilder: (context) => [
+                                    if (onRelinkCode != null)
+                                      const PopupMenuItem(
+                                        value: 'relink',
+                                        child: Text('Kode masuk ulang (HP anak)'),
+                                      ),
+                                    if (onRemove != null)
+                                      const PopupMenuItem(
+                                        value: 'remove',
+                                        child: Text('Hapus dari daftar'),
+                                      ),
+                                  ],
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 2),
                           Text(

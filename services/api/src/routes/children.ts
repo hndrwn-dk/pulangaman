@@ -377,6 +377,35 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
   }
 });
 
+childrenRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const childId = String(req.params.id);
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+    if (!(await assertParentOfChild(parentId, childId))) {
+      res.status(404).json({ error: 'child_not_found' });
+      return;
+    }
+
+    await pool.query(
+      `DELETE FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
+      [parentId, childId],
+    );
+    await pool.query(
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, 'child.unlinked', '{}'::jsonb)`,
+      [parentId, childId],
+    );
+
+    res.json({ ok: true, childId });
+  } catch (error) {
+    next(error);
+  }
+});
+
 childrenRouter.post('/:id/emergency-contacts', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;

@@ -309,6 +309,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     onOpenKabar: kabar == null
                         ? null
                         : () => _openInbox(childId: child.id),
+                    onRelinkCode: () => _showRelinkInvite(context, child),
+                    onRemove: () => _confirmRemoveChild(context, child),
                     onOpenMap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
@@ -425,6 +427,122 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     );
   }
 
+  Future<void> _showRelinkInvite(BuildContext context, ChildSummary child) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Kode masuk ulang · ${child.name}'),
+        content: const Text(
+          'Pakai ini kalau HP anak logout. '
+          'Kode menempel ke anak yang sama — tidak membuat Andi baru.',
+          style: TextStyle(color: AppColors.inkSoft, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+            child: const Text('Buat kode'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      final invite = await ref.read(childrenControllerProvider.notifier).createInvite(
+            childDisplayName: child.name,
+            relinkChildId: child.id,
+          );
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Kode masuk ulang siap'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                invite.code,
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                  color: AppColors.tealDeep,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Di HP anak: Masuk → nama ${child.name} → kode ini → peran Anak.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.inkSoft,
+                  height: 1.4,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+              child: const Text('Mengerti'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal buat kode: $e')),
+      );
+    }
+  }
+
+  Future<void> _confirmRemoveChild(
+    BuildContext context,
+    ChildSummary child,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus ${child.name} dari daftar?'),
+        content: const Text(
+          'Anak ini hilang dari layar ortu. '
+          'Kalau salah hapus, bisa tambah lagi dengan kode baru.',
+          style: TextStyle(color: AppColors.inkSoft, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await ref.read(childrenControllerProvider.notifier).unlinkChild(child.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${child.name} dihapus dari daftar')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal hapus: $e')),
+      );
+    }
+  }
+
   Future<void> _showCreateInvite(BuildContext context) async {
     final nameCtrl = TextEditingController();
     final ok = await showDialog<bool>(
@@ -436,7 +554,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Isi nama panggilan supaya mudah diingat (boleh dikosongkan).',
+              'Isi nama panggilan supaya mudah diingat (boleh dikosongkan).\n\n'
+              'Ini untuk anak BARU. Kalau HP anak hanya logout, '
+              'jangan pakai ini — buka menu ⋮ di kartu anak → '
+              '“Kode masuk ulang”.',
               style: TextStyle(color: AppColors.inkSoft, height: 1.35),
             ),
             const SizedBox(height: 12),

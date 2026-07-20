@@ -594,8 +594,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 builder: (ctx) => AlertDialog(
                   title: const Text('Keluar dari akun anak?'),
                   content: const Text(
-                    'Nanti untuk masuk lagi, minta kode undangan baru '
-                    'dari HP orang tua, lalu pilih peran Anak.',
+                    'Nanti untuk masuk lagi, di HP ortu buka menu ⋮ di kartu anak '
+                    '→ “Kode masuk ulang”, lalu masukkan kode itu di sini. '
+                    'Jangan buat “Tambah anak” baru (itu membuat profil dobel).',
                   ),
                   actions: [
                     TextButton(

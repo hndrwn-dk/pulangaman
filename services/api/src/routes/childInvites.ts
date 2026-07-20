@@ -35,6 +35,8 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
     const body = z
       .object({
         childDisplayName: z.string().min(1).max(120).optional(),
+        /** If set, redeeming reuses this child account instead of creating a new one. */
+        relinkChildId: z.string().uuid().optional(),
       })
       .parse(req.body ?? {});
 
@@ -47,6 +49,22 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
       return;
     }
 
+    let relinkName: string | null = body.childDisplayName ?? null;
+    if (body.relinkChildId) {
+      const link = await pool.query<{ name: string }>(
+        `SELECT u.name
+         FROM parent_children pc
+         JOIN users u ON u.id = pc.child_id
+         WHERE pc.parent_id = $1 AND pc.child_id = $2`,
+        [parentId, body.relinkChildId],
+      );
+      if (link.rowCount === 0) {
+        res.status(404).json({ error: 'child_not_found' });
+        return;
+      }
+      relinkName = relinkName ?? link.rows[0].name;
+    }
+
     let code = generateInviteCode();
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3_600_000);
@@ -56,21 +74,36 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
           code: string;
           expires_at: Date;
         }>(
-          `INSERT INTO child_invites (parent_id, code, child_display_name, expires_at)
-           VALUES ($1, $2, $3, $4)
+          `INSERT INTO child_invites
+             (parent_id, code, child_display_name, expires_at, relink_child_id)
+           VALUES ($1, $2, $3, $4, $5)
            RETURNING id, code, expires_at`,
-          [parentId, code, body.childDisplayName ?? null, expiresAt.toISOString()],
+          [
+            parentId,
+            code,
+            relinkName,
+            expiresAt.toISOString(),
+            body.relinkChildId ?? null,
+          ],
         );
         await pool.query(
           `INSERT INTO audit_events (actor_id, action, payload)
            VALUES ($1, 'child_invite.created', $2::jsonb)`,
-          [parentId, JSON.stringify({ inviteId: result.rows[0].id, code })],
+          [
+            parentId,
+            JSON.stringify({
+              inviteId: result.rows[0].id,
+              code,
+              relinkChildId: body.relinkChildId ?? null,
+            }),
+          ],
         );
         res.status(201).json({
           id: result.rows[0].id,
           code: result.rows[0].code,
           expiresAt: result.rows[0].expires_at,
-          childDisplayName: body.childDisplayName ?? null,
+          childDisplayName: relinkName,
+          relinkChildId: body.relinkChildId ?? null,
         });
         return;
       } catch (error) {
@@ -120,8 +153,7 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
 
 /**
  * Child joins via invite code (no prior auth).
- * Creates child user + parent_children link and returns session fields for the app.
- * Registered before /:id routes for clarity.
+ * Creates child user + parent_children link, OR reuses existing child when invite has relink_child_id.
  */
 childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
   try {
@@ -153,8 +185,9 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         id: string;
         parent_id: string;
         child_display_name: string | null;
+        relink_child_id: string | null;
       }>(
-        `SELECT id, parent_id, child_display_name
+        `SELECT id, parent_id, child_display_name, relink_child_id
          FROM child_invites
          WHERE code = $1 AND status = 'pending'
          FOR UPDATE`,
@@ -168,29 +201,59 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
 
       const inviteRow = invite.rows[0];
       const displayName = body.name.trim() || inviteRow.child_display_name || 'Anak';
-      const firebaseUid = `child_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
-      const phone = `invite:${code.toLowerCase()}`;
 
-      const child = await client.query<{ id: string }>(
-        `INSERT INTO users (firebase_uid, phone, name)
-         VALUES ($1, $2, $3)
-         RETURNING id`,
-        [firebaseUid, phone, displayName],
-      );
-      const childId = child.rows[0].id;
+      let childId: string;
+      let firebaseUid: string;
 
-      await client.query(
-        `INSERT INTO user_roles (user_id, role) VALUES ($1, 'child')`,
-        [childId],
-      );
-      await client.query(
-        `INSERT INTO child_profiles (user_id) VALUES ($1)`,
-        [childId],
-      );
-      await client.query(
-        `INSERT INTO parent_children (parent_id, child_id) VALUES ($1, $2)`,
-        [inviteRow.parent_id, childId],
-      );
+      if (inviteRow.relink_child_id) {
+        const existing = await client.query<{ id: string; name: string }>(
+          `SELECT u.id, u.name
+           FROM users u
+           JOIN parent_children pc ON pc.child_id = u.id
+           WHERE u.id = $1 AND pc.parent_id = $2
+           FOR UPDATE`,
+          [inviteRow.relink_child_id, inviteRow.parent_id],
+        );
+        if (existing.rowCount === 0) {
+          await client.query('ROLLBACK');
+          res.status(404).json({ error: 'relink_child_not_found' });
+          return;
+        }
+        childId = existing.rows[0].id;
+        firebaseUid = `child_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+        await client.query(
+          `UPDATE users
+           SET firebase_uid = $2,
+               name = COALESCE(NULLIF($3, ''), name),
+               updated_at = now()
+           WHERE id = $1`,
+          [childId, firebaseUid, displayName],
+        );
+      } else {
+        firebaseUid = `child_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+        const phone = `invite:${code.toLowerCase()}`;
+        const child = await client.query<{ id: string }>(
+          `INSERT INTO users (firebase_uid, phone, name)
+           VALUES ($1, $2, $3)
+           RETURNING id`,
+          [firebaseUid, phone, displayName],
+        );
+        childId = child.rows[0].id;
+
+        await client.query(
+          `INSERT INTO user_roles (user_id, role) VALUES ($1, 'child')`,
+          [childId],
+        );
+        await client.query(
+          `INSERT INTO child_profiles (user_id) VALUES ($1)`,
+          [childId],
+        );
+        await client.query(
+          `INSERT INTO parent_children (parent_id, child_id) VALUES ($1, $2)`,
+          [inviteRow.parent_id, childId],
+        );
+      }
+
       await client.query(
         `UPDATE child_invites
          SET status = 'redeemed',
@@ -205,7 +268,12 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         [
           childId,
           childId,
-          JSON.stringify({ inviteId: inviteRow.id, parentId: inviteRow.parent_id, code }),
+          JSON.stringify({
+            inviteId: inviteRow.id,
+            parentId: inviteRow.parent_id,
+            code,
+            relinked: Boolean(inviteRow.relink_child_id),
+          }),
         ],
       );
 
@@ -216,6 +284,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         role: 'child',
         name: displayName,
         parentId: inviteRow.parent_id,
+        relinked: Boolean(inviteRow.relink_child_id),
         /** Dev-auth token: Bearer dev:<firebaseUid> */
         tokenHint: `dev:${firebaseUid}`,
       });
