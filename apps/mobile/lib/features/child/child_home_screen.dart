@@ -22,7 +22,8 @@ class ChildHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<ChildHomeScreen> createState() => _ChildHomeScreenState();
 }
 
-class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
+class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
+    with WidgetsBindingObserver {
   Timer? _timer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _tracking = false;
@@ -34,28 +35,46 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
   int _streak = 0;
   bool _usageAccess = false;
   bool _accessibility = false;
+  final ScreenTimeChannel _screenTimeChannel = ScreenTimeChannel();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(_startTracking);
     Future.microtask(_setupScreenTimeAndRewards);
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
   }
 
-  Future<void> _setupScreenTimeAndRewards() async {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshScreenTimeAndRewards());
+    }
+  }
+
+  Future<void> _setupScreenTimeAndRewards() => _refreshScreenTimeAndRewards();
+
+  Future<void> _refreshScreenTimeAndRewards() async {
+    await _syncScreenTimePermissions();
+    await _loadRewards();
+  }
+
+  Future<void> _syncScreenTimePermissions() async {
     final auth = ref.read(authControllerProvider);
     final userId = auth.userId;
     if (userId == null) return;
-    final channel = ScreenTimeChannel();
+
     try {
-      final usage = await channel.hasUsageAccess();
-      final accessibility = await channel.isAccessibilityEnabled();
+      final usage = await _screenTimeChannel.hasUsageAccess();
+      final accessibility = await _screenTimeChannel.isAccessibilityEnabled();
+      if (!mounted) return;
       setState(() {
         _usageAccess = usage;
         _accessibility = accessibility;
       });
+
       final installationId = 'android-$userId';
       await ref.read(apiClientProvider).post('/api/v1/policies/device', body: {
         'installationId': installationId,
@@ -64,23 +83,33 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
         'usageAccessGranted': usage,
         'accessibilityEnabled': accessibility,
       });
-      final policyData = await ref.read(apiClientProvider).get('/api/v1/policies/current/me');
+
+      if (!usage || !accessibility) return;
+
+      final policyData =
+          await ref.read(apiClientProvider).get('/api/v1/policies/current/me');
       final policy = policyData['policy'] as Map<String, dynamic>?;
-      if (policy != null) {
-        await channel.applyPolicy(policy);
-        await channel.startEnforcement();
-        await ref.read(apiClientProvider).post('/api/v1/policies/ack', body: {
-          'installationId': installationId,
-          'policyId': policy['id'],
-          'version': policy['version'],
-        });
-      }
+      if (policy == null) return;
+
+      await _screenTimeChannel.applyPolicy(policy);
+      await _screenTimeChannel.startEnforcement();
+      await ref.read(apiClientProvider).post('/api/v1/policies/ack', body: {
+        'installationId': installationId,
+        'policyId': policy['id'],
+        'version': policy['version'],
+      });
     } catch (_) {
       // Native screen-time APIs are Android-only.
     }
+  }
+
+  Future<void> _loadRewards() async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null) return;
     try {
       final data = await ref.read(apiClientProvider).get('/api/v1/rewards/$userId');
       final balance = data['balance'] as Map<String, dynamic>? ?? {};
+      if (!mounted) return;
       setState(() {
         _points = (balance['points'] as num?)?.toInt() ?? 0;
         _streak = (balance['current_streak'] as num?)?.toInt() ?? 0;
@@ -232,6 +261,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _connectivitySub?.cancel();
     super.dispose();
@@ -326,12 +356,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen> {
                   const SizedBox(height: 10),
                   if (!_usageAccess)
                     OutlinedButton(
-                      onPressed: () => ScreenTimeChannel().openUsageAccessSettings(),
+                      onPressed: () =>
+                          _screenTimeChannel.openUsageAccessSettings(),
                       child: const Text('Izinkan akses pemakaian'),
                     ),
                   if (!_accessibility)
                     OutlinedButton(
-                      onPressed: () => ScreenTimeChannel().openAccessibilitySettings(),
+                      onPressed: () =>
+                          _screenTimeChannel.openAccessibilitySettings(),
                       child: const Text('Aktifkan pemblokiran aplikasi'),
                     ),
                 ],
