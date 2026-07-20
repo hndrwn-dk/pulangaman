@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../community/reports_screen.dart';
 import '../community/safe_route_screen.dart';
 import 'guardians_screen.dart';
+import 'reminders_screen.dart';
 import 'zones_screen.dart';
 
 class MoreScreen extends StatelessWidget {
@@ -10,9 +11,22 @@ class MoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({IconData icon, String title, Widget page})>[
+      (
+        icon: Icons.alarm_rounded,
+        title: 'Pengingat jadwal',
+        page: const RemindersScreen(),
+      ),
       (icon: Icons.fence, title: 'Zona aman', page: const ZonesEntryScreen()),
-      (icon: Icons.shield_outlined, title: 'Wali terpercaya', page: const GuardiansEntryScreen()),
-      (icon: Icons.report_outlined, title: 'Laporan komunitas', page: const ReportsScreen()),
+      (
+        icon: Icons.shield_outlined,
+        title: 'Wali terpercaya',
+        page: const GuardiansEntryScreen(),
+      ),
+      (
+        icon: Icons.report_outlined,
+        title: 'Laporan komunitas',
+        page: const ReportsScreen(),
+      ),
       (icon: Icons.route, title: 'Rute aman', page: const SafeRouteScreen()),
     ];
     return Scaffold(
@@ -26,7 +40,10 @@ class MoreScreen extends StatelessWidget {
           return Card(
             child: ListTile(
               leading: CircleAvatar(child: Icon(item.icon)),
-              title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              title: Text(
+                item.title,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => item.page),

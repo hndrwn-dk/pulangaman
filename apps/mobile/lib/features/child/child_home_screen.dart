@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
+import '../../core/network/ws_client.dart';
 import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
 import '../auth/auth_controller.dart';
@@ -18,6 +19,7 @@ import 'child_layar_tab.dart';
 import 'child_usage_utils.dart';
 import 'location_tracking_channel.dart';
 import 'panic_tap_counter.dart';
+import 'reminder_channel.dart';
 
 final offlineQueueProvider = Provider<OfflineQueue>((ref) => OfflineQueue());
 
@@ -31,6 +33,7 @@ class ChildHomeScreen extends ConsumerStatefulWidget {
 class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     with WidgetsBindingObserver {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  final _ws = WsClient();
   bool _tracking = false;
   bool _panicMode = false;
   bool _panicInFlight = false;
@@ -46,8 +49,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   List<UsageAppEntry> _usageApps = [];
   bool _usageLoading = false;
   String? _sendingPresetId;
+  int _reminderCount = 0;
+  bool _exactAlarmOk = true;
   final ScreenTimeChannel _screenTimeChannel = ScreenTimeChannel();
   final LocationTrackingChannel _locationChannel = LocationTrackingChannel();
+  final ReminderChannel _reminderChannel = ReminderChannel();
 
   @override
   void initState() {
@@ -55,6 +61,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(_startTracking);
     Future.microtask(_setupScreenTimeAndRewards);
+    Future.microtask(_syncReminders);
+    Future.microtask(_connectReminderWs);
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
   }
@@ -64,6 +72,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshScreenTimeAndRewards());
       unawaited(_ensureNativeTracking());
+      unawaited(_syncReminders());
     }
   }
 
@@ -107,6 +116,70 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } finally {
       if (mounted) setState(() => _usageLoading = false);
     }
+  }
+
+  Future<void> _connectReminderWs() async {
+    final auth = ref.read(authControllerProvider);
+    final token = auth.token;
+    final userId = auth.userId;
+    if (token == null || userId == null) return;
+    try {
+      if (!_ws.isConnected) {
+        await _ws.connect(token);
+        _ws.addHandler(_onReminderWs);
+      }
+      _ws.subscribe('child:$userId');
+    } catch (_) {}
+  }
+
+  void _onReminderWs(String event, Map<String, dynamic> payload) {
+    if (event == 'child:reminders_updated') {
+      unawaited(_syncReminders());
+    }
+  }
+
+  Future<void> _syncReminders() async {
+    await Permission.notification.request();
+    try {
+      final canExact = await _reminderChannel.canScheduleExactAlarms();
+      if (!mounted) return;
+      setState(() => _exactAlarmOk = canExact);
+      if (!canExact) {
+        // Soft prompt once via status chip; user can tap later.
+      }
+
+      final data = await ref.read(apiClientProvider).get('/api/v1/reminders/me');
+      final list = (data['reminders'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (r) => {
+              'id': r['id'],
+              'title': r['title'],
+              'body': r['body'],
+              'hour': r['hour'],
+              'minute': r['minute'],
+              'daysOfWeek': r['daysOfWeek'] ?? [1, 2, 3, 4, 5, 6, 7],
+              'style': r['style'] ?? 'fullscreen',
+              'enabled': r['enabled'] != false,
+            },
+          )
+          .toList();
+      await _reminderChannel.syncReminders(list);
+      if (!mounted) return;
+      setState(() => _reminderCount = list.length);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _reminderCount = 0);
+    }
+  }
+
+  Future<void> _openReminderPermissions() async {
+    final canExact = await _reminderChannel.canScheduleExactAlarms();
+    if (!canExact) {
+      await _reminderChannel.openExactAlarmSettings();
+      return;
+    }
+    await _reminderChannel.openFullScreenIntentSettings();
   }
 
   Future<void> _uploadUsageTelemetry(List<UsageAppEntry> apps) async {
@@ -444,6 +517,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySub?.cancel();
+    _ws.removeHandler(_onReminderWs);
+    unawaited(_ws.disconnect());
     // Keep native FGS running after Flutter dispose so background tracking continues.
     super.dispose();
   }
@@ -482,10 +557,13 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             status: _status,
             panicInFlight: _panicInFlight,
             panicOnCooldown: _panicTapCounter.isOnCooldown,
+            reminderCount: _reminderCount,
+            exactAlarmOk: _exactAlarmOk,
             onPanicTap: _onPanicTap,
             onOpenUsageSettings: _screenTimeChannel.openUsageAccessSettings,
             onOpenAccessibilitySettings:
                 _screenTimeChannel.openAccessibilitySettings,
+            onOpenReminderPermissions: _openReminderPermissions,
           ),
           ChildLayarTab(
             usageAccess: _usageAccess,

@@ -18,9 +18,12 @@ class ChildBerandaTab extends StatelessWidget {
     required this.status,
     required this.panicInFlight,
     required this.panicOnCooldown,
+    required this.reminderCount,
+    required this.exactAlarmOk,
     required this.onPanicTap,
     required this.onOpenUsageSettings,
     required this.onOpenAccessibilitySettings,
+    required this.onOpenReminderPermissions,
   });
 
   final String childName;
@@ -33,9 +36,12 @@ class ChildBerandaTab extends StatelessWidget {
   final String? status;
   final bool panicInFlight;
   final bool panicOnCooldown;
+  final int reminderCount;
+  final bool exactAlarmOk;
   final VoidCallback onPanicTap;
   final VoidCallback onOpenUsageSettings;
   final VoidCallback onOpenAccessibilitySettings;
+  final VoidCallback onOpenReminderPermissions;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +76,18 @@ class ChildBerandaTab extends StatelessWidget {
                   : 'Izin layar belum lengkap',
               icon: Icons.hourglass_bottom,
               color: AppColors.lavender,
+            ),
+            GestureDetector(
+              onTap: exactAlarmOk ? null : onOpenReminderPermissions,
+              child: PaStatusPill(
+                label: !exactAlarmOk
+                    ? 'Izin alarm belum lengkap'
+                    : reminderCount > 0
+                        ? 'Pengingat aktif ($reminderCount)'
+                        : 'Belum ada pengingat',
+                icon: Icons.alarm_rounded,
+                color: exactAlarmOk ? AppColors.sky : AppColors.amber,
+              ),
             ),
           ],
         ),

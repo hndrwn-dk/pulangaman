@@ -1,9 +1,12 @@
 package com.tursinalabs.pulangaman
 
+import android.app.AlarmManager
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
+import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import android.text.TextUtils
@@ -13,10 +16,12 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : FlutterActivity() {
     private val screenTimeChannel = "com.tursinalabs.pulangaman/screen_time"
     private val locationChannel = "com.tursinalabs.pulangaman/location_tracking"
+    private val remindersChannel = "com.tursinalabs.pulangaman/reminders"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -109,6 +114,88 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, remindersChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "syncReminders" -> {
+                        val list = call.arguments as? List<*> ?: emptyList<Any>()
+                        val json = JSONArray()
+                        for (item in list) {
+                            val map = item as? Map<*, *> ?: continue
+                            val obj = JSONObject()
+                            obj.put("id", map["id"]?.toString() ?: "")
+                            obj.put("title", map["title"]?.toString() ?: "")
+                            obj.put("body", map["body"]?.toString() ?: "")
+                            obj.put("hour", (map["hour"] as? Number)?.toInt() ?: 0)
+                            obj.put("minute", (map["minute"] as? Number)?.toInt() ?: 0)
+                            obj.put("style", map["style"]?.toString() ?: "fullscreen")
+                            obj.put("enabled", map["enabled"] != false)
+                            val days = JSONArray()
+                            val dayList = map["daysOfWeek"] as? List<*> ?: emptyList<Any>()
+                            for (d in dayList) {
+                                days.put((d as? Number)?.toInt() ?: continue)
+                            }
+                            if (days.length() == 0) {
+                                for (d in 1..7) days.put(d)
+                            }
+                            obj.put("daysOfWeek", days)
+                            json.put(obj)
+                        }
+                        ReminderScheduler.saveAndSchedule(this, json.toString())
+                        result.success(true)
+                    }
+                    "canScheduleExactAlarms" -> result.success(canScheduleExactAlarms())
+                    "openExactAlarmSettings" -> {
+                        openExactAlarmSettings()
+                        result.success(null)
+                    }
+                    "openFullScreenIntentSettings" -> {
+                        openFullScreenIntentSettings()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun canScheduleExactAlarms(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+        return alarmManager.canScheduleExactAlarms()
+    }
+
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                        data = Uri.parse("package:$packageName")
+                    },
+                )
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:$packageName")
+                })
+            }
+        }
+    }
+
+    private fun openFullScreenIntentSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                        data = Uri.parse("package:$packageName")
+                    },
+                )
+                return
+            } catch (_: Exception) {
+            }
+        }
+        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:$packageName")
+        })
     }
 
     private fun isServiceRunning(serviceClass: Class<*>): Boolean {

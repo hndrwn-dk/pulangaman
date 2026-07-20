@@ -59,17 +59,29 @@ class ApiClient {
     String path, {
     Map<String, String>? query,
   }) async {
-    final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
+    final uri = query == null
+        ? Uri.parse('$baseUrl$path')
+        : Uri.parse('$baseUrl$path').replace(queryParameters: query);
     final response = await _client.get(uri, headers: _headers);
     return _decode(response);
   }
 
+  Future<Map<String, dynamic>> delete(String path) async {
+    final response = await _client.delete(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers,
+    );
+    return _decode(response);
+  }
+
   Map<String, dynamic> _decode(http.Response response) {
-    final raw = response.body.isEmpty ? '{}' : response.body;
-    final decoded = jsonDecode(raw);
     if (response.statusCode >= 400) {
-      throw ApiException(response.statusCode, raw);
+      throw ApiException(response.statusCode, response.body);
     }
+    if (response.body.isEmpty) {
+      return {'ok': true};
+    }
+    final decoded = jsonDecode(response.body);
     if (decoded is Map<String, dynamic>) {
       return decoded;
     }
