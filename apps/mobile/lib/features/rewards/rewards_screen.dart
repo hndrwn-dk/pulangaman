@@ -66,22 +66,28 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
     final points = _balance['points'] ?? 0;
     final streak = _balance['current_streak'] ?? 0;
     return Scaffold(
-      appBar: AppBar(title: const Text('Hadiah keluarga')),
+      appBar: AppBar(title: const Text('Hadiah')),
       floatingActionButton: _childId == null
           ? null
           : FloatingActionButton.extended(
               onPressed: _bonus,
               backgroundColor: AppColors.coral,
-              icon: const Icon(Icons.add_reaction),
-              label: const Text('Bonus'),
+              icon: const Icon(Icons.favorite),
+              label: const Text('Kasih pujian (+5)'),
             ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
+          const Text(
+            'Poin dikumpulkan saat anak tiba di sekolah tepat waktu. '
+            'Bisa juga ditambah manual sebagai pujian.',
+            style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+          ),
+          const SizedBox(height: AppSpacing.md),
           if (children.items.isNotEmpty)
             DropdownButtonFormField<String>(
               initialValue: _childId ?? children.items.first.id,
-              decoration: const InputDecoration(labelText: 'Pilih anak'),
+              decoration: const InputDecoration(labelText: 'Lihat anak'),
               items: children.items
                   .map((child) => DropdownMenuItem(value: child.id, child: Text(child.name)))
                   .toList(),
@@ -114,13 +120,19 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Poin Aman', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-                      Text('$streak hari berturut-turut'),
+                      const Text(
+                        'Total poin anak',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        streak == 0
+                            ? 'Belum ada streak harian'
+                            : 'Rajin $streak hari berturut-turut',
+                      ),
                       const SizedBox(height: 8),
-                      const PaStatusPill(
-                        label: 'Tiba sekolah +10',
-                        icon: Icons.school,
-                        color: AppColors.coral,
+                      const Text(
+                        'Contoh: tiba di sekolah +10 poin',
+                        style: TextStyle(color: AppColors.inkSoft, fontSize: 12),
                       ),
                     ],
                   ),
@@ -129,21 +141,39 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Text('Aktivitas terbaru', style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-              )),
+          Text(
+            'Riwayat poin',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
           const SizedBox(height: 12),
           if (_ledger.isEmpty)
-            const Text('Belum ada poin. Check-in sekolah pertama akan memulai streak.')
+            const Text(
+              'Belum ada poin. Setelah anak check-in sekolah, poin muncul di sini.',
+              style: TextStyle(color: AppColors.inkSoft),
+            )
           else
-            ..._ledger.map((item) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.mint,
-                    child: Text('${item['delta']}'),
+            ..._ledger.map((item) {
+              final raw = item['created_at']?.toString();
+              final at = raw == null ? null : DateTime.tryParse(raw);
+              final when = at == null
+                  ? (raw ?? '')
+                  : '${at.toLocal().day}/${at.toLocal().month} '
+                      '${at.toLocal().hour.toString().padLeft(2, '0')}:'
+                      '${at.toLocal().minute.toString().padLeft(2, '0')}';
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.mint,
+                  child: Text(
+                    '+${item['delta']}',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
                   ),
-                  title: Text('${item['reason']}'),
-                  subtitle: Text('${item['created_at']}'),
-                )),
+                ),
+                title: Text('${item['reason']}'),
+                subtitle: Text(when),
+              );
+            }),
         ],
       ),
     );

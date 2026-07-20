@@ -8,9 +8,29 @@ import { recordSchoolAttendance } from './attendance.js';
 type ZoneRow = {
   id: string;
   type: string;
+  name: string | null;
   radius_m: number;
   distance_m: number;
 };
+
+function zoneLabel(type: string, name: string | null): string {
+  const trimmed = name?.trim();
+  if (trimmed) return trimmed;
+  if (type === 'home') return 'Rumah';
+  if (type === 'school') return 'Sekolah';
+  return 'Zona aman';
+}
+
+function zoneMessage(params: {
+  childName: string;
+  label: string;
+  event: 'enter' | 'exit';
+}): string {
+  if (params.event === 'enter') {
+    return `${params.childName} sudah sampai di ${params.label}`;
+  }
+  return `${params.childName} meninggalkan ${params.label}`;
+}
 
 /**
  * Evaluate circular zones for a child location with hysteresis + debounce.
@@ -23,7 +43,7 @@ export async function evaluateGeofences(params: {
   lng: number;
 }): Promise<void> {
   const zones = await pool.query<ZoneRow>(
-    `SELECT id, type, radius_m,
+    `SELECT id, type, name, radius_m,
             ST_Distance(
               center,
               ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
@@ -42,6 +62,12 @@ export async function evaluateGeofences(params: {
     [params.childId],
   );
   const parentId = parent.rows[0]?.parent_id;
+
+  const child = await pool.query<{ name: string }>(
+    `SELECT name FROM users WHERE id = $1`,
+    [params.childId],
+  );
+  const childName = child.rows[0]?.name?.trim() || 'Anak';
 
   for (const zone of zones.rows) {
     const state = await pool.query<{ presence: Presence; last_event_at: Date | null }>(
@@ -67,6 +93,7 @@ export async function evaluateGeofences(params: {
       : 0;
     const sinceLast = Date.now() - lastEventAt;
     const isTransition = previous !== 'unknown' && next !== previous;
+    const firstInside = previous === 'unknown' && next === 'inside';
     const emit = shouldEmitZoneEvent({
       previous,
       next,
@@ -74,7 +101,7 @@ export async function evaluateGeofences(params: {
       debounceMs: config.ZONE_DEBOUNCE_SECONDS * 1000,
     });
 
-    if (isTransition && !emit) {
+    if ((isTransition || firstInside) && !emit) {
       continue;
     }
 
@@ -88,7 +115,7 @@ export async function evaluateGeofences(params: {
                ELSE zone_states.last_event_at
              END,
              updated_at = now()`,
-      [params.childId, zone.id, next, isTransition && emit],
+      [params.childId, zone.id, next, emit],
     );
 
     if (!emit || !parentId) {
@@ -96,11 +123,23 @@ export async function evaluateGeofences(params: {
     }
 
     const event = next === 'inside' ? 'enter' : 'exit';
+    // Seeding unknown → outside should not notify parents.
+    if (event === 'exit' && previous === 'unknown') {
+      continue;
+    }
+
+    const label = zoneLabel(zone.type, zone.name);
+    const message = zoneMessage({ childName, label, event });
     const payload = {
       childId: params.childId,
+      childName,
       zoneId: zone.id,
       zoneType: zone.type,
+      zoneName: zone.name,
+      zoneLabel: label,
       event,
+      message,
+      at: new Date().toISOString(),
     };
 
     broadcastToRoom(childRoom(params.childId), 'parent:zone_event', payload);
@@ -108,17 +147,16 @@ export async function evaluateGeofences(params: {
     await sendFcmToUser(
       parentId,
       {
-        title: 'PulangAman',
-        body:
-          event === 'enter'
-            ? `Anak memasuki zona ${zone.type}`
-            : `Anak meninggalkan zona ${zone.type}`,
+        title: event === 'enter' ? 'Anak di zona aman' : 'Update lokasi anak',
+        body: message,
       },
       {
         type: 'zone_event',
         childId: params.childId,
         zoneType: zone.type,
+        zoneLabel: label,
         event,
+        message,
       },
     );
 

@@ -23,6 +23,7 @@ import { policiesRouter } from './routes/policies.js';
 import { telemetryRouter } from './routes/telemetry.js';
 import { messagesRouter } from './routes/messages.js';
 import { remindersRouter } from './routes/reminders.js';
+import { placesRouter } from './routes/places.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,7 @@ export function createApp() {
   app.use('/api/v1/telemetry', telemetryRouter);
   app.use('/api/v1/messages', messagesRouter);
   app.use('/api/v1/reminders', remindersRouter);
+  app.use('/api/v1/places', placesRouter);
 
   // Phase 3 light school admin UI (static).
   app.use(

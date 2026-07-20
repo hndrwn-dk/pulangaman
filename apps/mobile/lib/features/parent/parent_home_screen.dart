@@ -16,6 +16,7 @@ import 'kabar_inbox_screen.dart';
 import 'kabar_models.dart';
 import 'live_map_screen.dart';
 import 'more_screen.dart';
+import 'zone_alert_host.dart';
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   const ParentHomeScreen({super.key});
@@ -36,7 +37,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
-      await ref.read(childrenControllerProvider.notifier).refresh();
+      await ref.read(childrenControllerProvider.notifier).bootstrap();
       await _loadMessages();
       await _connectWs();
     });
@@ -278,8 +279,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   ),
             ),
             const SizedBox(height: 12),
-            if (children.loading)
-              const Center(child: CircularProgressIndicator())
+            if (children.loading && !children.hasData)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
             else if (children.items.isEmpty)
               const PaEmptyState(
                 icon: Icons.child_care,
@@ -287,7 +291,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 message:
                     'Buat kode undangan, lalu masukkan kode itu di HP anak.',
               )
-            else
+            else ...[
+              if (children.refreshing)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
               ...children.items.map((child) {
                 final kabar = _latestFor(child.id);
                 return Card(
@@ -314,6 +323,17 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(formatLastSeen(child.lastSeenAt)),
+                        if (commuteStatusLabel(child.commuteStatus).isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            commuteStatusLabel(child.commuteStatus),
+                            style: const TextStyle(
+                              color: AppColors.tealDeep,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                         if (kabar != null) ...[
                           const SizedBox(height: 2),
                           Text(
@@ -331,7 +351,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                         ],
                       ],
                     ),
-                    isThreeLine: kabar != null,
+                    isThreeLine: kabar != null ||
+                        commuteStatusLabel(child.commuteStatus).isNotEmpty,
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
@@ -343,6 +364,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   ),
                 );
               }),
+            ],
             if (children.invites.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
@@ -597,23 +619,47 @@ class _ParentShellState extends ConsumerState<ParentShell> {
       RewardsScreen(),
       MoreScreen(),
     ];
-    return Scaffold(
-      body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (value) {
-          setState(() => _index = value);
-          if (value == 0) {
-            ref.read(childrenControllerProvider.notifier).refresh();
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.family_restroom_outlined), selectedIcon: Icon(Icons.family_restroom), label: 'Anak'),
-          NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Sekolah'),
-          NavigationDestination(icon: Icon(Icons.hourglass_empty), selectedIcon: Icon(Icons.hourglass_bottom), label: 'Layar'),
-          NavigationDestination(icon: Icon(Icons.star_outline), selectedIcon: Icon(Icons.star), label: 'Hadiah'),
-          NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Lainnya'),
-        ],
+    return ParentZoneAlertHost(
+      child: Scaffold(
+        body: IndexedStack(index: _index, children: pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (value) {
+            setState(() => _index = value);
+            if (value == 0) {
+              unawaited(
+                ref.read(childrenControllerProvider.notifier).refresh(),
+              );
+            }
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.family_restroom_outlined),
+              selectedIcon: Icon(Icons.family_restroom),
+              label: 'Anak',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.school_outlined),
+              selectedIcon: Icon(Icons.school),
+              label: 'Sekolah',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.phone_android_outlined),
+              selectedIcon: Icon(Icons.phone_android),
+              label: 'Batas HP',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.star_outline),
+              selectedIcon: Icon(Icons.star),
+              label: 'Hadiah',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.grid_view_outlined),
+              selectedIcon: Icon(Icons.grid_view),
+              label: 'Lainnya',
+            ),
+          ],
+        ),
       ),
     );
   }

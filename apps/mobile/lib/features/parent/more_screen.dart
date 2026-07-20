@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../community/reports_screen.dart';
-import '../community/safe_route_screen.dart';
 import 'guardians_screen.dart';
 import 'reminders_screen.dart';
 import 'zones_screen.dart';
@@ -10,24 +9,31 @@ class MoreScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = <({IconData icon, String title, Widget page})>[
+    final items = <({IconData icon, String title, String subtitle, Widget page})>[
       (
         icon: Icons.alarm_rounded,
         title: 'Pengingat jadwal',
+        subtitle: 'Belajar, tidur, pesan besar di HP anak',
         page: const RemindersScreen(),
       ),
-      (icon: Icons.fence, title: 'Zona aman', page: const ZonesEntryScreen()),
+      (
+        icon: Icons.home_work_outlined,
+        title: 'Lokasi penting',
+        subtitle: 'Rumah, sekolah, dan rute aman (cari nama tempat)',
+        page: const PlacesEntryScreen(),
+      ),
       (
         icon: Icons.shield_outlined,
         title: 'Wali terpercaya',
+        subtitle: 'Orang dewasa yang boleh bantu pantau',
         page: const GuardiansEntryScreen(),
       ),
       (
         icon: Icons.report_outlined,
         title: 'Laporan komunitas',
+        subtitle: 'Bagikan area yang perlu dihindari',
         page: const ReportsScreen(),
       ),
-      (icon: Icons.route, title: 'Rute aman', page: const SafeRouteScreen()),
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('Fitur lainnya')),
@@ -44,6 +50,7 @@ class MoreScreen extends StatelessWidget {
                 item.title,
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
+              subtitle: Text(item.subtitle),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => item.page),

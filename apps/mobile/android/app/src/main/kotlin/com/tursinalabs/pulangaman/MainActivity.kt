@@ -154,6 +154,19 @@ class MainActivity : FlutterActivity() {
                         openFullScreenIntentSettings()
                         result.success(null)
                     }
+                    "previewNow" -> {
+                        val title = call.argument<String>("title") ?: "Pengingat"
+                        val body = call.argument<String>("body") ?: ""
+                        val style = call.argument<String>("style") ?: "fullscreen"
+                        val intent = Intent(this, ReminderFullScreenActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            putExtra(ReminderReceiver.EXTRA_TITLE, title)
+                            putExtra(ReminderReceiver.EXTRA_BODY, body)
+                            putExtra(ReminderReceiver.EXTRA_STYLE, style)
+                        }
+                        startActivity(intent)
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

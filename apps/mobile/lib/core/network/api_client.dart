@@ -58,11 +58,12 @@ class ApiClient {
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, String>? query,
+    Duration timeout = const Duration(seconds: 25),
   }) async {
     final uri = query == null
         ? Uri.parse('$baseUrl$path')
         : Uri.parse('$baseUrl$path').replace(queryParameters: query);
-    final response = await _client.get(uri, headers: _headers);
+    final response = await _client.get(uri, headers: _headers).timeout(timeout);
     return _decode(response);
   }
 

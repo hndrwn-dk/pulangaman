@@ -19,4 +19,16 @@ class ReminderChannel {
   Future<void> openFullScreenIntentSettings() async {
     await _channel.invokeMethod<void>('openFullScreenIntentSettings');
   }
+
+  Future<void> previewNow({
+    required String title,
+    required String body,
+    String style = 'fullscreen',
+  }) async {
+    await _channel.invokeMethod<void>('previewNow', {
+      'title': title,
+      'body': body,
+      'style': style,
+    });
+  }
 }

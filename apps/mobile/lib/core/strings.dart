@@ -17,7 +17,7 @@ abstract final class AppStrings {
   static const inviteShareHint =
       'Bagikan kode ini ke HP anak. Berlaku 24 jam.';
   static const liveMap = 'Peta langsung';
-  static const zonesTitle = 'Zona aman';
+  static const zonesTitle = 'Lokasi penting';
   static const guardiansTitle = 'Wali terpercaya';
   static const panicButton = 'TOMBOL PANIK';
   static const panicConfirm = 'Ketuk 3 kali untuk mengirim peringatan';

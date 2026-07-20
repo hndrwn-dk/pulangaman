@@ -109,7 +109,14 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Pengingat "$title" dikirim ke anak')),
+        SnackBar(
+          content: Text(
+            'Pengingat "$title" disimpan.\n'
+            'Buka PulangAman di HP anak supaya jadwal aktif. '
+            'Untuk uji cepat, tekan "Coba 1 menit lagi".',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
       );
       await _load(childId);
     } catch (e) {
@@ -346,8 +353,9 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
           PaSectionCard(
             color: AppColors.sky.withValues(alpha: 0.12),
             child: const Text(
-              'Atur jam belajar, tidur, atau pesan lain. Di jam tersebut '
-              'HP anak menampilkan layar penuh (atau notifikasi) seperti siaran keluarga.',
+              'Buat pengingat supaya HP anak menampilkan pesan besar di jam tertentu '
+              '(misalnya belajar jam 7 malam, tidur jam 9 malam). '
+              'Anak cukup tekan Mengerti untuk menutup.',
               style: TextStyle(color: AppColors.inkSoft, height: 1.35),
             ),
           ),
@@ -410,8 +418,8 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                 ),
                 OutlinedButton.icon(
                   onPressed: _createTestInOneMinute,
-                  icon: const Icon(Icons.science_outlined),
-                  label: const Text('Tes +1 mnt'),
+                  icon: const Icon(Icons.timer_outlined),
+                  label: const Text('Coba 1 menit lagi'),
                 ),
               ],
             ),

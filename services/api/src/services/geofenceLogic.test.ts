@@ -50,11 +50,23 @@ describe('shouldEmitZoneEvent', () => {
     );
   });
 
-  it('does not emit initial unknown seeding', () => {
+  it('emits first detection already inside a zone', () => {
     assert.equal(
       shouldEmitZoneEvent({
         previous: 'unknown',
         next: 'inside',
+        sinceLastEventMs: 0,
+        debounceMs: 45_000,
+      }),
+      true,
+    );
+  });
+
+  it('does not emit unknown seeding to outside', () => {
+    assert.equal(
+      shouldEmitZoneEvent({
+        previous: 'unknown',
+        next: 'outside',
         sinceLastEventMs: 0,
         debounceMs: 45_000,
       }),

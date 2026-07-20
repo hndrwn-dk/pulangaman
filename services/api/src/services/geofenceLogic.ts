@@ -28,6 +28,10 @@ export function shouldEmitZoneEvent(params: {
   sinceLastEventMs: number;
   debounceMs: number;
 }): boolean {
+  // First GPS fix already inside a zone → notify parent once ("sudah di rumah").
+  if (params.previous === 'unknown' && params.next === 'inside') {
+    return true;
+  }
   const isTransition = params.previous !== 'unknown' && params.next !== params.previous;
   if (!isTransition) {
     return false;

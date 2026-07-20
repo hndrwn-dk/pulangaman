@@ -167,6 +167,19 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       await _reminderChannel.syncReminders(list);
       if (!mounted) return;
       setState(() => _reminderCount = list.length);
+      if (!_exactAlarmOk && list.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Izinkan alarm tepat waktu agar pengingat ortu muncul.',
+            ),
+            action: SnackBarAction(
+              label: 'Buka',
+              onPressed: _openReminderPermissions,
+            ),
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _reminderCount = 0);

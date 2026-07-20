@@ -1,6 +1,5 @@
 import { pool } from '../db/pool.js';
 import { broadcastToRoom, childRoom } from '../ws/server.js';
-import { sendFcmToUser } from './fcm.js';
 import { awardReward } from './rewards.js';
 
 export async function recordSchoolAttendance(params: {
@@ -9,10 +8,9 @@ export async function recordSchoolAttendance(params: {
   event: 'enter' | 'exit';
   recordedAt?: Date;
 }): Promise<void> {
-  const school = await pool.query<{ school_id: string; parent_id: string }>(
-    `SELECT cp.school_id, pc.parent_id
+  const school = await pool.query<{ school_id: string }>(
+    `SELECT cp.school_id
      FROM child_profiles cp
-     JOIN parent_children pc ON pc.child_id = cp.user_id
      WHERE cp.user_id = $1 AND cp.school_id IS NOT NULL
      LIMIT 1`,
     [params.childId],
@@ -21,7 +19,7 @@ export async function recordSchoolAttendance(params: {
     return;
   }
 
-  const { school_id: schoolId, parent_id: parentId } = school.rows[0];
+  const { school_id: schoolId } = school.rows[0];
   const eventType = params.event === 'enter' ? 'check_in' : 'check_out';
   const recordedAt = params.recordedAt ?? new Date();
   const localDate = new Intl.DateTimeFormat('en-CA', {
@@ -59,18 +57,7 @@ export async function recordSchoolAttendance(params: {
     recordedAt: recordedAt.toISOString(),
   };
   broadcastToRoom(childRoom(params.childId), 'parent:attendance', payload);
-  await sendFcmToUser(
-    parentId,
-    {
-      title: 'Kehadiran sekolah',
-      body: params.event === 'enter' ? 'Anak sudah tiba di sekolah' : 'Anak meninggalkan sekolah',
-    },
-    {
-      type: 'attendance_event',
-      childId: params.childId,
-      event: eventType,
-    },
-  );
+  // Push ke parent sudah dikirim lewat parent:zone_event (geofence) agar tidak dobel.
 
   await pool.query(
     `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)

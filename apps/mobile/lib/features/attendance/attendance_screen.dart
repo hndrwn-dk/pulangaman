@@ -47,23 +47,27 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
       });
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('Sekolah hari ini')),
+      appBar: AppBar(title: const Text('Sekolah')),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           Text(
-            'Perjalanan sekolah',
+            'Apakah anak sudah di sekolah?',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
           ),
           const SizedBox(height: 6),
-          const Text('Check-in otomatis dari geofence, tanpa perlu anak menekan tombol.'),
+          const Text(
+            'Catatan masuk/pulang muncul otomatis saat anak sampai di area sekolah. '
+            'Anak tidak perlu menekan apa pun.',
+            style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+          ),
           const SizedBox(height: AppSpacing.md),
           if (children.items.isNotEmpty)
             DropdownButtonFormField<String>(
               initialValue: _selectedChildId ?? children.items.first.id,
-              decoration: const InputDecoration(labelText: 'Pilih anak'),
+              decoration: const InputDecoration(labelText: 'Lihat anak'),
               items: children.items
                   .map((child) => DropdownMenuItem(
                         value: child.id,
@@ -80,12 +84,20 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
           else if (_events.isEmpty)
             const PaEmptyState(
               icon: Icons.school_outlined,
-              title: 'Belum ada aktivitas sekolah',
-              message: 'Event masuk dan keluar sekolah akan tampil otomatis di sini.',
+              title: 'Belum ada catatan hari ini',
+              message:
+                  'Kalau zona sekolah sudah diatur dan lokasi anak aktif, '
+                  'catatan tiba/pulang akan muncul di sini.',
             )
           else
             ..._events.map((event) {
               final checkIn = event['event_type'] == 'check_in';
+              final raw = event['recorded_at']?.toString();
+              final at = raw == null ? null : DateTime.tryParse(raw);
+              final timeLabel = at == null
+                  ? (raw ?? '')
+                  : '${at.toLocal().hour.toString().padLeft(2, '0')}:'
+                      '${at.toLocal().minute.toString().padLeft(2, '0')}';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: PaSectionCard(
@@ -106,10 +118,10 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              checkIn ? 'Tiba di sekolah' : 'Pulang dari sekolah',
+                              checkIn ? 'Sudah tiba di sekolah' : 'Sudah pulang sekolah',
                               style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
-                            Text('${event['school_name']} · ${event['recorded_at']}'),
+                            Text('${event['school_name']} · jam $timeLabel'),
                           ],
                         ),
                       ),

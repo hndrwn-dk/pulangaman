@@ -28,10 +28,15 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   LatLng? _position;
   DateTime? _updatedAt;
   bool _stale = true;
+  bool _atHome = false;
+  String? _placeLabel;
   String? _alertId;
   String? _kabarBanner;
   Timer? _poll;
   Timer? _kabarClear;
+  LatLng? _homeCenter;
+  double _homeRadiusM = 120;
+  Set<Circle> _circles = {};
 
   @override
   void initState() {
@@ -40,6 +45,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   }
 
   Future<void> _bootstrap() async {
+    await _loadHomeZone();
     await _fetchHistory();
     await _fetchLocation();
     final token = ref.read(authControllerProvider).token;
@@ -51,6 +57,56 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     _poll = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLocation());
   }
 
+  Future<void> _loadHomeZone() async {
+    try {
+      final data = await ref.read(apiClientProvider).get(
+        '/api/v1/zones',
+        query: {'childId': widget.child.id},
+      );
+      final zones = (data['zones'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>();
+      Map<String, dynamic>? home;
+      for (final z in zones) {
+        if (z['type'] == 'home') {
+          home = z;
+          break;
+        }
+      }
+      if (home == null) return;
+      final lat = (home['lat'] as num?)?.toDouble();
+      final lng = (home['lng'] as num?)?.toDouble();
+      final radius = (home['radius_m'] as num?)?.toDouble() ?? 120;
+      if (lat == null || lng == null) return;
+      if (!mounted) return;
+      setState(() {
+        _homeCenter = LatLng(lat, lng);
+        _homeRadiusM = radius;
+        _circles = {
+          Circle(
+            circleId: const CircleId('home'),
+            center: _homeCenter!,
+            radius: _homeRadiusM,
+            fillColor: AppColors.teal.withValues(alpha: 0.12),
+            strokeColor: AppColors.teal,
+            strokeWidth: 2,
+          ),
+        };
+      });
+    } catch (_) {}
+  }
+
+  bool _isInsideHome(LatLng p) {
+    final home = _homeCenter;
+    if (home == null) return false;
+    return distanceMeters(
+          home.latitude,
+          home.longitude,
+          p.latitude,
+          p.longitude,
+        ) <=
+        _homeRadiusM;
+  }
+
   Future<void> _fetchHistory() async {
     try {
       final api = ref.read(apiClientProvider);
@@ -58,7 +114,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
         '/api/v1/children/${widget.child.id}/location/history',
         query: {'minutes': '120'},
       );
-      final points = (data['points'] as List<dynamic>? ?? [])
+      final rawPoints = (data['points'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map((p) {
             final lat = (p['lat'] as num?)?.toDouble();
@@ -68,62 +124,134 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
           })
           .whereType<LatLng>()
           .toList();
-      if (!mounted || points.isEmpty) return;
+      if (!mounted || rawPoints.isEmpty) return;
+
+      final cleaned = _simplifyTrail(rawPoints);
+      final last = rawPoints.last;
+      final atHome = _isInsideHome(last);
       setState(() {
         _trail
           ..clear()
-          ..addAll(_downsample(points));
-        _position = points.last;
+          ..addAll(atHome ? [last] : cleaned);
+        _position = last;
+        _atHome = atHome;
         _stale = false;
       });
-      _fitTrail();
-    } catch (_) {
-      // History may be empty for new children.
-    }
+      unawaited(_reverseGeocode(last));
+      if (atHome) {
+        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(last, 16));
+      } else {
+        _fitTrail();
+      }
+    } catch (_) {}
   }
 
-  List<LatLng> _downsample(List<LatLng> points) {
-    if (points.length <= 300) return points;
-    final step = (points.length / 300).ceil();
-    final out = <LatLng>[];
-    for (var i = 0; i < points.length; i += step) {
-      out.add(points[i]);
+  /// Drop GPS jitter: keep points only if moved ~35m+, collapse home cluster.
+  List<LatLng> _simplifyTrail(List<LatLng> points) {
+    if (points.isEmpty) return points;
+    final out = <LatLng>[points.first];
+    for (final p in points.skip(1)) {
+      if (_homeCenter != null && _isInsideHome(p)) {
+        // Skip scribble while inside home — keep at most one home point.
+        if (!_isInsideHome(out.last)) {
+          out.add(p);
+        } else {
+          out[out.length - 1] = p;
+        }
+        continue;
+      }
+      final last = out.last;
+      final moved = distanceMeters(
+        last.latitude,
+        last.longitude,
+        p.latitude,
+        p.longitude,
+      );
+      if (moved >= 35) out.add(p);
     }
-    if (out.last != points.last) out.add(points.last);
+    if (out.length > 120) {
+      final step = (out.length / 120).ceil();
+      final sampled = <LatLng>[];
+      for (var i = 0; i < out.length; i += step) {
+        sampled.add(out[i]);
+      }
+      if (sampled.last != out.last) sampled.add(out.last);
+      return sampled;
+    }
     return out;
   }
 
   void _appendTrail(LatLng position) {
+    if (_atHome || _isInsideHome(position)) {
+      // Freeze path at home — update marker only.
+      if (_trail.isEmpty) {
+        _trail.add(position);
+      } else {
+        _trail
+          ..clear()
+          ..add(position);
+      }
+      return;
+    }
     if (_trail.isNotEmpty) {
       final last = _trail.last;
-      final dLat = (last.latitude - position.latitude).abs();
-      final dLng = (last.longitude - position.longitude).abs();
-      // ~1m threshold — skip near-duplicates.
-      if (dLat < 0.00001 && dLng < 0.00001) return;
+      final moved = distanceMeters(
+        last.latitude,
+        last.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      if (moved < 35) return;
     }
     _trail.add(position);
-    if (_trail.length > 400) {
-      _trail.removeRange(0, _trail.length - 400);
+    if (_trail.length > 120) {
+      _trail.removeRange(0, _trail.length - 120);
     }
+  }
+
+  Future<void> _reverseGeocode(LatLng position) async {
+    try {
+      final data = await ref.read(apiClientProvider).get(
+        '/api/v1/places/reverse',
+        query: {
+          'lat': position.latitude.toString(),
+          'lng': position.longitude.toString(),
+        },
+      );
+      final label = data['label'] as String?;
+      if (!mounted || label == null) return;
+      setState(() => _placeLabel = label);
+    } catch (_) {}
   }
 
   void _updatePosition(LatLng position, {required bool stale, DateTime? at}) {
     final isFirst = _position == null;
+    final atHome = _isInsideHome(position);
     final moved = isFirst ||
-        (_position!.latitude - position.latitude).abs() > 0.00001 ||
-        (_position!.longitude - position.longitude).abs() > 0.00001;
+        distanceMeters(
+              _position!.latitude,
+              _position!.longitude,
+              position.latitude,
+              position.longitude,
+            ) >=
+            12;
+
     setState(() {
       _position = position;
       _stale = stale;
       _updatedAt = at ?? DateTime.now();
+      _atHome = atHome;
       if (moved) _appendTrail(position);
     });
     if (moved) {
-      _mapController?.animateCamera(
-        isFirst
-            ? CameraUpdate.newLatLngZoom(position, 15)
-            : CameraUpdate.newLatLng(position),
-      );
+      unawaited(_reverseGeocode(position));
+      if (!atHome) {
+        _mapController?.animateCamera(
+          isFirst
+              ? CameraUpdate.newLatLngZoom(position, 15)
+              : CameraUpdate.newLatLng(position),
+        );
+      }
     }
   }
 
@@ -182,6 +310,31 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
         if (mounted) setState(() => _kabarBanner = null);
       });
     }
+    if (event == 'parent:zone_event' &&
+        payload['childId'] == widget.child.id) {
+      final message = payload['message'] as String? ??
+          (payload['event'] == 'enter'
+              ? '${widget.child.name} sudah di zona aman'
+              : '${widget.child.name} meninggalkan zona aman');
+      final isEnter = payload['event'] == 'enter';
+      setState(() {
+        _kabarBanner = message;
+        if (isEnter) _atHome = payload['zoneType'] == 'home' || _atHome;
+      });
+      _kabarClear?.cancel();
+      _kabarClear = Timer(const Duration(seconds: 12), () {
+        if (mounted) setState(() => _kabarBanner = null);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.tealDeep,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _fetchLocation() async {
@@ -228,11 +381,12 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
 
   String _statusLabel() {
     if (_position == null) return 'Menunggu sinyal lokasi...';
+    if (_atHome) return 'Di rumah · jejak dihentikan';
     if (_stale) return 'Lokasi tidak diperbarui baru-baru ini';
-    if (_updatedAt == null) return 'Live';
+    if (_updatedAt == null) return 'Sedang bergerak';
     final age = DateTime.now().difference(_updatedAt!);
     if (age.inSeconds < 20) return 'Live · baru saja';
-    if (age.inMinutes < 1) return 'Live · ${age.inSeconds}d lalu';
+    if (age.inMinutes < 1) return 'Live · ${age.inSeconds} dtk lalu';
     return 'Live · ${age.inMinutes} mnt lalu';
   }
 
@@ -250,7 +404,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   Widget build(BuildContext context) {
     final center = _position ?? const LatLng(-6.2, 106.8);
     final polylines = <Polyline>{
-      if (_trail.length >= 2)
+      if (!_atHome && _trail.length >= 2)
         Polyline(
           polylineId: const PolylineId('trail'),
           points: List<LatLng>.from(_trail),
@@ -300,11 +454,9 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                   initialCameraPosition: CameraPosition(target: center, zoom: 15),
                   onMapCreated: (controller) {
                     _mapController = controller;
-                    if (_trail.length >= 2) {
-                      _fitTrail();
-                    } else if (_position != null) {
+                    if (_position != null) {
                       controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(_position!, 15),
+                        CameraUpdate.newLatLngZoom(_position!, _atHome ? 16 : 15),
                       );
                     }
                   },
@@ -313,9 +465,13 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                       Marker(
                         markerId: MarkerId(widget.child.id),
                         position: _position!,
-                        infoWindow: InfoWindow(title: widget.child.name),
+                        infoWindow: InfoWindow(
+                          title: widget.child.name,
+                          snippet: _atHome ? 'Di rumah' : _placeLabel,
+                        ),
                       ),
                   },
+                  circles: _circles,
                   polylines: polylines,
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
@@ -335,6 +491,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
@@ -342,7 +499,11 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                                 width: 10,
                                 height: 10,
                                 decoration: BoxDecoration(
-                                  color: _stale ? AppColors.amber : AppColors.success,
+                                  color: _atHome
+                                      ? AppColors.teal
+                                      : _stale
+                                          ? AppColors.amber
+                                          : AppColors.success,
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -354,7 +515,11 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                                 ),
                               ),
                               Text(
-                                '${_trail.length} titik',
+                                _atHome
+                                    ? 'Rumah'
+                                    : _trail.length < 2
+                                        ? 'Jejak singkat'
+                                        : '${_trail.length} titik jalur',
                                 style: const TextStyle(
                                   color: AppColors.inkSoft,
                                   fontWeight: FontWeight.w600,
@@ -363,14 +528,16 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                               ),
                             ],
                           ),
-                          if (_position != null) ...[
+                          if (_placeLabel != null) ...[
                             const SizedBox(height: 6),
                             Text(
-                              '${_position!.latitude.toStringAsFixed(5)}, '
-                              '${_position!.longitude.toStringAsFixed(5)}',
+                              _placeLabel!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.inkSoft,
                                 fontSize: 12,
+                                height: 1.3,
                               ),
                             ),
                           ],
@@ -381,18 +548,22 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                 ),
                 Positioned(
                   right: 16,
-                  bottom: 96,
+                  bottom: 108,
                   child: FloatingActionButton.extended(
-                    onPressed: () {
-                      Navigator.of(context).push(
+                    onPressed: () async {
+                      await Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ZonesScreen(child: widget.child),
+                          builder: (_) => PlacesScreen(child: widget.child),
                         ),
                       );
+                      await _loadHomeZone();
+                      if (_position != null) {
+                        setState(() => _atHome = _isInsideHome(_position!));
+                      }
                     },
                     backgroundColor: AppColors.teal,
-                    label: const Text(AppStrings.zonesTitle),
-                    icon: const Icon(Icons.fence),
+                    label: const Text('Lokasi penting'),
+                    icon: const Icon(Icons.home_work_outlined),
                   ),
                 ),
               ],

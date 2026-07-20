@@ -1,7 +1,9 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
+import 'children_local_cache.dart';
 
 class ChildSummary {
   ChildSummary({
@@ -23,10 +25,19 @@ class ChildSummary {
       id: json['id'] as String,
       name: json['name'] as String,
       phone: json['phone'] as String?,
-      lastSeenAt: json['last_seen_at']?.toString(),
-      commuteStatus: json['commute_status'] as String?,
+      lastSeenAt: json['last_seen_at']?.toString() ?? json['lastSeenAt']?.toString(),
+      commuteStatus:
+          json['commute_status'] as String? ?? json['commuteStatus'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'phone': phone,
+        'last_seen_at': lastSeenAt,
+        'commute_status': commuteStatus,
+      };
 }
 
 class ChildInvite {
@@ -45,14 +56,24 @@ class ChildInvite {
   final String? childDisplayName;
 
   factory ChildInvite.fromJson(Map<String, dynamic> json) {
+    final expires = json['expires_at'] ?? json['expiresAt'];
     return ChildInvite(
       id: json['id'] as String,
       code: json['code'] as String,
-      status: json['status'] as String,
-      expiresAt: DateTime.parse(json['expires_at'] as String),
-      childDisplayName: json['child_display_name'] as String?,
+      status: json['status'] as String? ?? 'pending',
+      expiresAt: DateTime.parse(expires as String),
+      childDisplayName:
+          json['child_display_name'] as String? ?? json['childDisplayName'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'code': code,
+        'status': status,
+        'expires_at': expiresAt.toIso8601String(),
+        'child_display_name': childDisplayName,
+      };
 }
 
 class ChildrenState {
@@ -60,13 +81,23 @@ class ChildrenState {
     this.items = const [],
     this.invites = const [],
     this.loading = false,
+    this.refreshing = false,
     this.error,
+    this.fromCache = false,
   });
 
   final List<ChildSummary> items;
   final List<ChildInvite> invites;
+
+  /// True only on first load when there is nothing to show yet.
   final bool loading;
+
+  /// Background revalidation; UI should keep showing [items].
+  final bool refreshing;
   final String? error;
+  final bool fromCache;
+
+  bool get hasData => items.isNotEmpty || invites.isNotEmpty;
 }
 
 final childrenControllerProvider =
@@ -78,32 +109,91 @@ class ChildrenController extends StateNotifier<ChildrenState> {
   ChildrenController(this._ref) : super(const ChildrenState());
 
   final Ref _ref;
+  Future<void>? _inFlight;
+  DateTime? _lastOkAt;
+  static const _minRefreshGap = Duration(seconds: 8);
+  static const _requestTimeout = Duration(seconds: 25);
 
-  Future<void> refresh() async {
+  String? get _cacheKey {
+    final auth = _ref.read(authControllerProvider);
+    return auth.userId ?? auth.token;
+  }
+
+  /// Show disk cache immediately, then refresh from network.
+  Future<void> bootstrap() async {
+    final key = _cacheKey;
+    if (key != null && !state.hasData) {
+      final cached = await ChildrenLocalCache.instance.read(key);
+      if (cached != null && (cached.items.isNotEmpty || cached.invites.isNotEmpty)) {
+        state = ChildrenState(
+          items: cached.items,
+          invites: cached.invites,
+          fromCache: true,
+        );
+      }
+    }
+    await refresh();
+  }
+
+  Future<void> refresh({bool force = false}) {
+    if (!force &&
+        _lastOkAt != null &&
+        DateTime.now().difference(_lastOkAt!) < _minRefreshGap &&
+        state.hasData &&
+        _inFlight == null) {
+      return Future.value();
+    }
+    return _inFlight ??= _refreshBody().whenComplete(() => _inFlight = null);
+  }
+
+  Future<void> _refreshBody() async {
+    final showBlockingLoader = !state.hasData;
     state = ChildrenState(
       items: state.items,
       invites: state.invites,
-      loading: true,
+      loading: showBlockingLoader,
+      refreshing: !showBlockingLoader,
+      fromCache: state.fromCache,
+      error: null,
     );
+
     try {
       final api = _ref.read(apiClientProvider);
-      final data = await api.get('/api/v1/children');
-      final list = (data['children'] as List<dynamic>? ?? [])
+      final results = await Future.wait([
+        api.get('/api/v1/children').timeout(_requestTimeout),
+        api.get('/api/v1/child-invites').timeout(_requestTimeout),
+      ]);
+
+      final list = (results[0]['children'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>()
           .map(ChildSummary.fromJson)
           .toList();
-      final invitesData = await api.get('/api/v1/child-invites');
-      final invites = (invitesData['invites'] as List<dynamic>? ?? [])
+      final invites = (results[1]['invites'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>()
           .map(ChildInvite.fromJson)
           .where((invite) => invite.status == 'pending')
           .toList();
+
       state = ChildrenState(items: list, invites: invites);
+      _lastOkAt = DateTime.now();
+
+      final key = _cacheKey;
+      if (key != null) {
+        unawaited(
+          ChildrenLocalCache.instance.write(
+            parentKey: key,
+            items: list,
+            invites: invites,
+          ),
+        );
+      }
     } catch (e) {
+      // Keep stale list visible; only surface error if we have nothing.
       state = ChildrenState(
         items: state.items,
         invites: state.invites,
-        error: e.toString(),
+        fromCache: state.fromCache || state.hasData,
+        error: state.hasData ? null : e.toString(),
       );
     }
   }
@@ -125,9 +215,13 @@ class ChildrenController extends StateNotifier<ChildrenState> {
     state = ChildrenState(
       items: state.items,
       invites: [invite, ...existing],
-      loading: false,
     );
-    unawaited(refresh());
+    unawaited(refresh(force: true));
     return invite;
+  }
+
+  Future<void> clearCache() async {
+    final key = _cacheKey;
+    if (key != null) await ChildrenLocalCache.instance.clear(key);
   }
 }
