@@ -31,11 +31,32 @@ telemetryRouter.post('/batch', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'child_profile_required' });
       return;
     }
-    const device = await pool.query<{ id: string }>(
+    const childRole = await pool.query(
+      `SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'child'`,
+      [childId],
+    );
+    if (childRole.rowCount === 0) {
+      res.status(403).json({ error: 'child_role_required' });
+      return;
+    }
+
+    let device = await pool.query<{ id: string }>(
       `SELECT id FROM child_devices
        WHERE child_id = $1 AND installation_id = $2`,
       [childId, body.installationId],
     );
+    if (device.rowCount === 0) {
+      device = await pool.query<{ id: string }>(
+        `INSERT INTO child_devices
+           (child_id, installation_id, device_name, app_version)
+         VALUES ($1, $2, 'Android child device', '0.3.0')
+         ON CONFLICT (installation_id) DO UPDATE SET
+           child_id = EXCLUDED.child_id,
+           last_seen_at = now()
+         RETURNING id`,
+        [childId, body.installationId],
+      );
+    }
     if (device.rowCount === 0) {
       res.status(404).json({ error: 'device_not_found' });
       return;
@@ -101,7 +122,10 @@ telemetryRouter.get('/:childId/summary', async (req: AuthedRequest, res, next) =
        FROM usage_telemetry
        WHERE child_id = $1
          AND kind = 'usage'
-         AND recorded_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta')
+         AND recorded_at >= (
+           date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta')
+           AT TIME ZONE 'Asia/Jakarta'
+         )
        GROUP BY package_name
        ORDER BY duration_seconds DESC`,
       [childId],

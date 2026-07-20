@@ -516,8 +516,12 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
               color: AppColors.sand.withValues(alpha: 0.55),
               child: const Text(
                 'Daftar app belum muncul.\n\n'
-                'Minta anak buka PulangAman di HP-nya sekali, '
-                'lalu tekan ikon segarkan di pojok kanan atas.',
+                '1. Pastikan kamu buka aturan untuk anak yang sama '
+                '(kalau ada 2 “Andi”, pilih yang baru).\n'
+                '2. Di HP anak: buka tab Layar, lalu tekan ikon segarkan '
+                '(pojok kanan atas).\n'
+                '3. Di layar ini (ortu), tekan ikon segarkan.\n\n'
+                'Catatan: ikon keluar di HP anak = logout, bukan segarkan.',
                 style: TextStyle(color: AppColors.inkSoft, height: 1.4),
               ),
             )

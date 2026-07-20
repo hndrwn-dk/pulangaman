@@ -12,6 +12,7 @@ import '../../core/config.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
+import '../../core/theme.dart';
 import '../auth/auth_controller.dart';
 import '../screentime/screen_time_channel.dart';
 import 'child_beranda_tab.dart';
@@ -201,6 +202,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (userId == null || apps.isEmpty) return;
     final day = DateTime.now().toUtc().toIso8601String().substring(0, 10);
     final now = DateTime.now().toUtc().toIso8601String();
+    final installationId = 'android-$userId';
     final events = apps
         .where((app) => app.packageName.isNotEmpty && app.durationSeconds > 0)
         .take(80)
@@ -222,8 +224,16 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         .toList();
     if (events.isEmpty) return;
     try {
+      // Ensure device row exists before telemetry (idempotent).
+      await ref.read(apiClientProvider).post('/api/v1/policies/device', body: {
+        'installationId': installationId,
+        'deviceName': 'Android child device',
+        'appVersion': '0.3.0',
+        'usageAccessGranted': _usageAccess,
+        'accessibilityEnabled': _accessibility,
+      });
       await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
-        'installationId': 'android-$userId',
+        'installationId': installationId,
         'events': events,
       });
     } catch (_) {
@@ -563,7 +573,46 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         title: Text('${AppStrings.brand} · $childName'),
         actions: [
           IconButton(
+            tooltip: 'Segarkan (kirim daftar app & aturan)',
             onPressed: () async {
+              await _refreshScreenTimeAndRewards();
+              await _syncReminders();
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Sudah disegarkan. Ortu bisa muat ulang daftar app.'),
+                ),
+              );
+            },
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: AppStrings.logout,
+            onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Keluar dari akun anak?'),
+                  content: const Text(
+                    'Nanti untuk masuk lagi, minta kode undangan baru '
+                    'dari HP orang tua, lalu pilih peran Anak.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Batal'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.coral,
+                      ),
+                      child: const Text('Keluar'),
+                    ),
+                  ],
+                ),
+              );
+              if (ok != true) return;
               try {
                 await _locationChannel.stop();
               } catch (_) {}
