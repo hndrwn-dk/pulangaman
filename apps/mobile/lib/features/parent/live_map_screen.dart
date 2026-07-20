@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../core/config.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
@@ -23,6 +22,7 @@ class LiveMapScreen extends ConsumerStatefulWidget {
 
 class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   final _ws = WsClient();
+  GoogleMapController? _mapController;
   LatLng? _position;
   bool _stale = true;
   String? _alertId;
@@ -42,7 +42,25 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       _ws.addHandler(_onWs);
       _ws.subscribe('child:${widget.child.id}');
     }
-    _poll = Timer.periodic(const Duration(seconds: 30), (_) => _fetchLocation());
+    _poll = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLocation());
+  }
+
+  void _updatePosition(LatLng position, {required bool stale}) {
+    final isFirst = _position == null;
+    final moved = isFirst ||
+        (_position!.latitude - position.latitude).abs() > 0.00001 ||
+        (_position!.longitude - position.longitude).abs() > 0.00001;
+    setState(() {
+      _position = position;
+      _stale = stale;
+    });
+    if (moved) {
+      _mapController?.animateCamera(
+        isFirst
+            ? CameraUpdate.newLatLngZoom(position, 15)
+            : CameraUpdate.newLatLng(position),
+      );
+    }
   }
 
   void _onWs(String event, Map<String, dynamic> payload) {
@@ -51,10 +69,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       final lat = (payload['lat'] as num?)?.toDouble();
       final lng = (payload['lng'] as num?)?.toDouble();
       if (lat != null && lng != null) {
-        setState(() {
-          _position = LatLng(lat, lng);
-          _stale = false;
-        });
+        _updatePosition(LatLng(lat, lng), stale: false);
       }
     }
     if (event == 'child:panic_triggered') {
@@ -69,12 +84,11 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       final loc = data['location'] as Map<String, dynamic>?;
       final lat = (loc?['lat'] as num?)?.toDouble();
       final lng = (loc?['lng'] as num?)?.toDouble();
-      setState(() {
-        if (lat != null && lng != null) {
-          _position = LatLng(lat, lng);
-        }
-        _stale = data['isStale'] == true;
-      });
+      if (lat != null && lng != null) {
+        _updatePosition(LatLng(lat, lng), stale: data['isStale'] == true);
+      } else {
+        setState(() => _stale = true);
+      }
     } catch (_) {
       setState(() => _stale = true);
     }
@@ -103,6 +117,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   @override
   void dispose() {
     _poll?.cancel();
+    _mapController?.dispose();
     _ws.removeHandler(_onWs);
     unawaited(_ws.disconnect());
     super.dispose();
@@ -116,12 +131,6 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       appBar: AppBar(title: Text('${AppStrings.liveMap} · ${widget.child.name}')),
       body: Column(
         children: [
-          if (AppConfig.googleMapsApiKey.isEmpty)
-            const MaterialBanner(
-              content: Text(AppStrings.mapKeyMissing),
-              backgroundColor: Color(0xFFE8F0FE),
-              actions: [SizedBox.shrink()],
-            ),
           if (_stale)
             MaterialBanner(
               content: const Text(AppStrings.staleLocation),
@@ -144,6 +153,14 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
               children: [
                 GoogleMap(
                   initialCameraPosition: CameraPosition(target: center, zoom: 15),
+                  onMapCreated: (controller) {
+                    _mapController = controller;
+                    if (_position != null) {
+                      controller.animateCamera(
+                        CameraUpdate.newLatLngZoom(_position!, 15),
+                      );
+                    }
+                  },
                   markers: {
                     if (_position != null)
                       Marker(
@@ -161,9 +178,14 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                     right: 12,
                     bottom: 16,
                     child: Material(
-                      color: Colors.white.withValues(alpha: 0.92),
+                      elevation: 2,
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white.withValues(alpha: 0.95),
                       child: Padding(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         child: Text(
                           '${AppStrings.lastKnownCoords}: '
                           '${_position!.latitude.toStringAsFixed(5)}, '
@@ -173,22 +195,26 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                       ),
                     ),
                   ),
+                Positioned(
+                  right: 16,
+                  bottom: 72,
+                  child: FloatingActionButton.extended(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ZonesScreen(child: widget.child),
+                        ),
+                      );
+                    },
+                    backgroundColor: AppColors.teal,
+                    label: const Text(AppStrings.zonesTitle),
+                    icon: const Icon(Icons.fence),
+                  ),
+                ),
               ],
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ZonesScreen(child: widget.child),
-            ),
-          );
-        },
-        backgroundColor: AppColors.teal,
-        label: const Text(AppStrings.zonesTitle),
-        icon: const Icon(Icons.fence),
       ),
     );
   }
