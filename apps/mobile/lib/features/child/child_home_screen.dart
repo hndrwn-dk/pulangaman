@@ -12,6 +12,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import '../screentime/screen_time_channel.dart';
+import 'panic_tap_counter.dart';
 
 final offlineQueueProvider = Provider<OfflineQueue>((ref) => OfflineQueue());
 
@@ -28,8 +29,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _tracking = false;
   bool _panicMode = false;
-  int _panicTaps = 0;
-  DateTime? _lastTapAt;
+  bool _panicInFlight = false;
+  final PanicTapCounter _panicTapCounter = PanicTapCounter();
   String? _status;
   int _points = 0;
   int _streak = 0;
@@ -194,24 +195,31 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   }
 
   Future<void> _onPanicTap() async {
-    final now = DateTime.now();
-    if (_lastTapAt == null ||
-        now.difference(_lastTapAt!) > const Duration(seconds: 2)) {
-      _panicTaps = 0;
+    if (_panicInFlight || _panicTapCounter.isOnCooldown) {
+      return;
     }
-    _lastTapAt = now;
-    _panicTaps += 1;
-    setState(() {});
 
-    if (_panicTaps < 3) {
+    final tapResult = _panicTapCounter.registerTap();
+    if (tapResult == 0) {
+      return;
+    }
+    if (tapResult > 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${AppStrings.panicConfirm} ($_panicTaps/3)')),
+        SnackBar(
+          content: Text('${AppStrings.panicConfirm} ($tapResult/3)'),
+          duration: const Duration(seconds: 2),
+        ),
       );
       return;
     }
 
-    _panicTaps = 0;
-    setState(() => _panicMode = true);
+    _panicInFlight = true;
+    _panicTapCounter.markTriggered();
+    if (mounted) {
+      setState(() => _panicMode = true);
+    }
     _scheduleTick();
 
     Position? pos;
@@ -229,10 +237,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       await ref.read(offlineQueueProvider).enqueue('panic', body);
       await _smsFallback();
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text(AppStrings.offlineQueued)),
         );
       }
+      _panicInFlight = false;
       return;
     }
 
@@ -240,13 +250,19 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       final api = ref.read(apiClientProvider);
       await api.post('/api/v1/panic/trigger', body: body);
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.panicSent)),
+          const SnackBar(
+            content: Text(AppStrings.panicSent),
+            duration: Duration(seconds: 3),
+          ),
         );
       }
     } catch (_) {
       await ref.read(offlineQueueProvider).enqueue('panic', body);
       await _smsFallback();
+    } finally {
+      _panicInFlight = false;
     }
   }
 
@@ -321,7 +337,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 SizedBox(
                   height: 180,
                   child: FilledButton(
-                    onPressed: _onPanicTap,
+                    onPressed: (_panicInFlight || _panicTapCounter.isOnCooldown)
+                        ? null
+                        : _onPanicTap,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.danger,
                       shape: const CircleBorder(),
