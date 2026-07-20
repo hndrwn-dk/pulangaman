@@ -19,11 +19,26 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<ParentHomeScreen> createState() => _ParentHomeScreenState();
 }
 
-class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
+class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() => ref.read(childrenControllerProvider.notifier).refresh());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(childrenControllerProvider.notifier).refresh();
+    }
   }
 
   @override
@@ -227,6 +242,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
           ],
         ),
       );
+      if (context.mounted) {
+        await ref.read(childrenControllerProvider.notifier).refresh();
+      }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -248,7 +266,7 @@ class _ParentShellState extends ConsumerState<ParentShell> {
 
   @override
   Widget build(BuildContext context) {
-    const pages = [
+    final pages = [
       ParentHomeScreen(),
       AttendanceScreen(),
       ScreenTimeScreen(),
@@ -259,7 +277,12 @@ class _ParentShellState extends ConsumerState<ParentShell> {
       body: IndexedStack(index: _index, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: (value) {
+          setState(() => _index = value);
+          if (value == 0) {
+            ref.read(childrenControllerProvider.notifier).refresh();
+          }
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.family_restroom_outlined), selectedIcon: Icon(Icons.family_restroom), label: 'Anak'),
           NavigationDestination(icon: Icon(Icons.school_outlined), selectedIcon: Icon(Icons.school), label: 'Sekolah'),

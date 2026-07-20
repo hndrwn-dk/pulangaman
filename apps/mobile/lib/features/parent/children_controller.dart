@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
@@ -120,7 +121,13 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       expiresAt: DateTime.parse(data['expiresAt'] as String),
       childDisplayName: data['childDisplayName'] as String?,
     );
-    await refresh();
+    final existing = state.invites.where((it) => it.code != invite.code).toList();
+    state = ChildrenState(
+      items: state.items,
+      invites: [invite, ...existing],
+      loading: false,
+    );
+    unawaited(refresh());
     return invite;
   }
 }
