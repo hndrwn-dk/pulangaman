@@ -39,6 +39,18 @@ zonesRouter.post('/', async (req: AuthedRequest, res, next) => {
       return;
     }
 
+    // One home / one school per child — replace previous.
+    if (body.type === 'home' || body.type === 'school') {
+      const old = await pool.query<{ id: string }>(
+        `SELECT id FROM zones WHERE child_id = $1 AND type = $2`,
+        [body.childId, body.type],
+      );
+      for (const row of old.rows) {
+        await pool.query(`DELETE FROM zone_states WHERE zone_id = $1`, [row.id]);
+        await pool.query(`DELETE FROM zones WHERE id = $1`, [row.id]);
+      }
+    }
+
     const result = await pool.query<{ id: string }>(
       `INSERT INTO zones (child_id, type, center, radius_m, name)
        VALUES (
@@ -77,11 +89,47 @@ zonesRouter.get('/', async (req: AuthedRequest, res, next) => {
               ST_X(center::geometry) AS lng
        FROM zones
        WHERE child_id = $1
-       ORDER BY created_at`,
+       ORDER BY
+         CASE type
+           WHEN 'home' THEN 0
+           WHEN 'school' THEN 1
+           ELSE 2
+         END,
+         created_at`,
       [childId],
     );
 
     res.json({ zones: result.rows });
+  } catch (error) {
+    next(error);
+  }
+});
+
+zonesRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const zoneId = z.string().uuid().parse(req.params.id);
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const zone = await pool.query<{ child_id: string }>(
+      `SELECT child_id FROM zones WHERE id = $1`,
+      [zoneId],
+    );
+    if (zone.rowCount === 0) {
+      res.status(404).json({ error: 'zone_not_found' });
+      return;
+    }
+    if (!(await assertParentOfChild(parentId, zone.rows[0].child_id))) {
+      res.status(404).json({ error: 'zone_not_found' });
+      return;
+    }
+
+    await pool.query(`DELETE FROM zone_states WHERE zone_id = $1`, [zoneId]);
+    await pool.query(`DELETE FROM zones WHERE id = $1`, [zoneId]);
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }

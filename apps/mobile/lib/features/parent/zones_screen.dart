@@ -36,7 +36,7 @@ class PlaceHit {
   }
 }
 
-/// Satu layar untuk Rumah / Sekolah + rute singkat antar keduanya.
+/// Satu layar untuk Rumah / Sekolah / tempat lain + rute rumah→sekolah.
 class PlacesEntryScreen extends ConsumerWidget {
   const PlacesEntryScreen({super.key});
 
@@ -44,15 +44,16 @@ class PlacesEntryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final children = ref.watch(childrenControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Lokasi penting')),
+      appBar: AppBar(title: const Text('Tempat aman')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const PaSectionCard(
             child: Text(
-              'Atur Rumah dan Sekolah dengan nama tempat (bukan angka koordinat). '
-              'Rute aman dibuat otomatis dari rumah ke sekolah.',
-              style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+              'Atur rumah, sekolah, dan tempat lain (les, tempat sering dikunjungi). '
+              'Cari dengan nama tempat — bukan angka koordinat. '
+              'Kamu dapat notifikasi saat anak sampai di tempat itu.',
+              style: TextStyle(color: AppColors.inkSoft, height: 1.4, fontSize: 16),
             ),
           ),
           const SizedBox(height: 12),
@@ -63,13 +64,20 @@ class PlacesEntryScreen extends ConsumerWidget {
               (child) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   leading: const CircleAvatar(child: Icon(Icons.place)),
                   title: Text(
                     child.name,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
                   ),
-                  subtitle: const Text('Rumah, sekolah, dan rute'),
-                  trailing: const Icon(Icons.chevron_right),
+                  subtitle: const Text(
+                    'Rumah, sekolah, tempat lain, dan rute',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  trailing: const Icon(Icons.chevron_right, size: 28),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -131,39 +139,180 @@ class _PlacesScreenState extends ConsumerState<PlacesScreen> {
     return null;
   }
 
-  Future<void> _addBySearch(String type) async {
+  List<Map<String, dynamic>> get _customZones =>
+      _zones.where((z) => z['type'] == 'custom').toList();
+
+  Future<void> _addBySearch(
+    String type, {
+    String? customLabel,
+  }) async {
     final selected = await showModalBottomSheet<PlaceHit>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _PlaceSearchSheet(
-        title: type == 'home' ? 'Cari alamat rumah' : 'Cari nama sekolah',
+        title: type == 'home'
+            ? 'Cari alamat rumah'
+            : type == 'school'
+                ? 'Cari nama sekolah'
+                : 'Cari tempat: ${customLabel ?? 'Tempat lain'}',
         hint: type == 'home'
             ? 'Contoh: Marine Parade, kode pos, nama kompleks'
-            : 'Contoh: Tao Nan School, nama sekolah',
+            : type == 'school'
+                ? 'Contoh: Tao Nan School, nama sekolah'
+                : 'Contoh: nama les, mall, taman, alamat',
       ),
     );
     if (selected == null || !mounted) return;
 
-    final radius = type == 'home' ? 120 : 150;
-    await ref.read(apiClientProvider).post('/api/v1/zones', body: {
-      'childId': widget.child.id,
-      'type': type,
-      'lat': selected.lat,
-      'lng': selected.lng,
-      'radiusM': radius,
-      'name': selected.name,
-    });
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          type == 'home'
-              ? 'Rumah disimpan: ${selected.name}'
-              : 'Sekolah disimpan: ${selected.name}',
+    final radius = type == 'home'
+        ? 120
+        : type == 'school'
+            ? 150
+            : 120;
+    final displayName = (customLabel != null && customLabel.trim().isNotEmpty)
+        ? '${customLabel.trim()} · ${selected.name}'
+        : selected.name;
+
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/zones', body: {
+        'childId': widget.child.id,
+        'type': type,
+        'lat': selected.lat,
+        'lng': selected.lng,
+        'radiusM': radius,
+        'name': displayName,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            type == 'home'
+                ? 'Rumah disimpan: ${selected.name}'
+                : type == 'school'
+                    ? 'Sekolah disimpan: ${selected.name}'
+                    : 'Tempat disimpan: $displayName',
+          ),
         ),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal simpan tempat: $e')),
+      );
+    }
+  }
+
+  Future<void> _addCustomPlace() async {
+    final labelCtrl = TextEditingController();
+    const presets = <String>[
+      'Tempat les',
+      'Rumah nenek',
+      'Teman',
+      'Mall / tempat main',
+      'Tempat baru',
+    ];
+
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Tambah tempat aman',
+                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Pilih jenis, atau tulis sendiri. Lalu cari alamatnya.',
+                style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final p in presets)
+                    ActionChip(
+                      label: Text(p),
+                      onPressed: () => Navigator.pop(ctx, p),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: labelCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Atau tulis nama sendiri',
+                  hintText: 'Contoh: Les piano Blok M',
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () {
+                  final t = labelCtrl.text.trim();
+                  Navigator.pop(ctx, t.isEmpty ? 'Tempat lain' : t);
+                },
+                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                child: const Text('Lanjut cari alamat'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (chosen == null || !mounted) return;
+    await _addBySearch('custom', customLabel: chosen);
+  }
+
+  Future<void> _deleteZone(Map<String, dynamic> zone) async {
+    final id = zone['id']?.toString();
+    if (id == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus tempat?'),
+        content: Text(
+          'Hapus "${_zoneLabel(zone)}"? Notifikasi sampai di tempat ini akan berhenti.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+            child: const Text('Hapus'),
+          ),
+        ],
       ),
     );
-    await _load();
+    if (ok != true || !mounted) return;
+    try {
+      await ref.read(apiClientProvider).delete('/api/v1/zones/$id');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tempat dihapus')),
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal hapus: $e')),
+      );
+    }
   }
 
   Future<void> _planRoute() async {
@@ -216,10 +365,11 @@ class _PlacesScreenState extends ConsumerState<PlacesScreen> {
   Widget build(BuildContext context) {
     final home = _zoneOf('home');
     final school = _zoneOf('school');
+    final customs = _customZones;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Lokasi · ${widget.child.name}'),
+        title: Text('Tempat · ${widget.child.name}'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -247,6 +397,56 @@ class _PlacesScreenState extends ConsumerState<PlacesScreen> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
+                  'Tempat lain',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Les, rumah nenek, mall, atau tempat baru yang anak akan kunjungi. '
+                  'Saat anak sampai, kamu dapat notifikasi.',
+                  style: TextStyle(color: AppColors.inkSoft, fontSize: 14, height: 1.35),
+                ),
+                const SizedBox(height: 10),
+                if (customs.isEmpty)
+                  PaSectionCard(
+                    color: AppColors.sand.withValues(alpha: 0.45),
+                    child: const Text(
+                      'Belum ada tempat lain. Tambah di bawah.',
+                      style: TextStyle(color: AppColors.inkSoft),
+                    ),
+                  )
+                else
+                  ...customs.map((z) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _PlaceCard(
+                        icon: Icons.place_rounded,
+                        title: _zoneLabel(z),
+                        subtitle: 'Tempat aman tambahan',
+                        actionLabel: 'Hapus',
+                        onPressed: () => _deleteZone(z),
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _addCustomPlace,
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  label: const Text('Tambah tempat lain'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.tealDeep,
+                    side: const BorderSide(color: AppColors.teal, width: 2),
+                    minimumSize: const Size.fromHeight(52),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
                   'Rute aman rumah → sekolah',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w900,
@@ -254,8 +454,8 @@ class _PlacesScreenState extends ConsumerState<PlacesScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Tidak perlu isi koordinat. Pakai lokasi di atas.',
-                  style: TextStyle(color: AppColors.inkSoft, fontSize: 13),
+                  'Opsional. Pakai rumah dan sekolah di atas.',
+                  style: TextStyle(color: AppColors.inkSoft, fontSize: 14),
                 ),
                 const SizedBox(height: 10),
                 FilledButton.icon(
@@ -306,6 +506,7 @@ class _PlacesScreenState extends ConsumerState<PlacesScreen> {
                     ),
                   ),
                 ],
+                const SizedBox(height: 24),
               ],
             ),
     );
@@ -423,9 +624,21 @@ class _PlaceSearchSheetState extends ConsumerState<_PlaceSearchSheet> {
       });
     } catch (e) {
       if (!mounted) return;
+      final raw = e.toString();
+      String msg =
+          'Pencarian gagal. Key Google Maps di server belum bisa dipakai untuk cari tempat.';
+      if (raw.contains('maps_key_missing')) {
+        msg = 'GOOGLE_MAPS_API_KEY belum diisi di Render.';
+      } else if (raw.contains('maps_key_restricted') ||
+          raw.contains('not authorized') ||
+          raw.contains('REQUEST_DENIED')) {
+        msg =
+            'Key Maps di server diblokir Google (biasanya key khusus Android). '
+            'Perlu key server terpisah: aktifkan Places API + Geocoding.';
+      }
       setState(() {
         _loading = false;
-        _error = 'Pencarian gagal. Pastikan Google Maps key aktif di server.';
+        _error = msg;
         _hits = [];
       });
     }
