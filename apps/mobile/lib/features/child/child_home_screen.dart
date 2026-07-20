@@ -81,6 +81,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Future<void> _setupScreenTimeAndRewards() => _refreshScreenTimeAndRewards();
 
   Future<void> _refreshScreenTimeAndRewards() async {
+    await _ensureNativeTracking();
+    await _pushLocationOnce();
     await _syncScreenTimePermissions();
     await _loadRewards();
     await _loadUsageStats(_usagePeriod);
@@ -110,7 +112,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         }
       });
       if (period == UsagePeriod.today) {
-        unawaited(_uploadUsageTelemetry(apps));
+        final ok = await _uploadUsageTelemetry(apps);
+        if (!ok && mounted) {
+          // Keep silent on auto-load; refresh button reports status.
+        }
       }
     } catch (_) {
       if (!mounted) return;
@@ -195,50 +200,6 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       return;
     }
     await _reminderChannel.openFullScreenIntentSettings();
-  }
-
-  Future<void> _uploadUsageTelemetry(List<UsageAppEntry> apps) async {
-    final userId = ref.read(authControllerProvider).userId;
-    if (userId == null || apps.isEmpty) return;
-    final day = DateTime.now().toUtc().toIso8601String().substring(0, 10);
-    final now = DateTime.now().toUtc().toIso8601String();
-    final installationId = 'android-$userId';
-    final events = apps
-        .where((app) => app.packageName.isNotEmpty && app.durationSeconds > 0)
-        .take(80)
-        .map(
-          (app) => {
-            'clientEventId': 'usage-$day-${app.packageName}',
-            'kind': 'usage',
-            'packageName': app.packageName,
-            'durationSeconds': app.durationSeconds,
-            'recordedAt': now,
-            'payload': {
-              'appLabel': friendlyAppName(
-                app.packageName,
-                appLabel: app.appLabel,
-              ),
-            },
-          },
-        )
-        .toList();
-    if (events.isEmpty) return;
-    try {
-      // Ensure device row exists before telemetry (idempotent).
-      await ref.read(apiClientProvider).post('/api/v1/policies/device', body: {
-        'installationId': installationId,
-        'deviceName': 'Android child device',
-        'appVersion': '0.3.0',
-        'usageAccessGranted': _usageAccess,
-        'accessibilityEnabled': _accessibility,
-      });
-      await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
-        'installationId': installationId,
-        'events': events,
-      });
-    } catch (_) {
-      // Telemetry is best-effort; parent UI still works without it.
-    }
   }
 
   Future<void> _syncScreenTimePermissions() async {
@@ -343,7 +304,6 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   }
 
   Future<void> _ensureNativeTracking() async {
-    if (!_tracking) return;
     final token = ref.read(authControllerProvider).token;
     if (token == null) return;
     try {
@@ -361,7 +321,52 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           panic: _panicMode,
         );
       }
+      if (mounted) setState(() => _tracking = true);
     } catch (_) {}
+  }
+
+  Future<bool> _uploadUsageTelemetry(List<UsageAppEntry> apps) async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null || apps.isEmpty) return false;
+    final day = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+    final now = DateTime.now().toUtc().toIso8601String();
+    final installationId = 'android-$userId';
+    final events = apps
+        .where((app) => app.packageName.isNotEmpty && app.durationSeconds > 0)
+        .take(80)
+        .map(
+          (app) => {
+            'clientEventId': 'usage-$day-${app.packageName}',
+            'kind': 'usage',
+            'packageName': app.packageName,
+            'durationSeconds': app.durationSeconds,
+            'recordedAt': now,
+            'payload': {
+              'appLabel': friendlyAppName(
+                app.packageName,
+                appLabel: app.appLabel,
+              ),
+            },
+          },
+        )
+        .toList();
+    if (events.isEmpty) return false;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/policies/device', body: {
+        'installationId': installationId,
+        'deviceName': 'Android child device',
+        'appVersion': '0.3.0',
+        'usageAccessGranted': _usageAccess,
+        'accessibilityEnabled': _accessibility,
+      });
+      await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
+        'installationId': installationId,
+        'events': events,
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _setPanicMode(bool enabled) async {
@@ -578,9 +583,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
               await _refreshScreenTimeAndRewards();
               await _syncReminders();
               if (!context.mounted) return;
+              final sent = _usageApps.isNotEmpty;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sudah disegarkan. Ortu bisa muat ulang daftar app.'),
+                SnackBar(
+                  content: Text(
+                    sent
+                        ? 'Lokasi & daftar app dikirim ke ortu'
+                        : 'Lokasi dikirim. Daftar app kosong — cek izin Usage Access.',
+                  ),
                 ),
               );
             },
@@ -594,9 +604,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 builder: (ctx) => AlertDialog(
                   title: const Text('Keluar dari akun anak?'),
                   content: const Text(
-                    'Nanti untuk masuk lagi, di HP ortu buka menu ⋮ di kartu anak '
-                    '→ “Kode masuk ulang”, lalu masukkan kode itu di sini. '
-                    'Jangan buat “Tambah anak” baru (itu membuat profil dobel).',
+                    'Untuk masuk lagi, minta kode masuk ulang dari HP ortu.',
                   ),
                   actions: [
                     TextButton(

@@ -37,8 +37,9 @@ class ChildHomeMapCard extends StatelessWidget {
   }
 
   String get _whenBubble {
+    if (position == null) return 'Menunggu lokasi...';
     final raw = child.lastSeenAt;
-    if (raw == null || raw.isEmpty) return 'Belum ada sinyal';
+    if (raw == null || raw.isEmpty) return 'Ada di peta';
     final at = DateTime.tryParse(raw);
     if (at == null) return formatLastSeen(raw);
     final local = at.toLocal();
@@ -196,9 +197,9 @@ class ChildHomeMapCard extends StatelessWidget {
                                   },
                                   itemBuilder: (context) => [
                                     if (onRelinkCode != null)
-                                      const PopupMenuItem(
+                                      PopupMenuItem(
                                         value: 'relink',
-                                        child: Text('Kode masuk ulang (HP anak)'),
+                                        child: Text('Kode masuk ulang ${child.name}'),
                                       ),
                                     if (onRemove != null)
                                       const PopupMenuItem(
@@ -258,15 +259,6 @@ class ChildHomeMapCard extends StatelessWidget {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 8),
-                          Text(
-                            'Ketuk kartu untuk buka peta',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.inkSoft.withValues(alpha: 0.9),
-                            ),
-                          ),
                         ],
                       ),
                     ),

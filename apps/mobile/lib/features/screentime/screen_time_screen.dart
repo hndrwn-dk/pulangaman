@@ -95,12 +95,6 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                   fontWeight: FontWeight.w900,
                 ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Ketuk anak untuk atur berapa lama boleh main HP. '
-            'Ketuk ikon pensil kecil untuk ganti wajah.',
-            style: TextStyle(color: AppColors.inkSoft, height: 1.35),
-          ),
           const SizedBox(height: AppSpacing.lg),
           if (children.items.isEmpty)
             const PaEmptyState(
@@ -432,7 +426,7 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
 
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Nyalakan batas waktu?',
+            'Batas waktu',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -442,13 +436,8 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
             child: SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(
-                _enabled ? 'Ya, batasi main HP' : 'Tidak, bebas dulu',
+                _enabled ? 'Batasi main HP' : 'Tanpa batas',
                 style: const TextStyle(fontWeight: FontWeight.w800),
-              ),
-              subtitle: Text(
-                _enabled
-                    ? 'Setelah lewat batas, app yang kamu blokir akan ditahan.'
-                    : 'Matikan hanya jika ingin anak main tanpa batas sementara.',
               ),
               value: _enabled,
               onChanged: (value) => setState(() => _enabled = value),
@@ -457,15 +446,10 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
 
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Berapa lama boleh main per hari?',
+            'Lama main per hari',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Pilih salah satu. Mudah diubah kapan saja.',
-            style: TextStyle(color: AppColors.inkSoft, fontSize: 13),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -494,16 +478,10 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
 
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'App mana yang ditahan?',
+            'App yang ditahan',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Geser ke "Tahan" untuk app yang tidak boleh berlebihan '
-            '(YouTube, game). Telepon & pesan tetap boleh.',
-            style: TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 10),
           if (_loading)
@@ -515,13 +493,7 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
             PaSectionCard(
               color: AppColors.sand.withValues(alpha: 0.55),
               child: const Text(
-                'Daftar app belum muncul.\n\n'
-                '1. Pastikan kamu buka aturan untuk anak yang sama '
-                '(kalau ada 2 “Andi”, pilih yang baru).\n'
-                '2. Di HP anak: buka tab Layar, lalu tekan ikon segarkan '
-                '(pojok kanan atas).\n'
-                '3. Di layar ini (ortu), tekan ikon segarkan.\n\n'
-                'Catatan: ikon keluar di HP anak = logout, bukan segarkan.',
+                'Belum ada daftar app.',
                 style: TextStyle(color: AppColors.inkSoft, height: 1.4),
               ),
             )
@@ -615,15 +587,9 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
               backgroundColor: AppColors.teal,
             ),
             child: Text(
-              _saving ? 'Menyimpan...' : 'Simpan aturan ke HP anak',
+              _saving ? 'Menyimpan...' : 'Simpan',
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Setelah simpan, buka sebentar PulangAman di HP anak supaya aturan aktif.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.inkSoft, fontSize: 12),
           ),
           const SizedBox(height: 24),
         ],

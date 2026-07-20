@@ -322,6 +322,62 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
     }
     const cached = await redis.get(childLocationKey(childId));
     if (!cached) {
+      const last = await pool.query<{
+        lat: number;
+        lng: number;
+        recorded_at: Date;
+        accuracy_m: number | null;
+      }>(
+        `SELECT
+           ST_Y(location::geometry) AS lat,
+           ST_X(location::geometry) AS lng,
+           recorded_at,
+           accuracy_m
+         FROM location_history
+         WHERE child_id = $1
+         ORDER BY recorded_at DESC
+         LIMIT 1`,
+        [childId],
+      );
+      if (last.rowCount && last.rows[0]) {
+        const row = last.rows[0];
+        const recordedAt = row.recorded_at.toISOString();
+        const location = {
+          childId,
+          lat: row.lat,
+          lng: row.lng,
+          accuracyM: row.accuracy_m,
+          recordedAt,
+          timestamp: recordedAt,
+          accuracy: row.accuracy_m,
+          batteryLevel: null as number | null,
+          batteryCharging: null as boolean | null,
+        };
+        const ageSeconds = Math.floor(
+          (Date.now() - row.recorded_at.getTime()) / 1000,
+        );
+        // Re-warm Redis so subsequent polls are cheap.
+        await redis.set(
+          childLocationKey(childId),
+          JSON.stringify(location),
+          'EX',
+          config.LOCATION_TTL_SECONDS,
+        );
+        res.json({
+          childId,
+          location,
+          ttlSeconds: config.LOCATION_TTL_SECONDS,
+          ageSeconds,
+          isStale: true,
+          staleAfterSeconds: config.STALE_LOCATION_SECONDS,
+          batteryLevel: null,
+          batteryCharging: false,
+          batteryAlert: ageSeconds > config.STALE_LOCATION_SECONDS * 2 ? 'stale' : 'none',
+          fromHistory: true,
+        });
+        return;
+      }
+
       const profile = await pool.query<{ last_seen_at: Date | null }>(
         `SELECT last_seen_at FROM child_profiles WHERE user_id = $1`,
         [childId],
