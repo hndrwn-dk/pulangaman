@@ -12,39 +12,10 @@ import '../auth/auth_controller.dart';
 import '../rewards/rewards_screen.dart';
 import '../screentime/screen_time_screen.dart';
 import 'children_controller.dart';
+import 'kabar_inbox_screen.dart';
+import 'kabar_models.dart';
 import 'live_map_screen.dart';
 import 'more_screen.dart';
-
-class ChildKabarMessage {
-  ChildKabarMessage({
-    required this.id,
-    required this.childId,
-    required this.childName,
-    required this.text,
-    this.preset,
-    required this.sentAt,
-  });
-
-  final String id;
-  final String childId;
-  final String childName;
-  final String text;
-  final String? preset;
-  final DateTime sentAt;
-
-  factory ChildKabarMessage.fromJson(Map<String, dynamic> json) {
-    return ChildKabarMessage(
-      id: json['id'] as String? ??
-          '${json['childId']}-${json['sentAt']}-${json['text']}',
-      childId: json['childId'] as String? ?? '',
-      childName: json['childName'] as String? ?? 'Anak',
-      text: json['text'] as String? ?? '',
-      preset: json['preset'] as String?,
-      sentAt: DateTime.tryParse(json['sentAt']?.toString() ?? '') ??
-          DateTime.now(),
-    );
-  }
-}
 
 class ParentHomeScreen extends ConsumerStatefulWidget {
   const ParentHomeScreen({super.key});
@@ -153,51 +124,41 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${msg.childName}: ${msg.text}'),
-        backgroundColor: AppColors.tealDeep,
+        backgroundColor: msg.isUrgent ? AppColors.coral : AppColors.tealDeep,
       ),
     );
   }
 
-  IconData _presetIcon(String? preset) {
-    switch (preset) {
-      case 'at_school':
-        return Icons.school_rounded;
-      case 'at_home':
-        return Icons.home_rounded;
-      case 'need_help':
-        return Icons.support_agent_rounded;
-      default:
-        return Icons.chat_bubble_rounded;
-    }
+  void _openInbox({String? childId}) {
+    final children = ref.read(childrenControllerProvider).items;
+    final names = {for (final c in children) c.id: c.name};
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => KabarInboxScreen(
+          messages: List<ChildKabarMessage>.from(_messages),
+          initialChildId: childId,
+          childNames: names,
+        ),
+      ),
+    );
   }
 
-  Color _presetColor(String? preset) {
-    switch (preset) {
-      case 'at_school':
-        return AppColors.teal;
-      case 'at_home':
-        return AppColors.success;
-      case 'need_help':
-        return AppColors.coral;
-      default:
-        return AppColors.sky;
+  ChildKabarMessage? _latestFor(String childId) {
+    ChildKabarMessage? best;
+    for (final m in _messages) {
+      if (m.childId != childId) continue;
+      if (best == null || m.sentAt.isAfter(best.sentAt)) best = m;
     }
-  }
-
-  String _relativeTime(DateTime at) {
-    final age = DateTime.now().difference(at.toLocal());
-    if (age.inSeconds < 60) return 'baru saja';
-    if (age.inMinutes < 60) return '${age.inMinutes} mnt lalu';
-    if (age.inHours < 24) return '${age.inHours} jam lalu';
-    return '${age.inDays} hari lalu';
+    return best;
   }
 
   @override
   Widget build(BuildContext context) {
     final children = ref.watch(childrenControllerProvider);
     final auth = ref.watch(authControllerProvider);
+    final latestPerChild = latestKabarPerChild(_messages);
+    final urgent = latestPerChild.where((m) => m.isUrgent).toList();
 
-    // Keep WS rooms in sync when children list changes.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (children.items.isNotEmpty) _syncSubscriptions();
     });
@@ -261,7 +222,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             Row(
               children: [
                 Text(
-                  'Kabar terbaru',
+                  'Status anak',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
@@ -272,65 +233,41 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (_messages.isNotEmpty)
+                  TextButton(
+                    onPressed: () => _openInbox(),
+                    child: Text('Riwayat (${_messages.length})'),
                   ),
               ],
             ),
+            const SizedBox(height: 4),
+            const Text(
+              'Hanya kabar terakhir tiap anak. Buka riwayat untuk lihat semuanya.',
+              style: TextStyle(color: AppColors.inkSoft, fontSize: 12),
+            ),
             const SizedBox(height: 10),
-            if (_messages.isEmpty)
+            if (urgent.isNotEmpty) ...[
+              ...urgent.map((msg) => _UrgentBanner(
+                    msg: msg,
+                    onOpen: () => _openInbox(childId: msg.childId),
+                  )),
+              const SizedBox(height: 8),
+            ],
+            if (latestPerChild.isEmpty)
               PaSectionCard(
                 color: AppColors.sand.withValues(alpha: 0.5),
                 child: const Text(
-                  'Belum ada kabar dari anak. Pesan cepat dari HP anak akan muncul di sini.',
+                  'Belum ada kabar dari anak. Saat anak kirim pesan cepat, statusnya muncul di sini (satu kartu per anak).',
                   style: TextStyle(color: AppColors.inkSoft),
                 ),
               )
             else
-              ..._messages.take(8).map((msg) {
-                final color = _presetColor(msg.preset);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: color.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(_presetIcon(msg.preset), color: color),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                msg.childName,
-                                style: const TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                              Text(msg.text),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          _relativeTime(msg.sentAt),
-                          style: const TextStyle(
-                            color: AppColors.inkSoft,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              ...latestPerChild.map((msg) {
+                if (msg.isUrgent) return const SizedBox.shrink();
+                return _LatestStatusCard(
+                  msg: msg,
+                  onTap: () => _openInbox(childId: msg.childId),
                 );
               }),
             const SizedBox(height: AppSpacing.lg),
@@ -352,15 +289,49 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               )
             else
               ...children.items.map((child) {
+                final kabar = _latestFor(child.id);
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
-                    title: Text(child.name),
-                    subtitle: Text(
-                      child.lastSeenAt == null
-                          ? 'Belum ada lokasi'
-                          : 'Terakhir terlihat: ${child.lastSeenAt}',
+                    leading: CircleAvatar(
+                      backgroundColor: kabar == null
+                          ? AppColors.mint
+                          : kabarPresetColor(kabar.preset).withValues(alpha: 0.2),
+                      child: Icon(
+                        kabar == null
+                            ? Icons.child_care
+                            : kabarPresetIcon(kabar.preset),
+                        color: kabar == null
+                            ? AppColors.tealDeep
+                            : kabarPresetColor(kabar.preset),
+                      ),
                     ),
+                    title: Text(
+                      child.name,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(formatLastSeen(child.lastSeenAt)),
+                        if (kabar != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '${kabar.text} · ${kabarRelativeTime(kabar.sentAt)}',
+                            style: TextStyle(
+                              color: kabar.isUrgent
+                                  ? AppColors.coral
+                                  : AppColors.tealDeep,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                    isThreeLine: kabar != null,
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
@@ -486,6 +457,124 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         SnackBar(content: Text('Gagal buat kode: $e')),
       );
     }
+  }
+}
+
+class _UrgentBanner extends StatelessWidget {
+  const _UrgentBanner({required this.msg, required this.onOpen});
+
+  final ChildKabarMessage msg;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.coral.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const Icon(Icons.priority_high_rounded, color: AppColors.coral),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${msg.childName} butuh bantuan',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.coral,
+                        ),
+                      ),
+                      Text(
+                        '${msg.text} · ${kabarRelativeTime(msg.sentAt)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppColors.coral),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LatestStatusCard extends StatelessWidget {
+  const _LatestStatusCard({required this.msg, required this.onTap});
+
+  final ChildKabarMessage msg;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = kabarPresetColor(msg.preset);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(kabarPresetIcon(msg.preset), color: color),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        msg.childName,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        msg.text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  kabarRelativeTime(msg.sentAt),
+                  style: const TextStyle(
+                    color: AppColors.inkSoft,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

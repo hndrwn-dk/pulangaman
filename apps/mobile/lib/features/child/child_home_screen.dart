@@ -98,11 +98,49 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           _todayUsageSeconds = total;
         }
       });
+      if (period == UsagePeriod.today) {
+        unawaited(_uploadUsageTelemetry(apps));
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _usageApps = []);
     } finally {
       if (mounted) setState(() => _usageLoading = false);
+    }
+  }
+
+  Future<void> _uploadUsageTelemetry(List<UsageAppEntry> apps) async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null || apps.isEmpty) return;
+    final day = DateTime.now().toUtc().toIso8601String().substring(0, 10);
+    final now = DateTime.now().toUtc().toIso8601String();
+    final events = apps
+        .where((app) => app.packageName.isNotEmpty && app.durationSeconds > 0)
+        .take(80)
+        .map(
+          (app) => {
+            'clientEventId': 'usage-$day-${app.packageName}',
+            'kind': 'usage',
+            'packageName': app.packageName,
+            'durationSeconds': app.durationSeconds,
+            'recordedAt': now,
+            'payload': {
+              'appLabel': friendlyAppName(
+                app.packageName,
+                appLabel: app.appLabel,
+              ),
+            },
+          },
+        )
+        .toList();
+    if (events.isEmpty) return;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
+        'installationId': 'android-$userId',
+        'events': events,
+      });
+    } catch (_) {
+      // Telemetry is best-effort; parent UI still works without it.
     }
   }
 

@@ -43,12 +43,17 @@ telemetryRouter.post('/batch', async (req: AuthedRequest, res, next) => {
 
     let accepted = 0;
     for (const event of body.events) {
-      const result = await pool.query(
+      await pool.query(
         `INSERT INTO usage_telemetry
            (child_id, device_id, client_event_id, kind, package_name,
             duration_seconds, recorded_at, payload)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-         ON CONFLICT (child_id, client_event_id) DO NOTHING`,
+         ON CONFLICT (child_id, client_event_id) DO UPDATE
+           SET duration_seconds = EXCLUDED.duration_seconds,
+               recorded_at = EXCLUDED.recorded_at,
+               payload = EXCLUDED.payload,
+               kind = EXCLUDED.kind,
+               package_name = EXCLUDED.package_name`,
         [
           childId,
           device.rows[0].id,
@@ -60,7 +65,7 @@ telemetryRouter.post('/batch', async (req: AuthedRequest, res, next) => {
           JSON.stringify(event.payload ?? {}),
         ],
       );
-      accepted += result.rowCount ?? 0;
+      accepted += 1;
     }
     await pool.query(
       `UPDATE child_devices SET last_seen_at = now() WHERE id = $1`,
@@ -90,16 +95,25 @@ telemetryRouter.get('/:childId/summary', async (req: AuthedRequest, res, next) =
     }
     const result = await pool.query(
       `SELECT package_name,
+              MAX(payload->>'appLabel') AS app_label,
               SUM(COALESCE(duration_seconds, 0))::integer AS duration_seconds,
               COUNT(*) FILTER (WHERE kind = 'blocked')::integer AS blocked_count
        FROM usage_telemetry
        WHERE child_id = $1
+         AND kind = 'usage'
          AND recorded_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta')
        GROUP BY package_name
        ORDER BY duration_seconds DESC`,
       [childId],
     );
-    res.json({ apps: result.rows });
+    res.json({
+      apps: result.rows.map((row) => ({
+        package_name: row.package_name,
+        app_label: row.app_label,
+        duration_seconds: row.duration_seconds,
+        blocked_count: row.blocked_count,
+      })),
+    });
   } catch (error) {
     next(error);
   }
