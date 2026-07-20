@@ -8,6 +8,7 @@ import { config } from './config.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { childrenRouter } from './routes/children.js';
+import { childInvitesRouter } from './routes/childInvites.js';
 import { devicesRouter } from './routes/devices.js';
 import { zonesRouter } from './routes/zones.js';
 import { locationRouter } from './routes/location.js';
@@ -43,6 +44,7 @@ export function createApp() {
   app.use(healthRouter);
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/children', childrenRouter);
+  app.use('/api/v1/child-invites', childInvitesRouter);
   app.use('/api/v1/devices', devicesRouter);
   app.use('/api/v1/zones', zonesRouter);
   app.use('/api/v1/location', locationRouter);

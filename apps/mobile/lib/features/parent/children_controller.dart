@@ -28,10 +28,42 @@ class ChildSummary {
   }
 }
 
+class ChildInvite {
+  ChildInvite({
+    required this.id,
+    required this.code,
+    required this.status,
+    required this.expiresAt,
+    this.childDisplayName,
+  });
+
+  final String id;
+  final String code;
+  final String status;
+  final DateTime expiresAt;
+  final String? childDisplayName;
+
+  factory ChildInvite.fromJson(Map<String, dynamic> json) {
+    return ChildInvite(
+      id: json['id'] as String,
+      code: json['code'] as String,
+      status: json['status'] as String,
+      expiresAt: DateTime.parse(json['expires_at'] as String),
+      childDisplayName: json['child_display_name'] as String?,
+    );
+  }
+}
+
 class ChildrenState {
-  const ChildrenState({this.items = const [], this.loading = false, this.error});
+  const ChildrenState({
+    this.items = const [],
+    this.invites = const [],
+    this.loading = false,
+    this.error,
+  });
 
   final List<ChildSummary> items;
+  final List<ChildInvite> invites;
   final bool loading;
   final String? error;
 }
@@ -47,7 +79,11 @@ class ChildrenController extends StateNotifier<ChildrenState> {
   final Ref _ref;
 
   Future<void> refresh() async {
-    state = ChildrenState(items: state.items, loading: true);
+    state = ChildrenState(
+      items: state.items,
+      invites: state.invites,
+      loading: true,
+    );
     try {
       final api = _ref.read(apiClientProvider);
       final data = await api.get('/api/v1/children');
@@ -55,18 +91,36 @@ class ChildrenController extends StateNotifier<ChildrenState> {
           .cast<Map<String, dynamic>>()
           .map(ChildSummary.fromJson)
           .toList();
-      state = ChildrenState(items: list);
+      final invitesData = await api.get('/api/v1/child-invites');
+      final invites = (invitesData['invites'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(ChildInvite.fromJson)
+          .where((invite) => invite.status == 'pending')
+          .toList();
+      state = ChildrenState(items: list, invites: invites);
     } catch (e) {
-      state = ChildrenState(items: state.items, error: e.toString());
+      state = ChildrenState(
+        items: state.items,
+        invites: state.invites,
+        error: e.toString(),
+      );
     }
   }
 
-  Future<void> addChild({required String name, required String phone}) async {
+  Future<ChildInvite> createInvite({String? childDisplayName}) async {
     final api = _ref.read(apiClientProvider);
-    await api.post('/api/v1/children', body: {
-      'name': name.trim(),
-      'phone': phone.trim(),
+    final data = await api.post('/api/v1/child-invites', body: {
+      if (childDisplayName != null && childDisplayName.trim().isNotEmpty)
+        'childDisplayName': childDisplayName.trim(),
     });
+    final invite = ChildInvite(
+      id: data['id'] as String,
+      code: data['code'] as String,
+      status: 'pending',
+      expiresAt: DateTime.parse(data['expiresAt'] as String),
+      childDisplayName: data['childDisplayName'] as String?,
+    );
     await refresh();
+    return invite;
   }
 }

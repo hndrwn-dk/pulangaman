@@ -125,6 +125,46 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// Child joins via parent invite code (no phone match needed).
+  Future<void> joinWithInvite({
+    required String name,
+    required String inviteCode,
+  }) async {
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final joined = await api.post('/api/v1/child-invites/join', body: {
+        'name': name.trim(),
+        'code': inviteCode.trim().toUpperCase(),
+      });
+
+      final firebaseUid = joined['firebaseUid'] as String;
+      final token = AppConfig.useDevAuth
+          ? (joined['tokenHint'] as String? ?? 'dev:$firebaseUid')
+          : firebaseUid;
+      final userId = joined['userId'] as String;
+      final displayName = (joined['name'] as String?)?.trim().isNotEmpty == true
+          ? joined['name'] as String
+          : name.trim();
+
+      api.setToken(token);
+      await store.save(
+        token: token,
+        userId: userId,
+        role: AppRole.child.name,
+        name: displayName,
+      );
+
+      state = AuthState(
+        token: token,
+        userId: userId,
+        role: AppRole.child,
+        name: displayName,
+      );
+    } catch (e) {
+      state = state.copyWith(loading: false, error: e.toString());
+    }
+  }
+
   Future<void> logout() async {
     await store.clear();
     api.setToken(null);

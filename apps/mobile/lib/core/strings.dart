@@ -11,7 +11,11 @@ abstract final class AppStrings {
   static const nameLabel = 'Nama';
   static const loginAction = 'Masuk';
   static const childrenTitle = 'Anak saya';
-  static const addChild = 'Tambah anak';
+  static const addChild = 'Undang anak';
+  static const inviteCodeLabel = 'Kode undangan';
+  static const createInvite = 'Buat kode undangan';
+  static const inviteShareHint =
+      'Bagikan kode ini ke HP anak. Berlaku 24 jam.';
   static const liveMap = 'Peta langsung';
   static const zonesTitle = 'Zona aman';
   static const guardiansTitle = 'Wali terpercaya';

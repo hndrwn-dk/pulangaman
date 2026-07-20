@@ -97,7 +97,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
               const PaEmptyState(
                 icon: Icons.child_care,
                 title: 'Belum ada anak',
-                message: 'Hubungkan perangkat anak untuk mulai menjaga perjalanan mereka.',
+                message:
+                    'Buat kode undangan, lalu masukkan kode itu di HP anak.',
               )
             else
               ...children.items.map((child) {
@@ -121,11 +122,46 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
                   ),
                 );
               }),
+            if (children.invites.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Kode menunggu dipakai',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              ...children.invites.map((invite) {
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.vpn_key, color: AppColors.teal),
+                    title: Text(
+                      invite.code,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    subtitle: Text(
+                      invite.childDisplayName == null
+                          ? 'Berlaku sampai ${invite.expiresAt.toLocal()}'
+                          : '${invite.childDisplayName} · sampai ${invite.expiresAt.toLocal()}',
+                    ),
+                  ),
+                );
+              }),
+            ],
+            if (children.error != null) ...[
+              const SizedBox(height: 8),
+              Text(children.error!, style: const TextStyle(color: AppColors.danger)),
+            ],
             const SizedBox(height: 8),
             FilledButton.icon(
-              onPressed: () => _showAddChild(context),
-              icon: const Icon(Icons.person_add),
-              label: const Text(AppStrings.addChild),
+              onPressed: () => _showCreateInvite(context),
+              icon: const Icon(Icons.qr_code_2),
+              label: const Text(AppStrings.createInvite),
               style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
             ),
           ],
@@ -134,41 +170,68 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen> {
     );
   }
 
-  Future<void> _showAddChild(BuildContext context) async {
+  Future<void> _showCreateInvite(BuildContext context) async {
     final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController(text: '+62813');
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(AppStrings.addChild),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: AppStrings.nameLabel),
-            ),
-            TextField(
-              controller: phoneCtrl,
-              decoration: const InputDecoration(labelText: AppStrings.phoneLabel),
-              keyboardType: TextInputType.phone,
-            ),
-          ],
+        title: const Text(AppStrings.createInvite),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Nama panggilan anak (opsional)',
+            hintText: 'Contoh: Andi',
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(AppStrings.save),
+            child: const Text('Buat kode'),
           ),
         ],
       ),
     );
-    if (ok == true) {
-      await ref.read(childrenControllerProvider.notifier).addChild(
-            name: nameCtrl.text,
-            phone: phoneCtrl.text,
+    if (ok != true || !context.mounted) return;
+
+    try {
+      final invite = await ref.read(childrenControllerProvider.notifier).createInvite(
+            childDisplayName: nameCtrl.text,
           );
+      if (!context.mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Kode undangan siap'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                invite.code,
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                  color: AppColors.tealDeep,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(AppStrings.inviteShareHint),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal buat kode: $e')),
+      );
     }
   }
 }

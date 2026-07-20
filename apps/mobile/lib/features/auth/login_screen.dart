@@ -15,12 +15,14 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController(text: '+62812');
+  final _inviteCtrl = TextEditingController();
   AppRole _role = AppRole.parent;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
+    _inviteCtrl.dispose();
     super.dispose();
   }
 
@@ -103,14 +105,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: AppStrings.phoneLabel,
-                  border: OutlineInputBorder(),
+              if (_role == AppRole.child)
+                TextField(
+                  controller: _inviteCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.inviteCodeLabel,
+                    hintText: 'Contoh: A7K2M9',
+                    border: OutlineInputBorder(),
+                    helperText: 'Minta kode 6 digit dari orang tua',
+                  ),
+                )
+              else
+                TextField(
+                  controller: _phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: AppStrings.phoneLabel,
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
               const SizedBox(height: 16),
               SegmentedButton<AppRole>(
                 segments: const [
@@ -130,11 +144,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: auth.loading
                     ? null
                     : () {
-                        ref.read(authControllerProvider.notifier).login(
-                              name: _nameCtrl.text,
-                              phone: _phoneCtrl.text,
-                              role: _role,
-                            );
+                        if (_role == AppRole.child) {
+                          ref.read(authControllerProvider.notifier).joinWithInvite(
+                                name: _nameCtrl.text,
+                                inviteCode: _inviteCtrl.text,
+                              );
+                        } else {
+                          ref.read(authControllerProvider.notifier).login(
+                                name: _nameCtrl.text,
+                                phone: _phoneCtrl.text,
+                                role: _role,
+                              );
+                        }
                       },
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.teal,
