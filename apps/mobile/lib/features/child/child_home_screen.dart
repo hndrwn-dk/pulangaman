@@ -4,17 +4,19 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config.dart';
 import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
-import '../../core/theme.dart';
 import '../auth/auth_controller.dart';
 import '../screentime/screen_time_channel.dart';
 import 'child_beranda_tab.dart';
 import 'child_kabar_tab.dart';
 import 'child_layar_tab.dart';
 import 'child_usage_utils.dart';
+import 'location_tracking_channel.dart';
 import 'panic_tap_counter.dart';
 
 final offlineQueueProvider = Provider<OfflineQueue>((ref) => OfflineQueue());
@@ -28,7 +30,6 @@ class ChildHomeScreen extends ConsumerStatefulWidget {
 
 class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     with WidgetsBindingObserver {
-  Timer? _timer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   bool _tracking = false;
   bool _panicMode = false;
@@ -46,6 +47,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   bool _usageLoading = false;
   String? _sendingPresetId;
   final ScreenTimeChannel _screenTimeChannel = ScreenTimeChannel();
+  final LocationTrackingChannel _locationChannel = LocationTrackingChannel();
 
   @override
   void initState() {
@@ -61,6 +63,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshScreenTimeAndRewards());
+      unawaited(_ensureNativeTracking());
     }
   }
 
@@ -163,25 +166,83 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     final permission = await Geolocator.requestPermission();
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
       setState(() => _status = 'Izin lokasi ditolak');
       return;
     }
-    setState(() {
-      _tracking = true;
-      _status = AppStrings.trackingOn;
-    });
-    _scheduleTick();
+
+    // Android 10+: request "Allow all the time" so tracking survives background.
+    final always = await Permission.locationAlways.request();
+    await Permission.notification.request();
+
+    final token = ref.read(authControllerProvider).token;
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      setState(() => _status = 'Sesi belum siap');
+      return;
+    }
+
+    try {
+      await _locationChannel.start(
+        token: token,
+        apiBaseUrl: AppConfig.apiBaseUrl,
+        panic: _panicMode,
+      );
+      // One immediate foreground push so parent sees a point right away.
+      await _pushLocationOnce();
+      if (!mounted) return;
+      setState(() {
+        _tracking = true;
+        _status = always.isGranted
+            ? AppStrings.trackingOn
+            : 'Lokasi aktif — izinkan "Selalu" agar tetap jalan di background';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _tracking = true;
+        _status = AppStrings.trackingOn;
+      });
+      unawaited(_pushLocationOnce());
+    }
   }
 
-  void _scheduleTick() {
-    _timer?.cancel();
-    final interval = _panicMode
-        ? const Duration(seconds: 3)
-        : const Duration(seconds: 10);
-    _timer = Timer.periodic(interval, (_) => _pushLocation());
+  Future<void> _ensureNativeTracking() async {
+    if (!_tracking) return;
+    final token = ref.read(authControllerProvider).token;
+    if (token == null) return;
+    try {
+      final running = await _locationChannel.isRunning();
+      if (!running) {
+        await _locationChannel.start(
+          token: token,
+          apiBaseUrl: AppConfig.apiBaseUrl,
+          panic: _panicMode,
+        );
+      } else {
+        await _locationChannel.update(
+          token: token,
+          apiBaseUrl: AppConfig.apiBaseUrl,
+          panic: _panicMode,
+        );
+      }
+    } catch (_) {}
   }
 
-  Future<void> _pushLocation() async {
+  Future<void> _setPanicMode(bool enabled) async {
+    _panicMode = enabled;
+    final token = ref.read(authControllerProvider).token;
+    if (token == null) return;
+    try {
+      await _locationChannel.update(
+        token: token,
+        apiBaseUrl: AppConfig.apiBaseUrl,
+        panic: enabled,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _pushLocationOnce() async {
     try {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -198,16 +259,15 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       final online = await _isOnline();
       if (!online) {
         await ref.read(offlineQueueProvider).enqueue('location', body);
-        setState(() => _status = AppStrings.offlineQueued);
+        if (mounted) setState(() => _status = AppStrings.offlineQueued);
         return;
       }
 
-      final api = ref.read(apiClientProvider);
-      await api.post('/api/v1/location', body: body);
-      setState(() => _status = AppStrings.trackingOn);
+      await ref.read(apiClientProvider).post('/api/v1/location', body: body);
+      if (mounted) setState(() => _status = AppStrings.trackingOn);
       await _flushQueue();
-    } catch (e) {
-      setState(() => _status = 'Gagal kirim lokasi');
+    } catch (_) {
+      if (mounted) setState(() => _status = 'Gagal kirim lokasi');
     }
   }
 
@@ -261,7 +321,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (mounted) {
       setState(() => _panicMode = true);
     }
-    _scheduleTick();
+    await _setPanicMode(true);
 
     Position? pos;
     try {
@@ -345,8 +405,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _timer?.cancel();
     _connectivitySub?.cancel();
+    // Keep native FGS running after Flutter dispose so background tracking continues.
     super.dispose();
   }
 
@@ -360,7 +420,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         title: Text('${AppStrings.brand} · $childName'),
         actions: [
           IconButton(
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+            onPressed: () async {
+              try {
+                await _locationChannel.stop();
+              } catch (_) {}
+              await ref.read(authControllerProvider.notifier).logout();
+            },
             icon: const Icon(Icons.logout),
           ),
         ],

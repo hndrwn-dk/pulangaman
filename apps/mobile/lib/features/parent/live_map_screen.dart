@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,10 +24,14 @@ class LiveMapScreen extends ConsumerStatefulWidget {
 class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   final _ws = WsClient();
   GoogleMapController? _mapController;
+  final List<LatLng> _trail = [];
   LatLng? _position;
+  DateTime? _updatedAt;
   bool _stale = true;
   String? _alertId;
+  String? _kabarBanner;
   Timer? _poll;
+  Timer? _kabarClear;
 
   @override
   void initState() {
@@ -35,6 +40,7 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   }
 
   Future<void> _bootstrap() async {
+    await _fetchHistory();
     await _fetchLocation();
     final token = ref.read(authControllerProvider).token;
     if (token != null) {
@@ -45,7 +51,63 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     _poll = Timer.periodic(const Duration(seconds: 10), (_) => _fetchLocation());
   }
 
-  void _updatePosition(LatLng position, {required bool stale}) {
+  Future<void> _fetchHistory() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final data = await api.get(
+        '/api/v1/children/${widget.child.id}/location/history',
+        query: {'minutes': '120'},
+      );
+      final points = (data['points'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((p) {
+            final lat = (p['lat'] as num?)?.toDouble();
+            final lng = (p['lng'] as num?)?.toDouble();
+            if (lat == null || lng == null) return null;
+            return LatLng(lat, lng);
+          })
+          .whereType<LatLng>()
+          .toList();
+      if (!mounted || points.isEmpty) return;
+      setState(() {
+        _trail
+          ..clear()
+          ..addAll(_downsample(points));
+        _position = points.last;
+        _stale = false;
+      });
+      _fitTrail();
+    } catch (_) {
+      // History may be empty for new children.
+    }
+  }
+
+  List<LatLng> _downsample(List<LatLng> points) {
+    if (points.length <= 300) return points;
+    final step = (points.length / 300).ceil();
+    final out = <LatLng>[];
+    for (var i = 0; i < points.length; i += step) {
+      out.add(points[i]);
+    }
+    if (out.last != points.last) out.add(points.last);
+    return out;
+  }
+
+  void _appendTrail(LatLng position) {
+    if (_trail.isNotEmpty) {
+      final last = _trail.last;
+      final dLat = (last.latitude - position.latitude).abs();
+      final dLng = (last.longitude - position.longitude).abs();
+      // ~1m threshold — skip near-duplicates.
+      if (dLat < 0.00001 && dLng < 0.00001) return;
+    }
+    _trail.add(position);
+    if (_trail.length > 400) {
+      _trail.removeRange(0, _trail.length - 400);
+    }
+  }
+
+  void _updatePosition(LatLng position, {required bool stale, DateTime? at}) {
     final isFirst = _position == null;
     final moved = isFirst ||
         (_position!.latitude - position.latitude).abs() > 0.00001 ||
@@ -53,6 +115,8 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     setState(() {
       _position = position;
       _stale = stale;
+      _updatedAt = at ?? DateTime.now();
+      if (moved) _appendTrail(position);
     });
     if (moved) {
       _mapController?.animateCamera(
@@ -63,17 +127,60 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     }
   }
 
+  void _fitTrail() {
+    if (_mapController == null || _trail.isEmpty) return;
+    if (_trail.length == 1) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(_trail.first, 15),
+      );
+      return;
+    }
+    var minLat = _trail.first.latitude;
+    var maxLat = _trail.first.latitude;
+    var minLng = _trail.first.longitude;
+    var maxLng = _trail.first.longitude;
+    for (final p in _trail) {
+      minLat = math.min(minLat, p.latitude);
+      maxLat = math.max(maxLat, p.latitude);
+      minLng = math.min(minLng, p.longitude);
+      maxLng = math.max(maxLng, p.longitude);
+    }
+    _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        64,
+      ),
+    );
+  }
+
   void _onWs(String event, Map<String, dynamic> payload) {
     if (event == 'child:location_update' &&
         payload['childId'] == widget.child.id) {
       final lat = (payload['lat'] as num?)?.toDouble();
       final lng = (payload['lng'] as num?)?.toDouble();
       if (lat != null && lng != null) {
-        _updatePosition(LatLng(lat, lng), stale: false);
+        final recorded = payload['recordedAt'] as String?;
+        _updatePosition(
+          LatLng(lat, lng),
+          stale: false,
+          at: recorded != null ? DateTime.tryParse(recorded) : null,
+        );
       }
     }
     if (event == 'child:panic_triggered') {
       setState(() => _alertId = payload['alertId'] as String?);
+    }
+    if (event == 'child:message' && payload['childId'] == widget.child.id) {
+      final text = payload['text'] as String? ?? 'Kabar baru';
+      final name = payload['childName'] as String? ?? widget.child.name;
+      setState(() => _kabarBanner = '$name: $text');
+      _kabarClear?.cancel();
+      _kabarClear = Timer(const Duration(seconds: 8), () {
+        if (mounted) setState(() => _kabarBanner = null);
+      });
     }
   }
 
@@ -85,7 +192,12 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       final lat = (loc?['lat'] as num?)?.toDouble();
       final lng = (loc?['lng'] as num?)?.toDouble();
       if (lat != null && lng != null) {
-        _updatePosition(LatLng(lat, lng), stale: data['isStale'] == true);
+        final recorded = loc?['recordedAt'] as String?;
+        _updatePosition(
+          LatLng(lat, lng),
+          stale: data['isStale'] == true,
+          at: recorded != null ? DateTime.tryParse(recorded) : null,
+        );
       } else {
         setState(() => _stale = true);
       }
@@ -114,9 +226,20 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     setState(() => _alertId = null);
   }
 
+  String _statusLabel() {
+    if (_position == null) return 'Menunggu sinyal lokasi...';
+    if (_stale) return 'Lokasi tidak diperbarui baru-baru ini';
+    if (_updatedAt == null) return 'Live';
+    final age = DateTime.now().difference(_updatedAt!);
+    if (age.inSeconds < 20) return 'Live · baru saja';
+    if (age.inMinutes < 1) return 'Live · ${age.inSeconds}d lalu';
+    return 'Live · ${age.inMinutes} mnt lalu';
+  }
+
   @override
   void dispose() {
     _poll?.cancel();
+    _kabarClear?.cancel();
     _mapController?.dispose();
     _ws.removeHandler(_onWs);
     unawaited(_ws.disconnect());
@@ -126,6 +249,16 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
   @override
   Widget build(BuildContext context) {
     final center = _position ?? const LatLng(-6.2, 106.8);
+    final polylines = <Polyline>{
+      if (_trail.length >= 2)
+        Polyline(
+          polylineId: const PolylineId('trail'),
+          points: List<LatLng>.from(_trail),
+          color: AppColors.teal,
+          width: 5,
+          geodesic: true,
+        ),
+    };
 
     return Scaffold(
       appBar: AppBar(title: Text('${AppStrings.liveMap} · ${widget.child.name}')),
@@ -148,6 +281,18 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                 TextButton(onPressed: _resolve, child: const Text(AppStrings.resolveAlert)),
               ],
             ),
+          if (_kabarBanner != null)
+            MaterialBanner(
+              content: Text(_kabarBanner!),
+              backgroundColor: const Color(0xFFE8F8F2),
+              leading: const Icon(Icons.chat_bubble, color: AppColors.teal),
+              actions: [
+                TextButton(
+                  onPressed: () => setState(() => _kabarBanner = null),
+                  child: const Text('Tutup'),
+                ),
+              ],
+            ),
           Expanded(
             child: Stack(
               children: [
@@ -155,7 +300,9 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                   initialCameraPosition: CameraPosition(target: center, zoom: 15),
                   onMapCreated: (controller) {
                     _mapController = controller;
-                    if (_position != null) {
+                    if (_trail.length >= 2) {
+                      _fitTrail();
+                    } else if (_position != null) {
                       controller.animateCamera(
                         CameraUpdate.newLatLngZoom(_position!, 15),
                       );
@@ -169,35 +316,72 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
                         infoWindow: InfoWindow(title: widget.child.name),
                       ),
                   },
+                  polylines: polylines,
                   myLocationButtonEnabled: false,
                   zoomControlsEnabled: false,
                 ),
-                if (_position != null)
-                  Positioned(
-                    left: 12,
-                    right: 12,
-                    bottom: 16,
-                    child: Material(
-                      elevation: 2,
-                      borderRadius: BorderRadius.circular(8),
-                      color: Colors.white.withValues(alpha: 0.95),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        child: Text(
-                          '${AppStrings.lastKnownCoords}: '
-                          '${_position!.latitude.toStringAsFixed(5)}, '
-                          '${_position!.longitude.toStringAsFixed(5)}',
-                          textAlign: TextAlign.center,
-                        ),
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 16,
+                  child: Material(
+                    elevation: 3,
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white.withValues(alpha: 0.96),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: _stale ? AppColors.amber : AppColors.success,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _statusLabel(),
+                                  style: const TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                              ),
+                              Text(
+                                '${_trail.length} titik',
+                                style: const TextStyle(
+                                  color: AppColors.inkSoft,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_position != null) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              '${_position!.latitude.toStringAsFixed(5)}, '
+                              '${_position!.longitude.toStringAsFixed(5)}',
+                              style: const TextStyle(
+                                color: AppColors.inkSoft,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
+                ),
                 Positioned(
                   right: 16,
-                  bottom: 72,
+                  bottom: 96,
                   child: FloatingActionButton.extended(
                     onPressed: () {
                       Navigator.of(context).push(

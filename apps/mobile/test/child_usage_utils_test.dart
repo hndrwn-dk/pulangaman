@@ -16,6 +16,14 @@ void main() {
     });
   });
 
+  group('formatDurationCompact', () {
+    test('uses short units for ring display', () {
+      expect(formatDurationCompact(0), '0m');
+      expect(formatDurationCompact(90), '1m');
+      expect(formatDurationCompact(3660), '1j 1m');
+    });
+  });
+
   group('friendlyAppName', () {
     test('maps known packages', () {
       expect(
@@ -25,6 +33,13 @@ void main() {
       expect(
         friendlyAppName('com.tursinalabs.pulangaman'),
         'PulangAman',
+      );
+    });
+
+    test('prefers native app label when provided', () {
+      expect(
+        friendlyAppName('com.example.myapp', appLabel: 'My Game'),
+        'My Game',
       );
     });
 
@@ -38,9 +53,11 @@ void main() {
       final entry = UsageAppEntry.fromJson({
         'packageName': 'com.test.app',
         'durationSeconds': 120,
+        'appLabel': 'Test',
       });
       expect(entry.packageName, 'com.test.app');
       expect(entry.durationSeconds, 120);
+      expect(entry.appLabel, 'Test');
     });
   });
 }

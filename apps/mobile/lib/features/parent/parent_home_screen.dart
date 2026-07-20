@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/network/ws_client.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
@@ -12,6 +15,37 @@ import 'children_controller.dart';
 import 'live_map_screen.dart';
 import 'more_screen.dart';
 
+class ChildKabarMessage {
+  ChildKabarMessage({
+    required this.id,
+    required this.childId,
+    required this.childName,
+    required this.text,
+    this.preset,
+    required this.sentAt,
+  });
+
+  final String id;
+  final String childId;
+  final String childName;
+  final String text;
+  final String? preset;
+  final DateTime sentAt;
+
+  factory ChildKabarMessage.fromJson(Map<String, dynamic> json) {
+    return ChildKabarMessage(
+      id: json['id'] as String? ??
+          '${json['childId']}-${json['sentAt']}-${json['text']}',
+      childId: json['childId'] as String? ?? '',
+      childName: json['childName'] as String? ?? 'Anak',
+      text: json['text'] as String? ?? '',
+      preset: json['preset'] as String?,
+      sentAt: DateTime.tryParse(json['sentAt']?.toString() ?? '') ??
+          DateTime.now(),
+    );
+  }
+}
+
 class ParentHomeScreen extends ConsumerStatefulWidget {
   const ParentHomeScreen({super.key});
 
@@ -21,16 +55,27 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
 
 class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     with WidgetsBindingObserver {
+  final _ws = WsClient();
+  final List<ChildKabarMessage> _messages = [];
+  bool _messagesLoading = false;
+  Set<String> _subscribedChildren = {};
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() => ref.read(childrenControllerProvider.notifier).refresh());
+    Future.microtask(() async {
+      await ref.read(childrenControllerProvider.notifier).refresh();
+      await _loadMessages();
+      await _connectWs();
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _ws.removeHandler(_onWs);
+    unawaited(_ws.disconnect());
     super.dispose();
   }
 
@@ -38,13 +83,124 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(childrenControllerProvider.notifier).refresh();
+      unawaited(_loadMessages());
+      unawaited(_connectWs());
     }
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() => _messagesLoading = true);
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/messages');
+      final list = (data['messages'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ChildKabarMessage.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(list);
+      });
+    } catch (_) {
+      // Parent may not have messages yet.
+    } finally {
+      if (mounted) setState(() => _messagesLoading = false);
+    }
+  }
+
+  Future<void> _connectWs() async {
+    final token = ref.read(authControllerProvider).token;
+    if (token == null) return;
+    try {
+      if (!_ws.isConnected) {
+        await _ws.connect(token);
+        _ws.addHandler(_onWs);
+      }
+      _syncSubscriptions();
+    } catch (_) {}
+  }
+
+  void _syncSubscriptions() {
+    final children = ref.read(childrenControllerProvider).items;
+    final ids = children.map((c) => c.id).toSet();
+    for (final id in ids.difference(_subscribedChildren)) {
+      _ws.subscribe('child:$id');
+    }
+    _subscribedChildren = ids;
+  }
+
+  void _onWs(String event, Map<String, dynamic> payload) {
+    if (event != 'child:message') return;
+    final msg = ChildKabarMessage.fromJson({
+      'id': payload['id'] ??
+          '${payload['childId']}-${payload['sentAt']}-${payload['text']}',
+      'childId': payload['childId'],
+      'childName': payload['childName'],
+      'text': payload['text'],
+      'preset': payload['preset'],
+      'sentAt': payload['sentAt'] ?? DateTime.now().toIso8601String(),
+    });
+    if (!mounted) return;
+    setState(() {
+      _messages.removeWhere((m) => m.id == msg.id);
+      _messages.insert(0, msg);
+      if (_messages.length > 50) {
+        _messages.removeRange(50, _messages.length);
+      }
+    });
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${msg.childName}: ${msg.text}'),
+        backgroundColor: AppColors.tealDeep,
+      ),
+    );
+  }
+
+  IconData _presetIcon(String? preset) {
+    switch (preset) {
+      case 'at_school':
+        return Icons.school_rounded;
+      case 'at_home':
+        return Icons.home_rounded;
+      case 'need_help':
+        return Icons.support_agent_rounded;
+      default:
+        return Icons.chat_bubble_rounded;
+    }
+  }
+
+  Color _presetColor(String? preset) {
+    switch (preset) {
+      case 'at_school':
+        return AppColors.teal;
+      case 'at_home':
+        return AppColors.success;
+      case 'need_help':
+        return AppColors.coral;
+      default:
+        return AppColors.sky;
+    }
+  }
+
+  String _relativeTime(DateTime at) {
+    final age = DateTime.now().difference(at.toLocal());
+    if (age.inSeconds < 60) return 'baru saja';
+    if (age.inMinutes < 60) return '${age.inMinutes} mnt lalu';
+    if (age.inHours < 24) return '${age.inHours} jam lalu';
+    return '${age.inDays} hari lalu';
   }
 
   @override
   Widget build(BuildContext context) {
     final children = ref.watch(childrenControllerProvider);
     final auth = ref.watch(authControllerProvider);
+
+    // Keep WS rooms in sync when children list changes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (children.items.isNotEmpty) _syncSubscriptions();
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -58,7 +214,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(childrenControllerProvider.notifier).refresh(),
+        onRefresh: () async {
+          await ref.read(childrenControllerProvider.notifier).refresh();
+          await _loadMessages();
+        },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -98,6 +257,82 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 ],
               ),
             ),
+            const SizedBox(height: AppSpacing.lg),
+            Row(
+              children: [
+                Text(
+                  'Kabar terbaru',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const Spacer(),
+                if (_messagesLoading)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_messages.isEmpty)
+              PaSectionCard(
+                color: AppColors.sand.withValues(alpha: 0.5),
+                child: const Text(
+                  'Belum ada kabar dari anak. Pesan cepat dari HP anak akan muncul di sini.',
+                  style: TextStyle(color: AppColors.inkSoft),
+                ),
+              )
+            else
+              ..._messages.take(8).map((msg) {
+                final color = _presetColor(msg.preset);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: color.withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(_presetIcon(msg.preset), color: color),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                msg.childName,
+                                style: const TextStyle(fontWeight: FontWeight.w800),
+                              ),
+                              Text(msg.text),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          _relativeTime(msg.sentAt),
+                          style: const TextStyle(
+                            color: AppColors.inkSoft,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
             const SizedBox(height: AppSpacing.lg),
             Text(
               AppStrings.childrenTitle,

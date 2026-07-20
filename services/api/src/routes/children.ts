@@ -148,6 +148,62 @@ childrenRouter.get('/', async (req: AuthedRequest, res, next) => {
   }
 });
 
+childrenRouter.get('/:id/location/history', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const childId = String(req.params.id);
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    if (!(await assertParentOfChild(parentId, childId))) {
+      res.status(404).json({ error: 'child_not_found' });
+      return;
+    }
+
+    const minutesRaw = Number(req.query.minutes ?? 60);
+    const minutes = Number.isFinite(minutesRaw)
+      ? Math.min(360, Math.max(5, Math.floor(minutesRaw)))
+      : 60;
+
+    const result = await pool.query<{
+      lat: number;
+      lng: number;
+      recorded_at: Date;
+      accuracy_m: number | null;
+      source: string;
+    }>(
+      `SELECT
+         ST_Y(location::geometry) AS lat,
+         ST_X(location::geometry) AS lng,
+         recorded_at,
+         accuracy_m,
+         source
+       FROM location_history
+       WHERE child_id = $1
+         AND recorded_at > now() - ($2 * interval '1 minute')
+       ORDER BY recorded_at ASC
+       LIMIT 2000`,
+      [childId, minutes],
+    );
+
+    res.json({
+      childId,
+      minutes,
+      points: result.rows.map((row) => ({
+        lat: row.lat,
+        lng: row.lng,
+        recordedAt: row.recorded_at,
+        accuracyM: row.accuracy_m,
+        source: row.source,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
