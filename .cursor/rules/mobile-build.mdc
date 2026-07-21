@@ -1,0 +1,84 @@
+---
+description: Flutter mobile build, install, and API target for PulangAman agents
+alwaysApply: true
+---
+
+# PulangAman mobile build procedure
+
+## API target (compile-time)
+
+`AppConfig` in `apps/mobile/lib/core/config.dart` uses `String.fromEnvironment` — URLs are **baked in at build time**, not read at runtime.
+
+| Target | When to use |
+|--------|-------------|
+| **Cloud (default)** | Normal testing, parent/child on real devices or emulators |
+| **Local** | Only when `services/api` runs on the host (`npm run dev`) |
+
+**Cloud defaults** (no extra defines needed):
+- API: `https://pulangaman-api.onrender.com`
+- WS: `wss://pulangaman-api.onrender.com`
+- Auth: `USE_DEV_AUTH=true` (default)
+
+**Local override** (Android emulator → host machine):
+```bash
+--dart-define=API_BASE_URL=http://10.0.2.2:3000 \
+--dart-define=WS_BASE_URL=ws://10.0.2.2:3000 \
+--dart-define=USE_DEV_AUTH=true
+```
+
+Never ship a build that points at `10.0.2.2` unless the user explicitly tests against a local API.
+
+## Standard cloud APK build + install
+
+Run from `apps/mobile`. Always **rebuild and reinstall** after config or native changes; hot reload does not update `dart-define` values.
+
+```bash
+cd apps/mobile
+flutter build apk --debug --dart-define=USE_DEV_AUTH=true
+```
+
+Install (pick device with `adb devices`):
+
+```bash
+# Parent (emulator)
+adb -s emulator-5554 shell am force-stop com.tursinalabs.pulangaman
+adb -s emulator-5554 install -r build/app/outputs/flutter-apk/app-debug.apk
+adb -s emulator-5554 shell am start -n com.tursinalabs.pulangaman/.MainActivity
+
+# Child (physical Pixel — serial may differ)
+adb -s 3A251FDJG0045D install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
+Package: `com.tursinalabs.pulangaman`
+
+## `flutter run` (dev)
+
+Same defines as above. For cloud testing, defaults are enough:
+
+```bash
+flutter run -d emulator-5554 --dart-define=USE_DEV_AUTH=true
+```
+
+Full restart required after changing `--dart-define` or `config.dart` defaults.
+
+## Google Maps
+
+Maps tiles need `GOOGLE_MAPS_API_KEY` in `android/local.properties` **and** optional `--dart-define=GOOGLE_MAPS_API_KEY=...` for in-app banner. Rebuild after key changes.
+
+## API changes (Render)
+
+Mobile-only changes do **not** update the server. If the task touches `services/api/`:
+
+1. Commit and `git push origin main` (Render auto-deploys from `render.yaml`).
+2. Wait for deploy; verify: `curl https://pulangaman-api.onrender.com/health`
+3. Then rebuild/install the Flutter app if the client depends on new endpoints.
+
+Migrations run on start: `npm run migrate && node dist/index.js`.
+
+## Agent checklist
+
+- [ ] Confirm target: cloud vs local API
+- [ ] `flutter build apk` (or `flutter run`) with correct defines
+- [ ] Install on the device the user named (parent emulator vs child phone)
+- [ ] If API was changed, push to Render and verify `/health` before mobile smoke test
+- [ ] Do not commit secrets (`.env`, `local.properties` keys)

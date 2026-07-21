@@ -92,17 +92,13 @@ class _BrandHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: AppColors.amber,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.home_rounded,
-              color: AppColors.tealDeep,
-              size: 32,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              width: 58,
+              height: 58,
+              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 14),

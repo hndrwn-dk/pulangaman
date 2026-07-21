@@ -1,0 +1,41 @@
+---
+description: API build, migrate, and Render deploy for PulangAman
+globs: services/api/**
+alwaysApply: false
+---
+
+# PulangAman API deploy procedure
+
+## Local dev
+
+```bash
+cd services/api
+npm install
+npm run migrate   # needs DATABASE_URL in .env
+npm run dev
+```
+
+Health: `curl http://127.0.0.1:3000/health`
+
+## Production (Render)
+
+- Service: `pulangaman-api` — root `services/api`, auto-deploy on push to `main`
+- Build: `npm ci --include=dev && npm run build`
+- Start: `npm run migrate && node dist/index.js`
+- Health: `https://pulangaman-api.onrender.com/health`
+
+After pushing API changes:
+
+1. `git push origin main`
+2. Poll `/health` until `ok: true` (cold start can take ~30–50s)
+3. Tell the user to rebuild the Flutter app if endpoints or response shapes changed
+
+## Auth mode
+
+Mobile currently uses **dev-auth** (`Bearer dev:<uid>`). `FIREBASE_PROJECT_ID` on Render should stay empty until Firebase login ships in the app.
+
+## Do not
+
+- Skip migrations on production (handled by `startCommand`)
+- Commit `.env` or credentials
+- Assume mobile picks up API changes without a new APK when response contracts change
