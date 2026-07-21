@@ -312,17 +312,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Ketuk untuk buka jam putar (lebih mudah dari angka).',
-                        style: TextStyle(
-                          color: AppColors.inkSoft,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 12),
                     SegmentedButton<String>(
                       segments: const [
@@ -466,6 +455,47 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     );
   }
 
+  String _daysLabel(List<int> days) {
+    if (days.length >= 7) return 'Setiap hari';
+    const names = {
+      1: 'Sen',
+      2: 'Sel',
+      3: 'Rab',
+      4: 'Kam',
+      5: 'Jum',
+      6: 'Sab',
+      7: 'Min',
+    };
+    return days.map((d) => names[d] ?? '$d').join(', ');
+  }
+
+  IconData _iconForTitle(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('tidur') || t.contains('istirahat')) {
+      return Icons.bedtime_rounded;
+    }
+    if (t.contains('belajar')) return Icons.menu_book_rounded;
+    return Icons.alarm_rounded;
+  }
+
+  Color _iconBgForTitle(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('tidur') || t.contains('istirahat')) {
+      return const Color(0xFFDCEBFF);
+    }
+    if (t.contains('belajar')) return const Color(0xFFE8F6F1);
+    return const Color(0xFFFFF0DC);
+  }
+
+  Color _iconFgForTitle(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('tidur') || t.contains('istirahat')) {
+      return const Color(0xFF2563EB);
+    }
+    if (t.contains('belajar')) return AppColors.tealDeep;
+    return const Color(0xFFD97706);
+  }
+
   @override
   Widget build(BuildContext context) {
     final children = ref.watch(childrenControllerProvider);
@@ -478,222 +508,534 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       });
     }
 
+    final activeCount = _items.where((e) => e.enabled).length;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Pengingat jadwal')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          PaSectionCard(
-            color: AppColors.sky.withValues(alpha: 0.12),
-            child: const Text(
-              'Buat pengingat supaya HP anak menampilkan pesan besar di jam tertentu '
-              '(misalnya belajar jam 7 malam, tidur jam 9 malam). '
-              'Anak cukup tekan Mengerti untuk menutup.',
-              style: TextStyle(color: AppColors.inkSoft, height: 1.35, fontSize: 15),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (children.items.isEmpty)
-            const PaEmptyState(
-              icon: Icons.child_care,
-              title: 'Belum ada anak',
-              message: 'Hubungkan anak dulu sebelum membuat pengingat.',
-            )
-          else ...[
-            Text(
-              'Untuk anak',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
+      backgroundColor: const Color(0xFFF0F2F5),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
                   ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 96,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: children.items.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final child = children.items[index];
-                  final selected = child.id == (_childId ?? children.items.first.id);
-                  final gender = _genders[child.id] ??
-                      ChildGenderStore.guessFromName(child.name);
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () {
-                      if (child.id == _childId) return;
-                      unawaited(_load(child.id));
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 88,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.mint.withValues(alpha: 0.45)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: selected ? AppColors.teal : const Color(0x22075A4F),
-                          width: selected ? 2 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ChildAvatar(
-                            name: child.name,
-                            gender: gender,
-                            size: 48,
-                            selected: selected,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pengingat Jadwal',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            child.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                              color: selected ? AppColors.tealDeep : AppColors.ink,
+                        ),
+                        Text(
+                          '$activeCount pengingat aktif',
+                          style: const TextStyle(
+                            color: AppColors.inkSoft,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.teal,
+                onRefresh: () async {
+                  final id = _childId;
+                  if (id != null) await _load(id, force: true);
+                },
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F6F1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.lightbulb_outline_rounded,
+                            color: AppColors.tealDeep,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'HP anak akan menampilkan pesan besar di jam tertentu. '
+                              'Anak cukup tekan “Mengerti” untuk menutup.',
+                              style: TextStyle(
+                                color: AppColors.tealDeep,
+                                fontWeight: FontWeight.w600,
+                                height: 1.35,
+                                fontSize: 13.5,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
+                    if (children.items.isEmpty) ...[
+                      const SizedBox(height: 24),
+                      const PaEmptyState(
+                        icon: Icons.child_care,
+                        title: 'Belum ada anak',
+                        message:
+                            'Hubungkan anak dulu sebelum membuat pengingat.',
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 18),
+                      const Text(
+                        'UNTUK ANAK',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 42,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: children.items.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final child = children.items[index];
+                            final selected = child.id ==
+                                (_childId ?? children.items.first.id);
+                            final gender = _genders[child.id] ??
+                                ChildGenderStore.guessFromName(child.name);
+                            return Material(
+                              color: selected
+                                  ? AppColors.tealDeep
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                              child: InkWell(
+                                onTap: () {
+                                  if (child.id == _childId) return;
+                                  unawaited(_load(child.id));
+                                },
+                                borderRadius: BorderRadius.circular(999),
+                                child: Container(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    6,
+                                    4,
+                                    12,
+                                    4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: selected
+                                        ? null
+                                        : Border.all(
+                                            color: const Color(0xFFE2E6EA),
+                                          ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ChildAvatar(
+                                        name: child.name,
+                                        gender: gender,
+                                        size: 30,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        child.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13.5,
+                                          color: selected
+                                              ? Colors.white
+                                              : AppColors.ink,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'TAMBAH CEPAT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 44,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            _QuickChip(
+                              icon: Icons.menu_book_rounded,
+                              label: 'Belajar 19:00',
+                              onTap: () => _createPreset(
+                                title: 'Waktunya Belajar',
+                                body:
+                                    'Sekarang jam belajar. Matikan game dulu ya.',
+                                hour: 19,
+                                minute: 0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _QuickChip(
+                              icon: Icons.bedtime_rounded,
+                              label: 'Tidur 21:00',
+                              onTap: () => _createPreset(
+                                title: 'Waktunya Tidur',
+                                body:
+                                    'Sudah malam. Waktunya istirahat agar besok semangat.',
+                                hour: 21,
+                                minute: 0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Material(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              child: InkWell(
+                                onTap: _showCustomDialog,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E6EA),
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.add_rounded,
+                                    color: Color(0xFF7C3AED),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Jadwal Aktif',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _showCustomDialog,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.teal,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              '+ Tambah',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 28),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_error != null && _items.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: _cardDecoration,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: AppColors.inkSoft,
+                                  height: 1.35,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _childId == null
+                                    ? null
+                                    : () => _load(_childId!, force: true),
+                                child: const Text('Coba lagi'),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (_items.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: _cardDecoration,
+                          child: const Text(
+                            'Belum ada pengingat. Pakai tambah cepat di atas.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.inkSoft,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        )
+                      else
+                        ..._items.map((item) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _ReminderCard(
+                              item: item,
+                              daysLabel: _daysLabel(item.daysOfWeek),
+                              icon: _iconForTitle(item.title),
+                              iconBg: _iconBgForTitle(item.title),
+                              iconFg: _iconFgForTitle(item.title),
+                              onToggle: (v) => _toggleEnabled(item, v),
+                              onDelete: () => _delete(item),
+                            ),
+                          );
+                        }),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _createTestInOneMinute,
+                        icon: const Icon(Icons.timer_outlined),
+                        label: const Text('Coba 1 menit lagi'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.tealDeep,
+                          side: const BorderSide(color: Color(0xFFE2E6EA)),
+                          backgroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Tambah cepat',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final BoxDecoration _cardDecoration = BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(18),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.05),
+      blurRadius: 14,
+      offset: const Offset(0, 5),
+    ),
+  ],
+);
+
+class _QuickChip extends StatelessWidget {
+  const _QuickChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: AppColors.teal.withValues(alpha: 0.45)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: AppColors.tealDeep),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                  color: AppColors.tealDeep,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReminderCard extends StatelessWidget {
+  const _ReminderCard({
+    required this.item,
+    required this.daysLabel,
+    required this.icon,
+    required this.iconBg,
+    required this.iconFg,
+    required this.onToggle,
+    required this.onDelete,
+  });
+
+  final ChildReminder item;
+  final String daysLabel;
+  final IconData icon;
+  final Color iconBg;
+  final Color iconFg;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final fullscreen = item.style == 'fullscreen';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+      decoration: _cardDecoration,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            child: Icon(icon, color: iconFg, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FilledButton.tonalIcon(
-                  onPressed: () => _createPreset(
-                    title: 'Waktunya belajar',
-                    body: 'Sekarang jam belajar. Matikan game dulu ya.',
-                    hour: 19,
-                    minute: 0,
+                Text(
+                  '${item.timeLabel} · ${item.title}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15.5,
                   ),
-                  icon: const Icon(Icons.menu_book_rounded),
-                  label: const Text('Belajar 19:00'),
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: () => _createPreset(
-                    title: 'Waktunya tidur',
-                    body: 'Sudah malam. Waktunya istirahat agar besok semangat.',
-                    hour: 21,
-                    minute: 0,
+                const SizedBox(height: 4),
+                Text(
+                  item.body,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.inkSoft,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    height: 1.3,
                   ),
-                  icon: const Icon(Icons.bedtime_rounded),
-                  label: const Text('Tidur 21:00'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _showCustomDialog,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Kustom'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _createTestInOneMinute,
-                  icon: const Icon(Icons.timer_outlined),
-                  label: const Text('Coba 1 menit lagi'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _Tag(fullscreen ? 'Layar penuh' : 'Notifikasi'),
+                    _Tag(daysLabel),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Jadwal aktif',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_error != null && _items.isEmpty)
-              PaSectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.inkSoft, height: 1.35),
-                    ),
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: _childId == null
-                          ? null
-                          : () => _load(_childId!, force: true),
-                      child: const Text('Coba lagi'),
-                    ),
-                  ],
+          ),
+          const SizedBox(width: 4),
+          Column(
+            children: [
+              Switch(
+                value: item.enabled,
+                activeThumbColor: Colors.white,
+                activeTrackColor: AppColors.teal,
+                onChanged: onToggle,
+              ),
+              IconButton(
+                tooltip: 'Hapus',
+                onPressed: onDelete,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: AppColors.inkSoft,
                 ),
-              )
-            else if (_items.isEmpty)
-              const PaSectionCard(
-                child: Text(
-                  'Belum ada pengingat. Pakai tombol cepat di atas.',
-                  style: TextStyle(color: AppColors.inkSoft),
-                ),
-              )
-            else
-              ..._items.map((item) {
-                final fullscreen = item.style == 'fullscreen';
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: fullscreen
-                          ? AppColors.coral.withValues(alpha: 0.15)
-                          : AppColors.mint,
-                      child: Icon(
-                        fullscreen
-                            ? Icons.fullscreen_rounded
-                            : Icons.notifications_active_rounded,
-                        color: fullscreen ? AppColors.coral : AppColors.teal,
-                      ),
-                    ),
-                    title: Text(
-                      '${item.timeLabel} · ${item.title}',
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(
-                      '${item.body}\n'
-                      '${fullscreen ? 'Layar penuh' : 'Notifikasi'} · '
-                      '${item.daysOfWeek.length == 7 ? 'Setiap hari' : '${item.daysOfWeek.length} hari'}',
-                    ),
-                    isThreeLine: true,
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Switch(
-                          value: item.enabled,
-                          onChanged: (v) => _toggleEnabled(item, v),
-                        ),
-                        IconButton(
-                          tooltip: 'Hapus',
-                          onPressed: () => _delete(item),
-                          icon: const Icon(Icons.delete_outline, color: AppColors.danger),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-          ],
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F5F7),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: AppColors.inkSoft,
+        ),
       ),
     );
   }

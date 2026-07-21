@@ -43,13 +43,21 @@ class ChildBerandaTab extends StatelessWidget {
   final VoidCallback onOpenAccessibilitySettings;
   final VoidCallback onOpenReminderPermissions;
 
+  String _timeGreeting() {
+    final h = DateTime.now().hour;
+    if (h < 11) return 'Pagi';
+    if (h < 15) return 'Siang';
+    if (h < 18) return 'Sore';
+    return 'Malam';
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
         Text(
-          'Hai, $childName!',
+          '${_timeGreeting()}, $childName!',
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w900,
               ),

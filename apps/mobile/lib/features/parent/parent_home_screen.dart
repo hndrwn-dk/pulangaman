@@ -5,17 +5,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/network/ws_client.dart';
-import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import '../screentime/screen_time_screen.dart';
+import 'account_settings_screen.dart';
 import 'child_avatar.dart';
 import 'child_detail_screen.dart';
 import 'child_home_map_card.dart';
 import 'children_controller.dart';
 import 'kabar_inbox_screen.dart';
 import 'kabar_models.dart';
+import 'live_map_screen.dart';
 import 'more_screen.dart';
 import 'zones_screen.dart';
 import 'zone_alert_host.dart';
@@ -34,6 +35,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   Set<String> _subscribedChildren = {};
   final Map<String, ChildGender> _genders = {};
   final Map<String, LatLng> _positions = {};
+  final Map<String, int?> _batteryLevels = {};
+  final Map<String, bool> _batteryCharging = {};
+  final Map<String, bool> _staleByChild = {};
+  final Map<String, DateTime?> _updatedAt = {};
+  String? _selectedChildId;
+  Map<String, dynamic>? _activitySummary;
   Timer? _locationPoll;
 
   @override
@@ -95,15 +102,29 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     final children = ref.read(childrenControllerProvider).items;
     if (children.isEmpty) return;
     final api = ref.read(apiClientProvider);
-    final next = <String, LatLng>{..._positions};
+    final nextPos = <String, LatLng>{..._positions};
+    final nextBat = <String, int?>{..._batteryLevels};
+    final nextCharge = <String, bool>{..._batteryCharging};
+    final nextStale = <String, bool>{..._staleByChild};
+    final nextAt = <String, DateTime?>{..._updatedAt};
+
     await Future.wait(children.map((c) async {
       try {
         final data = await api.get('/api/v1/children/${c.id}/location');
         final loc = data['location'] as Map<String, dynamic>?;
         final lat = (loc?['lat'] as num?)?.toDouble();
         final lng = (loc?['lng'] as num?)?.toDouble();
+        final recorded = loc?['recordedAt'] as String?;
+        nextStale[c.id] = data['isStale'] == true;
+        nextBat[c.id] = (data['batteryLevel'] as num?)?.toInt() ??
+            (loc?['batteryLevel'] as num?)?.toInt();
+        nextCharge[c.id] =
+            data['batteryCharging'] == true || loc?['batteryCharging'] == true;
+        if (recorded != null) {
+          nextAt[c.id] = DateTime.tryParse(recorded)?.toLocal();
+        }
         if (lat != null && lng != null) {
-          next[c.id] = LatLng(lat, lng);
+          nextPos[c.id] = LatLng(lat, lng);
         }
       } catch (_) {}
     }));
@@ -111,8 +132,43 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     setState(() {
       _positions
         ..clear()
-        ..addAll(next);
+        ..addAll(nextPos);
+      _batteryLevels
+        ..clear()
+        ..addAll(nextBat);
+      _batteryCharging
+        ..clear()
+        ..addAll(nextCharge);
+      _staleByChild
+        ..clear()
+        ..addAll(nextStale);
+      _updatedAt
+        ..clear()
+        ..addAll(nextAt);
     });
+  }
+
+  Future<void> _loadActivityFor(String childId) async {
+    try {
+      final data =
+          await ref.read(apiClientProvider).get('/api/v1/children/$childId/activity');
+      if (!mounted || _selectedChildId != childId) return;
+      setState(() {
+        _activitySummary = data['summary'] as Map<String, dynamic>?;
+      });
+    } catch (_) {
+      if (!mounted || _selectedChildId != childId) return;
+      setState(() => _activitySummary = null);
+    }
+  }
+
+  void _selectChild(String childId) {
+    if (_selectedChildId == childId) return;
+    setState(() {
+      _selectedChildId = childId;
+      _activitySummary = null;
+    });
+    unawaited(_loadActivityFor(childId));
   }
 
   Future<void> _loadMessages() async {
@@ -128,9 +184,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           ..clear()
           ..addAll(list);
       });
-    } catch (_) {
-      // Parent may not have messages yet.
-    }
+    } catch (_) {}
   }
 
   Future<void> _connectWs() async {
@@ -160,7 +214,16 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       final lat = (payload['lat'] as num?)?.toDouble();
       final lng = (payload['lng'] as num?)?.toDouble();
       if (childId != null && lat != null && lng != null && mounted) {
-        setState(() => _positions[childId] = LatLng(lat, lng));
+        setState(() {
+          _positions[childId] = LatLng(lat, lng);
+          _staleByChild[childId] = false;
+          _updatedAt[childId] = DateTime.now();
+          final bl = (payload['batteryLevel'] as num?)?.toInt();
+          if (bl != null) _batteryLevels[childId] = bl;
+          if (payload.containsKey('batteryCharging')) {
+            _batteryCharging[childId] = payload['batteryCharging'] == true;
+          }
+        });
       }
       return;
     }
@@ -205,13 +268,55 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     );
   }
 
-  ChildKabarMessage? _latestFor(String childId) {
-    ChildKabarMessage? best;
-    for (final m in _messages) {
-      if (m.childId != childId) continue;
-      if (best == null || m.sentAt.isAfter(best.sentAt)) best = m;
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 11) return 'Selamat pagi';
+    if (h < 15) return 'Selamat siang';
+    if (h < 18) return 'Selamat sore';
+    return 'Selamat malam';
+  }
+
+  String _initials(String? name) {
+    final parts = (name ?? '').trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return 'PA';
+    if (parts.length == 1) {
+      final s = parts.first;
+      return (s.length >= 2 ? s.substring(0, 2) : s).toUpperCase();
     }
-    return best;
+    return ('${parts[0][0]}${parts[1][0]}').toUpperCase();
+  }
+
+  String? _stayDurationLabel() {
+    final places = (_activitySummary?['places'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    if (places.isEmpty) return null;
+    final sec = (places.first['durationSeconds'] as num?)?.toInt() ?? 0;
+    if (sec <= 0) return null;
+    final h = sec ~/ 3600;
+    final m = (sec % 3600) ~/ 60;
+    if (h > 0) return '${h}j ${m}m';
+    return '${m}m';
+  }
+
+  void _openChildDetail(ChildSummary child) {
+    final gender =
+        _genders[child.id] ?? ChildGenderStore.guessFromName(child.name);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ChildDetailScreen(
+          child: child,
+          gender: gender,
+          initialKabar: List<ChildKabarMessage>.from(_messages),
+        ),
+      ),
+    );
+  }
+
+  void _openLiveMap(ChildSummary child) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LiveMapScreen(child: child)),
+    );
   }
 
   @override
@@ -219,277 +324,294 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     final children = ref.watch(childrenControllerProvider);
     final auth = ref.watch(authControllerProvider);
     final urgent = _messages.where((m) => m.isUrgent).toList();
-    if (children.items.isNotEmpty && _genders.length < children.items.length) {
+    final items = children.items;
+
+    if (items.isNotEmpty) {
+      final ids = items.map((c) => c.id).toSet();
+      if (_selectedChildId == null || !ids.contains(_selectedChildId)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final id = items.first.id;
+          setState(() => _selectedChildId = id);
+          unawaited(_loadActivityFor(id));
+        });
+      }
+    }
+
+    if (items.isNotEmpty && _genders.length < items.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadGenders());
     }
-    if (children.items.isNotEmpty &&
-        _positions.length < children.items.length) {
+    if (items.isNotEmpty && _positions.length < items.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadLocations());
     }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (children.items.isNotEmpty) _syncSubscriptions();
+      if (items.isNotEmpty) _syncSubscriptions();
     });
 
+    final selected = items.isEmpty
+        ? null
+        : items.firstWhere(
+            (c) => c.id == _selectedChildId,
+            orElse: () => items.first,
+          );
+    final placeCount = _activitySummary?['placeCount'] as int? ??
+        ((_activitySummary?['places'] as List?)?.length ?? 0);
+    final distM =
+        (_activitySummary?['totalDistanceM'] as num?)?.toDouble() ?? 0.0;
+    final distLabel = distM >= 1000
+        ? '${(distM / 1000).toStringAsFixed(1)} km'
+        : '${distM.round()} m';
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${AppStrings.brand} · ${auth.name ?? ''}'),
-        actions: [
-          if (_messages.isNotEmpty)
-            TextButton(
-              onPressed: () => _openInbox(),
-              child: Text(
-                'Kabar (${_messages.length})',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+      backgroundColor: const Color(0xFFF0F2F5),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppColors.teal,
+          onRefresh: () async {
+            await ref.read(childrenControllerProvider.notifier).refresh();
+            await _loadGenders();
+            await _loadMessages();
+            await _loadLocations();
+            final id = _selectedChildId;
+            if (id != null) await _loadActivityFor(id);
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            children: [
+              _HomeHeader(
+                greeting: _greeting(),
+                name: auth.name ?? 'Orang tua',
+                initials: _initials(auth.name),
+                notificationCount: _messages.length,
+                onNotifications: () => _openInbox(),
+                onAccount: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AccountSettingsScreen(),
+                  ),
+                ),
               ),
-            ),
-          IconButton(
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            icon: const Icon(Icons.logout, size: 26),
-            tooltip: AppStrings.logout,
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await ref.read(childrenControllerProvider.notifier).refresh();
-          await _loadGenders();
-          await _loadMessages();
-          await _loadLocations();
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Text(
-              'Anak saya',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Ketuk kartu anak untuk buka peta lokasi.',
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: AppColors.inkSoft,
-                  ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (urgent.isNotEmpty) ...[
-              ...urgent.take(2).map(
-                    (msg) => _UrgentBanner(
-                      msg: msg,
-                      onOpen: () => _openInbox(childId: msg.childId),
+              if (urgent.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ...urgent.take(2).map(
+                      (msg) => _UrgentBanner(
+                        msg: msg,
+                        onOpen: () => _openInbox(childId: msg.childId),
+                      ),
                     ),
-                  ),
-              const SizedBox(height: 8),
-            ],
-            if (children.loading && !children.hasData)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (children.items.isEmpty)
-              const PaEmptyState(
-                icon: Icons.child_care,
-                title: 'Belum ada anak',
-                message:
-                    'Gunakan “Mau tambah anak?” di bawah untuk buat kode, '
-                    'lalu masukkan di HP anak.',
-              )
-            else ...[
-              ...children.items.map((child) {
-                final kabar = _latestFor(child.id);
-                final gender = _genders[child.id] ??
-                    ChildGenderStore.guessFromName(child.name);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: ChildHomeMapCard(
-                    child: child,
-                    gender: gender,
-                    position: _positions[child.id],
-                    kabar: kabar,
-                    onOpenKabar: kabar == null
-                        ? null
-                        : () => _openInbox(childId: child.id),
-                    onRelinkCode: () => _showRelinkInvite(context, child),
-                    onRemove: () => _confirmRemoveChild(context, child),
-                    onOpenMap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ChildDetailScreen(
-                            child: child,
-                            gender: gender,
-                            initialKabar: List<ChildKabarMessage>.from(_messages),
-                          ),
+              ],
+              const SizedBox(height: 18),
+              if (children.loading && !children.hasData)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (items.isEmpty)
+                const PaEmptyState(
+                  icon: Icons.child_care,
+                  title: 'Belum ada anak',
+                  message:
+                      'Ketuk “Tambah anak” di bawah untuk buat kode, '
+                      'lalu masukkan di HP anak.',
+                )
+              else ...[
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Lokasi Anak',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
                         ),
+                      ),
+                    ),
+                    if (selected != null)
+                      TextButton(
+                        onPressed: () => _openLiveMap(selected),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.teal,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Lihat peta ›',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 42,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final c = items[i];
+                      final selectedChip = c.id == selected?.id;
+                      final online = _staleByChild[c.id] != true &&
+                          _positions.containsKey(c.id);
+                      return _ChildChip(
+                        name: c.name,
+                        selected: selectedChip,
+                        online: online,
+                        gender: _genders[c.id] ??
+                            ChildGenderStore.guessFromName(c.name),
+                        onTap: () => _selectChild(c.id),
                       );
                     },
                   ),
-                );
-              }),
-            ],
-            if (children.invites.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Kode menunggu dipakai',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Ketik kode ini di HP anak (buka PulangAman → pilih Anak).',
-                style: TextStyle(color: AppColors.inkSoft, fontSize: 14, height: 1.35),
-              ),
-              const SizedBox(height: 10),
-              ...children.invites.map((invite) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
+                ),
+                const SizedBox(height: 14),
+                if (selected != null)
+                  ChildHomeMapCard(
+                    child: selected,
+                    gender: _genders[selected.id] ??
+                        ChildGenderStore.guessFromName(selected.name),
+                    position: _positions[selected.id],
+                    batteryLevel: _batteryLevels[selected.id],
+                    batteryCharging: _batteryCharging[selected.id] == true,
+                    stale: _staleByChild[selected.id] ?? true,
+                    updatedAt: _updatedAt[selected.id],
+                    stayDurationLabel: _stayDurationLabel(),
+                    onRelinkCode: () => _showRelinkInvite(context, selected),
+                    onRemove: () => _confirmRemoveChild(context, selected),
+                    onOpenMap: () => _openChildDetail(selected),
+                  ),
+                const SizedBox(height: 22),
+                const Text(
+                  'Ringkasan Hari Ini',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SummaryCard(
+                        value: '$placeCount',
+                        label: 'Tempat dikunjungi',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SummaryCard(
+                        value: distLabel,
+                        label: 'Total perjalanan',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (children.invites.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'Kode menunggu',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...children.invites.map((invite) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 8,
+                      vertical: 14,
                     ),
-                    leading: const Icon(Icons.vpn_key, color: AppColors.teal, size: 28),
-                    title: Text(
-                      invite.code,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                    subtitle: Text(
-                      invite.childDisplayName == null
-                          ? 'Berlaku sampai ${invite.expiresAt.toLocal()}'
-                          : '${invite.childDisplayName} · sampai ${invite.expiresAt.toLocal()}',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                );
-              }),
-            ],
-            if (children.error != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                children.error!,
-                style: const TextStyle(color: AppColors.danger, fontSize: 15),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0x22075A4F)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Mau tambah anak?',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
                         ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Buat kode, lalu ketik kode itu di HP anak. '
-                    'Satu kode untuk satu anak.',
-                    style: TextStyle(
-                      color: AppColors.inkSoft,
-                      fontSize: 15,
-                      height: 1.4,
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  OutlinedButton.icon(
-                    onPressed: () => _showCreateInvite(context),
-                    icon: const Icon(Icons.person_add_alt_1_outlined, size: 22),
-                    label: const Text('Tambah anak'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.tealDeep,
-                      side: const BorderSide(color: AppColors.teal, width: 2),
-                      minimumSize: const Size.fromHeight(52),
-                      shape: const StadiumBorder(),
-                      textStyle: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.vpn_key, color: AppColors.teal),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                invite.code,
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 3,
+                                ),
+                              ),
+                              if (invite.childDisplayName != null)
+                                Text(
+                                  invite.childDisplayName!,
+                                  style: const TextStyle(
+                                    color: AppColors.inkSoft,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
+                  );
+                }),
+              ],
+              if (children.error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  children.error!,
+                  style: const TextStyle(color: AppColors.danger, fontSize: 15),
+                ),
+              ],
+              const SizedBox(height: 18),
+              _AddChildButton(onTap: () => _showCreateInvite(context)),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Future<void> _showRelinkInvite(BuildContext context, ChildSummary child) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Kode masuk ulang · ${child.name}'),
-        content: const Text(
-          'Pakai ini kalau HP anak logout. '
-          'Kode menempel ke anak yang sama — tidak membuat Andi baru.',
-          style: TextStyle(color: AppColors.inkSoft, height: 1.4),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-            child: const Text('Buat kode'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
     try {
-      final invite = await ref.read(childrenControllerProvider.notifier).createInvite(
-            childDisplayName: child.name,
-            relinkChildId: child.id,
-          );
+      final invite =
+          await ref.read(childrenControllerProvider.notifier).createInvite(
+                childDisplayName: child.name,
+                relinkChildId: child.id,
+              );
       if (!context.mounted) return;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Kode masuk ulang siap'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                invite.code,
-                style: const TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                  color: AppColors.tealDeep,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Di HP anak: Masuk → nama ${child.name} → kode ini → peran Anak.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.inkSoft,
-                  height: 1.4,
-                  fontSize: 15,
-                ),
-              ),
-            ],
+          title: Text('Kode masuk ulang ${child.name}'),
+          content: Text(
+            invite.code,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 4,
+              color: AppColors.tealDeep,
+            ),
           ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
               style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-              child: const Text('Mengerti'),
+              child: const Text('OK'),
             ),
           ],
         ),
@@ -509,12 +631,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Hapus ${child.name} dari daftar?'),
-        content: const Text(
-          'Anak ini hilang dari layar ortu. '
-          'Kalau salah hapus, bisa tambah lagi dengan kode baru.',
-          style: TextStyle(color: AppColors.inkSoft, height: 1.4),
-        ),
+        title: Text('Hapus ${child.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -533,7 +650,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       await ref.read(childrenControllerProvider.notifier).unlinkChild(child.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${child.name} dihapus dari daftar')),
+        SnackBar(content: Text('${child.name} dihapus')),
       );
     } catch (e) {
       if (!context.mounted) return;
@@ -549,27 +666,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Tambah anak'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Isi nama panggilan supaya mudah diingat (boleh dikosongkan).\n\n'
-              'Ini untuk anak BARU. Kalau HP anak hanya logout, '
-              'jangan pakai ini — buka menu ⋮ di kartu anak → '
-              '“Kode masuk ulang”.',
-              style: TextStyle(color: AppColors.inkSoft, height: 1.35),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: nameCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Nama panggilan anak (opsional)',
-                hintText: 'Contoh: Andi, Sinta',
-              ),
-            ),
-          ],
+        content: TextField(
+          controller: nameCtrl,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Nama',
+          ),
         ),
         actions: [
           TextButton(
@@ -587,43 +689,30 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     if (ok != true || !context.mounted) return;
 
     try {
-      final invite = await ref.read(childrenControllerProvider.notifier).createInvite(
-            childDisplayName: nameCtrl.text,
-          );
+      final invite =
+          await ref.read(childrenControllerProvider.notifier).createInvite(
+                childDisplayName: nameCtrl.text,
+              );
       if (!context.mounted) return;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Kode siap dipakai'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                invite.code,
-                style: const TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                  color: AppColors.tealDeep,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'Buka PulangAman di HP anak → pilih Anak → masukkan kode ini.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: AppColors.inkSoft,
-                  height: 1.4,
-                  fontSize: 15,
-                ),
-              ),
-            ],
+          title: const Text('Kode'),
+          content: Text(
+            invite.code,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 4,
+              color: AppColors.tealDeep,
+            ),
           ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
               style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-              child: const Text('Mengerti'),
+              child: const Text('OK'),
             ),
           ],
         ),
@@ -640,6 +729,323 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   }
 }
 
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
+    required this.greeting,
+    required this.name,
+    required this.initials,
+    required this.notificationCount,
+    required this.onNotifications,
+    required this.onAccount,
+  });
+
+  final String greeting;
+  final String name;
+  final String initials;
+  final int notificationCount;
+  final VoidCallback onNotifications;
+  final VoidCallback onAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$greeting,',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.inkSoft,
+                ),
+              ),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                  color: AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Material(
+              color: Colors.white,
+              shape: const CircleBorder(),
+              elevation: 1,
+              shadowColor: Colors.black12,
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onNotifications,
+                child: const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: Icon(Icons.notifications_none_rounded, size: 22),
+                ),
+              ),
+            ),
+            if (notificationCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  constraints: const BoxConstraints(minWidth: 18),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: AppColors.coral,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    notificationCount > 9 ? '9+' : '$notificationCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(width: 8),
+        Material(
+          color: AppColors.tealDeep,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onAccount,
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChildChip extends StatelessWidget {
+  const _ChildChip({
+    required this.name,
+    required this.selected,
+    required this.online,
+    required this.gender,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool selected;
+  final bool online;
+  final ChildGender gender;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.tealDeep : Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: selected
+                ? null
+                : Border.all(color: const Color(0xFFE2E6EA)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ChildAvatar(name: name, gender: gender, size: 30),
+                  Positioned(
+                    right: -1,
+                    bottom: -1,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: online
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFFFBBF24),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                name,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13.5,
+                  color: selected ? Colors.white : AppColors.ink,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.value, required this.label});
+
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.8,
+              height: 1.05,
+              color: AppColors.teal,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.inkSoft,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddChildButton extends StatelessWidget {
+  const _AddChildButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFE8F6F1),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: CustomPaint(
+          painter: _DashedBorderPainter(
+            color: AppColors.teal.withValues(alpha: 0.55),
+            radius: 16,
+          ),
+          child: const SizedBox(
+            height: 54,
+            width: double.infinity,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add_rounded, color: AppColors.tealDeep),
+                SizedBox(width: 8),
+                Text(
+                  'Tambah anak',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: AppColors.tealDeep,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0.8, 0.8, size.width - 1.6, size.height - 1.6),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      const dash = 6.0;
+      const gap = 4.0;
+      while (distance < metric.length) {
+        final next = (distance + dash).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance = next + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.radius != radius;
+}
+
 class _UrgentBanner extends StatelessWidget {
   const _UrgentBanner({required this.msg, required this.onOpen});
 
@@ -651,17 +1057,29 @@ class _UrgentBanner extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: AppColors.coral.withValues(alpha: 0.12),
+        color: const Color(0xFFFFE8E6),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onOpen,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
             child: Row(
               children: [
-                const Icon(Icons.priority_high_rounded, color: AppColors.coral),
-                const SizedBox(width: 10),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: const BoxDecoration(
+                    color: AppColors.coral,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.priority_high_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,11 +1089,17 @@ class _UrgentBanner extends StatelessWidget {
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           color: AppColors.coral,
+                          fontSize: 15,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
-                        '${msg.text} · ${kabarRelativeTime(msg.sentAt)}',
-                        style: const TextStyle(fontSize: 12),
+                        '${kabarRelativeTime(msg.sentAt)} · Tap untuk detail',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF9A3B35),
+                        ),
                       ),
                     ],
                   ),
@@ -730,12 +1154,12 @@ class _ParentShellState extends ConsumerState<ParentShell> {
             NavigationDestination(
               icon: Icon(Icons.timer_outlined),
               selectedIcon: Icon(Icons.timer),
-              label: 'Waktu HP',
+              label: 'Waktu Layar',
             ),
             NavigationDestination(
               icon: Icon(Icons.home_work_outlined),
               selectedIcon: Icon(Icons.home_work),
-              label: 'Tempat',
+              label: 'Zona',
             ),
             NavigationDestination(
               icon: Icon(Icons.grid_view_outlined),

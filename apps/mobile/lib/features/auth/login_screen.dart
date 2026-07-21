@@ -26,175 +26,517 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  void _submit() {
+    if (_role == AppRole.child) {
+      ref.read(authControllerProvider.notifier).joinWithInvite(
+            name: _nameCtrl.text,
+            inviteCode: _inviteCtrl.text,
+          );
+    } else {
+      ref.read(authControllerProvider.notifier).login(
+            name: _nameCtrl.text,
+            phone: _phoneCtrl.text,
+            role: _role,
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.sand, AppColors.canvas, AppColors.mint],
-          ),
-        ),
-        child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 36, 24, 24),
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.86),
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: AppColors.amber,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.home_rounded, color: AppColors.tealDeep, size: 34),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppStrings.brand,
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  color: AppColors.tealDeep,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -1,
-                                ),
-                          ),
-                          const Text(AppStrings.tagline),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  _FeatureBubble(icon: Icons.school, label: 'Check-in', color: AppColors.sky),
-                  const SizedBox(width: 8),
-                  _FeatureBubble(icon: Icons.star, label: 'Hadiah', color: AppColors.amber),
-                  const SizedBox(width: 8),
-                  _FeatureBubble(icon: Icons.hourglass_bottom, label: 'Waktu layar', color: AppColors.lavender),
-                ],
-              ),
-              const SizedBox(height: 28),
-              Text(AppStrings.loginTitle,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      )),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: AppStrings.nameLabel,
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (_role == AppRole.child)
-                TextField(
-                  controller: _inviteCtrl,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.inviteCodeLabel,
-                    hintText: 'Contoh: A7K2M9',
-                    border: OutlineInputBorder(),
-                    helperText: 'Minta kode 6 digit dari orang tua',
-                  ),
-                )
-              else
-                TextField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: AppStrings.phoneLabel,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              SegmentedButton<AppRole>(
-                segments: const [
-                  ButtonSegment(value: AppRole.parent, label: Text('Orang tua')),
-                  ButtonSegment(value: AppRole.child, label: Text('Anak')),
-                  ButtonSegment(value: AppRole.guardian, label: Text('Wali')),
-                ],
-                selected: {_role},
-                onSelectionChanged: (v) => setState(() => _role = v.first),
-              ),
-              if (auth.error != null) ...[
-                const SizedBox(height: 12),
-                Text(auth.error!, style: const TextStyle(color: AppColors.danger)),
-              ],
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: auth.loading
-                    ? null
-                    : () {
-                        if (_role == AppRole.child) {
-                          ref.read(authControllerProvider.notifier).joinWithInvite(
-                                name: _nameCtrl.text,
-                                inviteCode: _inviteCtrl.text,
-                              );
-                        } else {
-                          ref.read(authControllerProvider.notifier).login(
-                                name: _nameCtrl.text,
-                                phone: _phoneCtrl.text,
-                                role: _role,
-                              );
-                        }
-                      },
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.teal,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: Text(
-                  auth.loading ? '...' : AppStrings.loginAction,
-                ),
-              ),
-            ],
-          ),
+      backgroundColor: AppColors.canvas,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          children: [
+            const _BrandHeader(),
+            const SizedBox(height: 14),
+            const _FeatureRow(),
+            const SizedBox(height: 20),
+            _LoginCard(
+              role: _role,
+              nameCtrl: _nameCtrl,
+              phoneCtrl: _phoneCtrl,
+              inviteCtrl: _inviteCtrl,
+              error: auth.error,
+              loading: auth.loading,
+              onRoleChanged: (role) => setState(() => _role = role),
+              onSubmit: _submit,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _FeatureBubble extends StatelessWidget {
-  const _FeatureBubble({required this.icon, required this.label, required this.color});
-
-  final IconData icon;
-  final String label;
-  final Color color;
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(AppRadius.md),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.tealDeep.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: AppColors.amber,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.home_rounded,
+              color: AppColors.tealDeep,
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppStrings.brand,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: AppColors.tealDeep,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        height: 1.1,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  AppStrings.tagline,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.inkSoft,
+                        height: 1.35,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureRow extends StatelessWidget {
+  const _FeatureRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Expanded(
+          child: _FeatureCard(
+            label: 'Check-in',
+            icon: Icons.school_rounded,
+            background: Color(0xFFD6EEFC),
+            iconBackground: Color(0xFF3B8FD9),
+          ),
         ),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.tealDeep),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+        SizedBox(width: 10),
+        Expanded(
+          child: _FeatureCard(
+            label: 'Hadiah',
+            icon: Icons.star_rounded,
+            background: Color(0xFFFFF0C2),
+            iconBackground: Color(0xFFE8A820),
+          ),
+        ),
+        SizedBox(width: 10),
+        Expanded(
+          child: _FeatureCard(
+            label: 'Waktu Layar',
+            icon: Icons.hourglass_bottom_rounded,
+            background: Color(0xFFE8DFFB),
+            iconBackground: Color(0xFF8B6FD4),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({
+    required this.label,
+    required this.icon,
+    required this.background,
+    required this.iconBackground,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color background;
+  final Color iconBackground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: iconBackground,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: Colors.white, size: 22),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.ink,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginCard extends StatelessWidget {
+  const _LoginCard({
+    required this.role,
+    required this.nameCtrl,
+    required this.phoneCtrl,
+    required this.inviteCtrl,
+    required this.error,
+    required this.loading,
+    required this.onRoleChanged,
+    required this.onSubmit,
+  });
+
+  final AppRole role;
+  final TextEditingController nameCtrl;
+  final TextEditingController phoneCtrl;
+  final TextEditingController inviteCtrl;
+  final String? error;
+  final bool loading;
+  final ValueChanged<AppRole> onRoleChanged;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.tealDeep.withValues(alpha: 0.07),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.sky.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.lock_outline_rounded,
+                  color: AppColors.tealDeep,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                AppStrings.loginTitle,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppColors.tealDeep,
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _LoginField(
+            label: AppStrings.nameLabel,
+            child: TextField(
+              controller: nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                hintText: 'Masukkan nama lengkap',
+                hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (role == AppRole.child)
+            _LoginField(
+              label: AppStrings.inviteCodeLabel,
+              helper: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline_rounded,
+                    size: 15,
+                    color: AppColors.amber.withValues(alpha: 0.95),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Minta kode 6 digit dari orang tua',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.inkSoft,
+                            fontSize: 13,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: inviteCtrl,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  hintText: 'Kode undangan',
+                  hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+                ),
+              ),
+            )
+          else
+            _LoginField(
+              label: AppStrings.phoneLabel,
+              child: TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  hintText: '+62812...',
+                  hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+                ),
+              ),
+            ),
+          const SizedBox(height: 20),
+          Text(
+            'Peran',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: AppColors.teal,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 10),
+          _RoleSelector(
+            selected: role,
+            onChanged: onRoleChanged,
+          ),
+          if (error != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              error!,
+              style: const TextStyle(
+                color: AppColors.danger,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
           ],
+          const SizedBox(height: 22),
+          FilledButton(
+            onPressed: loading ? null : onSubmit,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.teal,
+              disabledBackgroundColor: AppColors.teal.withValues(alpha: 0.5),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              elevation: 0,
+            ),
+            child: Text(
+              loading ? '...' : AppStrings.loginAction,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginField extends StatelessWidget {
+  const _LoginField({
+    required this.label,
+    this.helper,
+    required this.child,
+  });
+
+  final String label;
+  final Widget child;
+  final Widget? helper;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppColors.teal,
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: 8),
+        child,
+        if (helper != null) ...[
+          const SizedBox(height: 8),
+          helper!,
+        ],
+      ],
+    );
+  }
+}
+
+class _RoleSelector extends StatelessWidget {
+  const _RoleSelector({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final AppRole selected;
+  final ValueChanged<AppRole> onChanged;
+
+  static const _options = [
+    (AppRole.parent, 'Orang Tua'),
+    (AppRole.child, 'Anak'),
+    (AppRole.guardian, 'Wali'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F3F2),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < _options.length; i++) ...[
+            if (i > 0) const SizedBox(width: 4),
+            Expanded(
+              child: _RoleOption(
+                label: _options[i].$2,
+                selected: selected == _options[i].$1,
+                onTap: () => onChanged(_options[i].$1),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleOption extends StatelessWidget {
+  const _RoleOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.tealDeep.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (selected) ...[
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: const BoxDecoration(
+                    color: AppColors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: Colors.white,
+                    size: 13,
+                  ),
+                ),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                    color: selected ? AppColors.tealDeep : AppColors.inkSoft,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

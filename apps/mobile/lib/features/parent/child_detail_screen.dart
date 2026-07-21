@@ -353,18 +353,23 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
         ),
     };
     final banner = _batteryBannerText;
+    final mapHeight = MediaQuery.sizeOf(context).height * 0.36;
+    final statusLine = _stale
+        ? 'Lokasi tidak bisa diperbarui'
+        : (_atHome ? 'Di rumah' : 'Sedang dipantau');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F7),
+      backgroundColor: const Color(0xFFF0F2F5),
       body: Column(
         children: [
-          Expanded(
-            flex: 5,
+          SizedBox(
+            height: mapHeight,
             child: Stack(
               fit: StackFit.expand,
               children: [
                 GoogleMap(
-                  initialCameraPosition: CameraPosition(target: center, zoom: 15),
+                  initialCameraPosition:
+                      CameraPosition(target: center, zoom: 15),
                   onMapCreated: (c) {
                     _mapController = c;
                     if (_position != null) {
@@ -397,79 +402,75 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                   mapToolbarEnabled: false,
                 ),
                 SafeArea(
+                  bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Material(
-                          color: Colors.white,
-                          shape: const CircleBorder(),
-                          elevation: 2,
-                          child: IconButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.arrow_back),
-                            tooltip: 'Kembali',
-                          ),
+                        _MapRoundButton(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.of(context).pop(),
                         ),
                         const Spacer(),
-                        Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          elevation: 2,
-                          child: IconButton(
-                            onPressed: () {
-                              if (_position == null) return;
-                              _mapController?.animateCamera(
-                                CameraUpdate.newLatLngZoom(
-                                  _position!,
-                                  _atHome ? 16 : 15,
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.my_location),
-                            tooltip: 'Pusatkan',
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          elevation: 2,
-                          child: IconButton(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      LiveMapScreen(child: widget.child),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.fullscreen),
-                            tooltip: 'Peta penuh',
-                          ),
+                        Column(
+                          children: [
+                            _MapRoundButton(
+                              icon: Icons.gps_fixed_rounded,
+                              iconColor: const Color(0xFFE85A7A),
+                              onTap: () {
+                                if (_position == null) return;
+                                _mapController?.animateCamera(
+                                  CameraUpdate.newLatLngZoom(
+                                    _position!,
+                                    _atHome ? 16 : 15,
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            _MapRoundButton(
+                              icon: Icons.open_in_full_rounded,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        LiveMapScreen(child: widget.child),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
                 Positioned(
-                  left: 16,
-                  right: 16,
-                  top: MediaQuery.paddingOf(context).top + 56,
+                  left: 48,
+                  right: 48,
+                  top: MediaQuery.paddingOf(context).top + 10,
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
+                        horizontal: 16,
+                        vertical: 9,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.tealDeep,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.tealDeep.withValues(alpha: 0.35),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Text(
                         '$_statusBubble · $_whenLabel',
                         textAlign: TextAlign.center,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
@@ -484,13 +485,10 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
             ),
           ),
           Expanded(
-            flex: 6,
-            child: Material(
-              color: Colors.white,
-              elevation: 8,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              clipBehavior: Clip.antiAlias,
+            child: Transform.translate(
+              offset: const Offset(0, -28),
               child: RefreshIndicator(
+                color: AppColors.teal,
                 onRefresh: () async {
                   await Future.wait([
                     _fetchLocation(),
@@ -499,80 +497,25 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                   ]);
                 },
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
                   children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppColors.inkSoft.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
+                    _ProfileStatusCard(
+                      name: widget.child.name,
+                      gender: _gender,
+                      statusLine: statusLine,
+                      stale: _stale,
+                      banner: banner,
+                      batteryLevel: _batteryLevel,
+                      batteryCharging: _batteryCharging,
+                      onRefresh: _fetchLocation,
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        ChildAvatar(
-                          name: widget.child.name,
-                          gender: _gender,
-                          size: 52,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.child.name,
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              Text(
-                                _stale
-                                    ? 'Lokasi tidak baru'
-                                    : (_atHome ? 'Di rumah' : 'Sedang dipantau'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: _stale
-                                      ? AppColors.amber
-                                      : AppColors.tealDeep,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_batteryLevel != null)
-                          _BatteryChip(
-                            level: _batteryLevel!,
-                            charging: _batteryCharging,
-                          ),
-                      ],
-                    ),
-                    if (banner != null) ...[
-                      const SizedBox(height: 12),
-                      _AlertPill(
-                        text: banner,
-                        onTap: _fetchLocation,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Text(
-                      'Aksi cepat',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
                           child: _ActionTile(
-                            icon: Icons.home_work_outlined,
-                            label: 'Tempat aman',
+                            icon: Icons.home_work_rounded,
+                            label: 'Zona aman',
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -587,20 +530,16 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: _ActionTile(
-                            icon: Icons.chat_bubble_outline,
+                            icon: Icons.chat_bubble_rounded,
                             label: 'Kabar',
                             onTap: _openKabar,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
+                        const SizedBox(width: 10),
                         Expanded(
                           child: _ActionTile(
-                            icon: Icons.phone_android,
-                            label: 'Waktu HP',
+                            icon: Icons.phone_android_rounded,
+                            label: 'Waktu Layar',
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
@@ -613,7 +552,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: _ActionTile(
-                            icon: Icons.alarm,
+                            icon: Icons.alarm_rounded,
                             label: 'Pengingat',
                             onTap: () {
                               Navigator.of(context).push(
@@ -627,26 +566,18 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 22),
-                    Row(
-                      children: [
-                        Text(
-                          'Hari ini',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _activityLoading ? null : _fetchActivity,
-                          child: const Text('Muat ulang'),
-                        ),
-                      ],
+                    const Text(
+                      'Hari ini',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 12),
                     if (_activityLoading)
                       const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
+                        padding: EdgeInsets.symmetric(vertical: 28),
                         child: Center(child: CircularProgressIndicator()),
                       )
                     else if (_activityError != null)
@@ -657,28 +588,38 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                     else ...[
                       if (_activitySummary != null)
                         _ActivitySummaryRow(summary: _activitySummary!),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       if (_activityEvents.isEmpty)
-                        const Text(
-                          'Belum ada jejak hari ini. '
-                          'Pastikan HP anak menyala dan mengirim lokasi.',
-                          style: TextStyle(
-                            color: AppColors.inkSoft,
-                            height: 1.4,
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 22,
+                          ),
+                          decoration: _cardDecoration,
+                          child: const Text(
+                            'Belum ada jejak hari ini.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.inkSoft,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         )
                       else
-                        ..._activityEvents.map((e) {
+                        ...List.generate(_activityEvents.length, (i) {
+                          final e = _activityEvents[i];
                           final type = e['type'] as String?;
+                          final isLast = i == _activityEvents.length - 1;
                           if (type == 'stay') {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _StayCard(event: e),
+                            return _TimelineStayCard(
+                              event: e,
+                              showConnector: !isLast,
                             );
                           }
                           if (type == 'trip') {
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.only(bottom: 12),
                               child: _TripCard(event: e),
                             );
                           }
@@ -696,41 +637,223 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   }
 }
 
-class _BatteryChip extends StatelessWidget {
-  const _BatteryChip({required this.level, required this.charging});
+final BoxDecoration _cardDecoration = BoxDecoration(
+  color: Colors.white,
+  borderRadius: BorderRadius.circular(22),
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.06),
+      blurRadius: 18,
+      offset: const Offset(0, 6),
+    ),
+  ],
+);
 
-  final int level;
+class _MapRoundButton extends StatelessWidget {
+  const _MapRoundButton({
+    required this.icon,
+    required this.onTap,
+    this.iconColor,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 3,
+      shadowColor: Colors.black26,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, size: 20, color: iconColor ?? AppColors.ink),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileStatusCard extends StatelessWidget {
+  const _ProfileStatusCard({
+    required this.name,
+    required this.gender,
+    required this.statusLine,
+    required this.stale,
+    required this.banner,
+    required this.batteryLevel,
+    required this.batteryCharging,
+    required this.onRefresh,
+  });
+
+  final String name;
+  final ChildGender gender;
+  final String statusLine;
+  final bool stale;
+  final String? banner;
+  final int? batteryLevel;
+  final bool batteryCharging;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+      decoration: _cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ChildAvatar(name: name, gender: gender, size: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: stale
+                                ? const Color(0xFFE8A11A)
+                                : AppColors.teal,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            statusLine,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                              color: stale
+                                  ? const Color(0xFFC46A0A)
+                                  : AppColors.tealDeep,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Material(
+                color: const Color(0xFFF3F5F7),
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => onRefresh(),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      Icons.refresh_rounded,
+                      size: 20,
+                      color: AppColors.inkSoft,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (banner != null) ...[
+            const SizedBox(height: 12),
+            _AlertPill(text: banner!, onTap: () => onRefresh()),
+          ],
+          const SizedBox(height: 14),
+          _BatteryMeter(level: batteryLevel, charging: batteryCharging),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatteryMeter extends StatelessWidget {
+  const _BatteryMeter({required this.level, required this.charging});
+
+  final int? level;
   final bool charging;
 
   @override
   Widget build(BuildContext context) {
-    final low = level <= 15 && !charging;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: low
-            ? AppColors.coral.withValues(alpha: 0.12)
-            : AppColors.mint.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            charging ? Icons.battery_charging_full : Icons.battery_std,
-            size: 18,
-            color: low ? AppColors.coral : AppColors.tealDeep,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '$level%',
-            style: TextStyle(
-              fontWeight: FontWeight.w900,
-              color: low ? AppColors.coral : AppColors.tealDeep,
+    final value = level;
+    final known = value != null;
+    final low = known && value <= 15 && !charging;
+    final pct = known ? (value.clamp(0, 100) / 100.0) : 0.0;
+    final label = !known
+        ? 'Baterai belum diketahui'
+        : charging
+            ? 'Baterai $value% · di-cas'
+            : 'Baterai $value%';
+    final color = low ? AppColors.coral : AppColors.teal;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              charging
+                  ? Icons.battery_charging_full_rounded
+                  : low
+                      ? Icons.battery_alert_rounded
+                      : Icons.battery_std_rounded,
+              color: color,
+              size: 20,
             ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: low ? AppColors.coral : AppColors.ink,
+                ),
+              ),
+            ),
+            if (known)
+              Text(
+                '$value%',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  color: color,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            value: known ? pct : 0.08,
+            minHeight: 6,
+            backgroundColor: const Color(0xFFE8ECF0),
+            color: color,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -744,29 +867,29 @@ class _AlertPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
+      color: const Color(0xFFFFF3E6),
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: AppColors.amber, width: 2),
-          ),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              const Icon(Icons.error_outline, color: AppColors.amber),
-              const SizedBox(width: 10),
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFD97706),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   text,
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     height: 1.3,
-                    fontSize: 14,
+                    fontSize: 13,
+                    color: Color(0xFF9A5B00),
                   ),
                 ),
               ),
@@ -791,32 +914,36 @@ class _ActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFF7FAF9),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          height: 88,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.teal.withValues(alpha: 0.25)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: AppColors.tealDeep, size: 26),
-              const Spacer(),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
+    return Container(
+      decoration: _cardDecoration.copyWith(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(6, 14, 6, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: AppColors.tealDeep, size: 26),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11.5,
+                    height: 1.15,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -836,79 +963,23 @@ class _ActivitySummaryRow extends StatelessWidget {
         .toList();
     final placeCount = summary['placeCount'] as int? ?? places.length;
     final distM = (summary['totalDistanceM'] as num?)?.toDouble() ?? 0;
-    final placeLines = places.take(3).map((p) {
-      final name = p['name'] as String? ?? 'Tempat';
-      final secs = (p['durationSeconds'] as num?)?.toInt() ?? 0;
-      return '$name: ${_fmtDuration(secs)}';
-    }).join(' · ');
+    final distLabel = distM >= 1000
+        ? '${(distM / 1000).toStringAsFixed(1)} km'
+        : '${distM.round()} m';
 
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          flex: 3,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7FAF9),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.place, color: AppColors.teal, size: 20),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$placeCount tempat',
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
-                  ],
-                ),
-                if (placeLines.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    placeLines,
-                    style: const TextStyle(
-                      color: AppColors.inkSoft,
-                      fontSize: 13,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ],
-            ),
+          child: _SummaryStat(
+            value: '$placeCount',
+            label: 'tempat',
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
-          flex: 2,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7FAF9),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.teal.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.route, color: AppColors.teal, size: 20),
-                const SizedBox(height: 6),
-                Text(
-                  distM >= 1000
-                      ? '${(distM / 1000).toStringAsFixed(1)} km'
-                      : '${distM.round()} m',
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const Text(
-                  'Perjalanan',
-                  style: TextStyle(color: AppColors.inkSoft, fontSize: 12),
-                ),
-              ],
-            ),
+          child: _SummaryStat(
+            value: distLabel,
+            label: 'Perjalanan',
           ),
         ),
       ],
@@ -916,16 +987,67 @@ class _ActivitySummaryRow extends StatelessWidget {
   }
 }
 
-class _StayCard extends StatelessWidget {
-  const _StayCard({required this.event});
+class _SummaryStat extends StatelessWidget {
+  const _SummaryStat({
+    required this.value,
+    required this.label,
+  });
 
-  final Map<String, dynamic> event;
+  final String value;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    final name = event['placeName'] as String? ?? 'Tempat';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: _cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 28,
+              height: 1.05,
+              letterSpacing: -0.8,
+              color: AppColors.teal,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.inkSoft,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineStayCard extends StatelessWidget {
+  const _TimelineStayCard({
+    required this.event,
+    required this.showConnector,
+  });
+
+  final Map<String, dynamic> event;
+  final bool showConnector;
+
+  @override
+  Widget build(BuildContext context) {
     final type = event['placeType'] as String? ?? 'custom';
-    final start = DateTime.tryParse(event['startAt'] as String? ?? '')?.toLocal();
+    final name = _friendlyPlaceName(event['placeName'] as String?, type);
+    final start =
+        DateTime.tryParse(event['startAt'] as String? ?? '')?.toLocal();
     final end = DateTime.tryParse(event['endAt'] as String? ?? '')?.toLocal();
     final dur = (event['durationSeconds'] as num?)?.toInt() ?? 0;
     final icon = type == 'home'
@@ -934,49 +1056,90 @@ class _StayCard extends StatelessWidget {
             ? Icons.school_rounded
             : Icons.place_rounded;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x22075A4F)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.teal,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 17,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 28,
+              child: Column(
+                children: [
+                  const SizedBox(height: 22),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.teal.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${_fmtClock(start)} — ${_fmtClock(end)} (${_fmtDuration(dur)})',
-                  style: const TextStyle(
-                    color: AppColors.inkSoft,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
+                  if (showConnector)
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        color: AppColors.inkSoft.withValues(alpha: 0.22),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.fromLTRB(12, 14, 14, 14),
+                decoration: _cardDecoration,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.tealDeep,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${_fmtClock(start)} — ${_fmtClock(end)}',
+                            style: const TextStyle(
+                              color: AppColors.inkSoft,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      _fmtDuration(dur),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        color: AppColors.teal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -992,8 +1155,14 @@ class _TripCard extends StatelessWidget {
     final start = DateTime.tryParse(event['startAt'] as String? ?? '')?.toLocal();
     final end = DateTime.tryParse(event['endAt'] as String? ?? '')?.toLocal();
     final dur = (event['durationSeconds'] as num?)?.toInt() ?? 0;
-    final startLabel = event['startLabel'] as String? ?? 'Berangkat';
-    final endLabel = event['endLabel'] as String? ?? 'Tiba';
+    final startLabel = _friendlyPlaceName(
+      event['startLabel'] as String?,
+      null,
+    );
+    final endLabel = _friendlyPlaceName(
+      event['endLabel'] as String?,
+      null,
+    );
     final inaccurate = event['inaccurate'] == true;
     final path = (event['path'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
@@ -1007,22 +1176,16 @@ class _TripCard extends StatelessWidget {
         .toList();
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0x22075A4F)),
-      ),
+      decoration: _cardDecoration,
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (path.length >= 2)
             SizedBox(
-              height: 120,
+              height: 128,
               child: GoogleMap(
-                key: ValueKey(
-                  'trip-${event['startAt']}-${path.length}',
-                ),
+                key: ValueKey('trip-${event['startAt']}-${path.length}'),
                 initialCameraPosition: CameraPosition(
                   target: path[path.length ~/ 2],
                   zoom: 13,
@@ -1032,20 +1195,18 @@ class _TripCard extends StatelessWidget {
                   Marker(
                     markerId: const MarkerId('start'),
                     position: path.first,
-                    infoWindow: const InfoWindow(title: 'START'),
                   ),
                   Marker(
                     markerId: const MarkerId('finish'),
                     position: path.last,
-                    infoWindow: const InfoWindow(title: 'FINISH'),
                   ),
                 },
                 polylines: {
                   Polyline(
                     polylineId: const PolylineId('trip'),
                     points: path,
-                    color: AppColors.teal,
-                    width: 4,
+                    color: AppColors.tealDeep,
+                    width: 5,
                   ),
                 },
                 zoomControlsEnabled: false,
@@ -1059,81 +1220,63 @@ class _TripCard extends StatelessWidget {
             )
           else
             Container(
-              height: 72,
-              color: AppColors.mint.withValues(alpha: 0.4),
+              height: 64,
+              color: AppColors.mint.withValues(alpha: 0.45),
               alignment: Alignment.center,
               child: const Text(
-                'Rute',
+                'Perjalanan',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${_fmtClock(start)} → ${_fmtClock(end)} (${_fmtDuration(dur)})',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        startLabel,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        '${_fmtClock(start)} → ${_fmtClock(end)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _fmtDuration(dur),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.tealDeep,
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 10),
+                _TripEndpoint(
+                  color: AppColors.success,
+                  label: startLabel,
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 3),
                   child: Container(
                     width: 2,
-                    height: 10,
-                    color: AppColors.inkSoft.withValues(alpha: 0.4),
+                    height: 12,
+                    color: AppColors.inkSoft.withValues(alpha: 0.35),
                   ),
                 ),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.coral,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        endLabel,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ],
+                _TripEndpoint(
+                  color: AppColors.coral,
+                  label: endLabel,
                 ),
                 if (inaccurate) ...[
                   const SizedBox(height: 8),
                   const Text(
-                    'Rute kurang akurat karena sinyal HP lemah.',
+                    'Sinyal lemah — rute kurang akurat.',
                     style: TextStyle(
                       color: AppColors.inkSoft,
                       fontSize: 12,
-                      height: 1.3,
                     ),
                   ),
                 ],
@@ -1144,6 +1287,46 @@ class _TripCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TripEndpoint extends StatelessWidget {
+  const _TripEndpoint({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _friendlyPlaceName(String? raw, String? type) {
+  final name = raw?.trim() ?? '';
+  if (name.isEmpty || RegExp(r'^\d{4,}$').hasMatch(name)) {
+    if (type == 'home') return 'Rumah';
+    if (type == 'school') return 'Sekolah';
+    if (name == 'Berangkat' || name == 'Dalam perjalanan' || name == 'Tiba') {
+      return name;
+    }
+    return type == 'custom' ? 'Tempat aman' : (name.isEmpty ? 'Tempat' : name);
+  }
+  return name;
 }
 
 String _fmtClock(DateTime? at) {

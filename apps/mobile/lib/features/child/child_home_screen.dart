@@ -575,7 +575,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${AppStrings.brand} · $childName'),
+        title: const SizedBox.shrink(),
         actions: [
           IconButton(
             tooltip: 'Segarkan (kirim daftar app & aturan)',
