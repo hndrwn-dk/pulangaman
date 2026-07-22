@@ -10,6 +10,13 @@ abstract final class AppStrings {
   static const phoneLabel = 'Nomor telepon';
   static const nameLabel = 'Nama';
   static const loginAction = 'Masuk';
+  static const otpLabel = 'Kode OTP';
+  static const otpHint = '6 digit dari SMS';
+  static const otpSentHint = 'Kode verifikasi dikirim ke nomor Anda';
+  static const verifyOtpAction = 'Verifikasi';
+  static const resendOtp = 'Kirim ulang kode';
+  static const changeNumber = 'Ubah nomor';
+  static const sendOtpAction = 'Kirim kode OTP';
   static const childrenTitle = 'Anak saya';
   static const addChild = 'Undang anak';
   static const inviteCodeLabel = 'Kode undangan';

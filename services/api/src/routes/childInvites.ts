@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
+import { createChildCustomToken, ensureFirebaseUser } from '../firebase/admin.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
@@ -277,7 +278,14 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         ],
       );
 
+      await ensureFirebaseUser({
+        uid: firebaseUid,
+        displayName,
+      });
+      const tokenResult = await createChildCustomToken(firebaseUid);
+
       await client.query('COMMIT');
+
       res.status(201).json({
         userId: childId,
         firebaseUid,
@@ -285,6 +293,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         name: displayName,
         parentId: inviteRow.parent_id,
         relinked: Boolean(inviteRow.relink_child_id),
+        customToken: tokenResult.customToken,
         /** Dev-auth token: Bearer dev:<firebaseUid> */
         tokenHint: `dev:${firebaseUid}`,
       });

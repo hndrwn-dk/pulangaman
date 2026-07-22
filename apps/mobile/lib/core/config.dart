@@ -20,8 +20,10 @@ abstract final class AppConfig {
   );
 
   /// When true, login uses local `dev:<uid>` tokens (no Firebase).
+  /// Default false — cloud API now verifies real Firebase ID tokens.
+  /// Use `--dart-define=USE_DEV_AUTH=true` only against a local API without Firebase.
   static const useDevAuth = bool.fromEnvironment(
     'USE_DEV_AUTH',
-    defaultValue: true,
+    defaultValue: false,
   );
 }

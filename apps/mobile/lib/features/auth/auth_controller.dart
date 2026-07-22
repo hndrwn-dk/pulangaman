@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config.dart';
@@ -13,6 +17,7 @@ class AuthState {
     this.role,
     this.name,
     this.loading = false,
+    this.awaitingOtp = false,
     this.error,
   });
 
@@ -21,6 +26,7 @@ class AuthState {
   final AppRole? role;
   final String? name;
   final bool loading;
+  final bool awaitingOtp;
   final String? error;
 
   bool get isAuthenticated => token != null && userId != null && role != null;
@@ -31,6 +37,7 @@ class AuthState {
     AppRole? role,
     String? name,
     bool? loading,
+    bool? awaitingOtp,
     String? error,
     bool clearError = false,
   }) {
@@ -40,6 +47,7 @@ class AuthState {
       role: role ?? this.role,
       name: name ?? this.name,
       loading: loading ?? this.loading,
+      awaitingOtp: awaitingOtp ?? this.awaitingOtp,
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -65,10 +73,16 @@ class AuthController extends StateNotifier<AuthState> {
   final ApiClient api;
   final SessionStore store;
 
+  String? _verificationId;
+  int? _resendToken;
+  String? _pendingName;
+  String? _pendingPhone;
+  AppRole? _pendingRole;
+
   Future<void> restore() async {
     state = state.copyWith(loading: true, clearError: true);
     try {
-      final token = await store.token();
+      var token = await store.token();
       final userId = await store.userId();
       final roleRaw = await store.role();
       final name = await store.name();
@@ -76,6 +90,28 @@ class AuthController extends StateNotifier<AuthState> {
         state = const AuthState();
         return;
       }
+
+      if (!AppConfig.useDevAuth && Firebase.apps.isNotEmpty) {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          await store.clear();
+          state = const AuthState();
+          return;
+        }
+        token = await user.getIdToken(true);
+        if (token == null) {
+          await store.clear();
+          state = const AuthState();
+          return;
+        }
+        await store.save(
+          token: token,
+          userId: userId,
+          role: roleRaw,
+          name: name ?? '',
+        );
+      }
+
       api.setToken(token);
       state = AuthState(
         token: token,
@@ -94,35 +130,79 @@ class AuthController extends StateNotifier<AuthState> {
     required String phone,
     required AppRole role,
   }) async {
-    state = state.copyWith(loading: true, clearError: true);
+    state = state.copyWith(loading: true, awaitingOtp: false, clearError: true);
     try {
-      final firebaseUid = _devUid(role, phone);
-      final token = AppConfig.useDevAuth ? 'dev:$firebaseUid' : firebaseUid;
-      api.setToken(token);
-
-      final session = await api.post('/api/v1/auth/session', body: {
-        'name': name.trim(),
-        'phone': phone.trim(),
-        'role': role.name,
-      });
-
-      final userId = session['userId'] as String;
-      await store.save(
-        token: token,
-        userId: userId,
-        role: role.name,
+      if (AppConfig.useDevAuth) {
+        await _completeDevLogin(name: name, phone: phone, role: role);
+        return;
+      }
+      await _startPhoneOtp(
         name: name.trim(),
-      );
-
-      state = AuthState(
-        token: token,
-        userId: userId,
+        phone: normalizePhoneE164(phone),
         role: role,
-        name: name.trim(),
       );
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(
+        loading: false,
+        awaitingOtp: false,
+        error: _friendlyAuthError(e),
+      );
     }
+  }
+
+  Future<void> confirmOtp(String smsCode) async {
+    final verificationId = _verificationId;
+    final name = _pendingName;
+    final phone = _pendingPhone;
+    final role = _pendingRole;
+    if (verificationId == null ||
+        name == null ||
+        phone == null ||
+        role == null) {
+      state = state.copyWith(error: 'Sesi OTP tidak valid. Minta kode ulang.');
+      return;
+    }
+
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode.trim(),
+      );
+      await _signInAndCreateSession(
+        credential: credential,
+        name: name,
+        phone: phone,
+        role: role,
+      );
+    } catch (e) {
+      state = state.copyWith(loading: false, error: _friendlyAuthError(e));
+    }
+  }
+
+  Future<void> resendOtp() async {
+    final name = _pendingName;
+    final phone = _pendingPhone;
+    final role = _pendingRole;
+    if (name == null || phone == null || role == null) {
+      state = state.copyWith(error: 'Sesi OTP tidak valid. Isi formulir lagi.');
+      return;
+    }
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      await _startPhoneOtp(name: name, phone: phone, role: role, resend: true);
+    } catch (e) {
+      state = state.copyWith(loading: false, error: _friendlyAuthError(e));
+    }
+  }
+
+  void cancelOtp() {
+    _verificationId = null;
+    _resendToken = null;
+    _pendingName = null;
+    _pendingPhone = null;
+    _pendingRole = null;
+    state = state.copyWith(awaitingOtp: false, loading: false, clearError: true);
   }
 
   /// Child joins via parent invite code (no phone match needed).
@@ -130,7 +210,7 @@ class AuthController extends StateNotifier<AuthState> {
     required String name,
     required String inviteCode,
   }) async {
-    state = state.copyWith(loading: true, clearError: true);
+    state = state.copyWith(loading: true, awaitingOtp: false, clearError: true);
     try {
       final joined = await api.post('/api/v1/child-invites/join', body: {
         'name': name.trim(),
@@ -138,13 +218,29 @@ class AuthController extends StateNotifier<AuthState> {
       });
 
       final firebaseUid = joined['firebaseUid'] as String;
-      final token = AppConfig.useDevAuth
-          ? (joined['tokenHint'] as String? ?? 'dev:$firebaseUid')
-          : firebaseUid;
       final userId = joined['userId'] as String;
       final displayName = (joined['name'] as String?)?.trim().isNotEmpty == true
           ? joined['name'] as String
           : name.trim();
+
+      late final String token;
+      if (AppConfig.useDevAuth) {
+        token = joined['tokenHint'] as String? ?? 'dev:$firebaseUid';
+      } else {
+        final customToken = joined['customToken'] as String?;
+        if (customToken == null || customToken.isEmpty) {
+          throw StateError(
+            'Server tidak mengembalikan customToken. Deploy API terbaru dulu.',
+          );
+        }
+        final cred =
+            await FirebaseAuth.instance.signInWithCustomToken(customToken);
+        final idToken = await cred.user?.getIdToken();
+        if (idToken == null) {
+          throw StateError('Gagal mengambil ID token Firebase.');
+        }
+        token = idToken;
+      }
 
       api.setToken(token);
       await store.save(
@@ -161,18 +257,183 @@ class AuthController extends StateNotifier<AuthState> {
         name: displayName,
       );
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(loading: false, error: _friendlyAuthError(e));
     }
   }
 
   Future<void> logout() async {
+    if (!AppConfig.useDevAuth && Firebase.apps.isNotEmpty) {
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+    }
     await store.clear();
     api.setToken(null);
+    cancelOtp();
     state = const AuthState();
+  }
+
+  Future<void> _completeDevLogin({
+    required String name,
+    required String phone,
+    required AppRole role,
+  }) async {
+    final firebaseUid = _devUid(role, phone);
+    final token = 'dev:$firebaseUid';
+    api.setToken(token);
+
+    final session = await api.post('/api/v1/auth/session', body: {
+      'name': name.trim(),
+      'phone': phone.trim(),
+      'role': role.name,
+    });
+
+    final userId = session['userId'] as String;
+    await store.save(
+      token: token,
+      userId: userId,
+      role: role.name,
+      name: name.trim(),
+    );
+
+    state = AuthState(
+      token: token,
+      userId: userId,
+      role: role,
+      name: name.trim(),
+    );
+  }
+
+  Future<void> _startPhoneOtp({
+    required String name,
+    required String phone,
+    required AppRole role,
+    bool resend = false,
+  }) async {
+    _pendingName = name;
+    _pendingPhone = phone;
+    _pendingRole = role;
+
+    final completer = Completer<void>();
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phone,
+      forceResendingToken: resend ? _resendToken : null,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        try {
+          await _signInAndCreateSession(
+            credential: credential,
+            name: name,
+            phone: phone,
+            role: role,
+          );
+          if (!completer.isCompleted) completer.complete();
+        } catch (e) {
+          if (!completer.isCompleted) completer.completeError(e);
+        }
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        if (!completer.isCompleted) completer.completeError(e);
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        // Instant verification may already have signed in; do not reopen OTP UI.
+        if (state.isAuthenticated) return;
+        _verificationId = verificationId;
+        _resendToken = resendToken;
+        state = state.copyWith(
+          loading: false,
+          awaitingOtp: true,
+          clearError: true,
+        );
+        if (!completer.isCompleted) completer.complete();
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+      timeout: const Duration(seconds: 60),
+    );
+
+    await completer.future;
+  }
+
+  Future<void> _signInAndCreateSession({
+    required AuthCredential credential,
+    required String name,
+    required String phone,
+    required AppRole role,
+  }) async {
+    final cred = await FirebaseAuth.instance.signInWithCredential(credential);
+    final idToken = await cred.user?.getIdToken();
+    if (idToken == null) {
+      throw StateError('Gagal mengambil ID token Firebase.');
+    }
+
+    api.setToken(idToken);
+    final session = await api.post('/api/v1/auth/session', body: {
+      'name': name.trim(),
+      'phone': phone,
+      'role': role.name,
+    });
+
+    final userId = session['userId'] as String;
+    await store.save(
+      token: idToken,
+      userId: userId,
+      role: role.name,
+      name: name.trim(),
+    );
+
+    _verificationId = null;
+    _resendToken = null;
+    _pendingName = null;
+    _pendingPhone = null;
+    _pendingRole = null;
+
+    state = AuthState(
+      token: idToken,
+      userId: userId,
+      role: role,
+      name: name.trim(),
+    );
   }
 
   String _devUid(AppRole role, String phone) {
     final normalized = phone.replaceAll(RegExp(r'\D'), '');
     return '${role.name}_$normalized';
   }
+}
+
+String normalizePhoneE164(String raw) {
+  final trimmed = raw.trim().replaceAll(RegExp(r'[\s\-]'), '');
+  if (trimmed.startsWith('+')) {
+    return '+${trimmed.substring(1).replaceAll(RegExp(r'\D'), '')}';
+  }
+  final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('0')) {
+    return '+62${digits.substring(1)}';
+  }
+  if (digits.startsWith('62')) {
+    return '+$digits';
+  }
+  return '+$digits';
+}
+
+String _friendlyAuthError(Object e) {
+  if (e is FirebaseAuthException) {
+    switch (e.code) {
+      case 'invalid-phone-number':
+        return 'Nomor telepon tidak valid. Gunakan format +62...';
+      case 'too-many-requests':
+        return 'Terlalu banyak percobaan. Coba lagi nanti.';
+      case 'invalid-verification-code':
+        return 'Kode OTP salah.';
+      case 'session-expired':
+        return 'Kode OTP kedaluwarsa. Kirim ulang.';
+      case 'missing-client-identifier':
+        return 'Konfigurasi Firebase Android belum lengkap (SHA / google-services).';
+      default:
+        return e.message ?? e.code;
+    }
+  }
+  return e.toString();
 }

@@ -49,6 +49,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text(AppStrings.brand), findsOneWidget);
-    expect(find.text(AppStrings.loginAction), findsWidgets);
+    expect(find.text(AppStrings.sendOtpAction), findsWidgets);
   });
 }

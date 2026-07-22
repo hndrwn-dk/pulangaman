@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/config.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import 'auth_controller.dart';
@@ -16,6 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController(text: '+62812');
   final _inviteCtrl = TextEditingController();
+  final _otpCtrl = TextEditingController();
   AppRole _role = AppRole.parent;
 
   @override
@@ -23,27 +25,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _inviteCtrl.dispose();
+    _otpCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
+    final auth = ref.read(authControllerProvider);
+    final notifier = ref.read(authControllerProvider.notifier);
+
     if (_role == AppRole.child) {
-      ref.read(authControllerProvider.notifier).joinWithInvite(
-            name: _nameCtrl.text,
-            inviteCode: _inviteCtrl.text,
-          );
-    } else {
-      ref.read(authControllerProvider.notifier).login(
-            name: _nameCtrl.text,
-            phone: _phoneCtrl.text,
-            role: _role,
-          );
+      notifier.joinWithInvite(
+        name: _nameCtrl.text,
+        inviteCode: _inviteCtrl.text,
+      );
+      return;
     }
+
+    if (auth.awaitingOtp && !AppConfig.useDevAuth) {
+      notifier.confirmOtp(_otpCtrl.text);
+      return;
+    }
+
+    notifier.login(
+      name: _nameCtrl.text,
+      phone: _phoneCtrl.text,
+      role: _role,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
+    final showOtp = auth.awaitingOtp &&
+        _role != AppRole.child &&
+        !AppConfig.useDevAuth;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -60,10 +75,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               nameCtrl: _nameCtrl,
               phoneCtrl: _phoneCtrl,
               inviteCtrl: _inviteCtrl,
+              otpCtrl: _otpCtrl,
+              showOtp: showOtp,
               error: auth.error,
               loading: auth.loading,
-              onRoleChanged: (role) => setState(() => _role = role),
+              onRoleChanged: (role) {
+                if (auth.awaitingOtp) {
+                  ref.read(authControllerProvider.notifier).cancelOtp();
+                  _otpCtrl.clear();
+                }
+                setState(() => _role = role);
+              },
               onSubmit: _submit,
+              onResendOtp: () =>
+                  ref.read(authControllerProvider.notifier).resendOtp(),
+              onChangeNumber: () {
+                ref.read(authControllerProvider.notifier).cancelOtp();
+                _otpCtrl.clear();
+              },
             ),
           ],
         ),
@@ -225,23 +254,39 @@ class _LoginCard extends StatelessWidget {
     required this.nameCtrl,
     required this.phoneCtrl,
     required this.inviteCtrl,
+    required this.otpCtrl,
+    required this.showOtp,
     required this.error,
     required this.loading,
     required this.onRoleChanged,
     required this.onSubmit,
+    required this.onResendOtp,
+    required this.onChangeNumber,
   });
 
   final AppRole role;
   final TextEditingController nameCtrl;
   final TextEditingController phoneCtrl;
   final TextEditingController inviteCtrl;
+  final TextEditingController otpCtrl;
+  final bool showOtp;
   final String? error;
   final bool loading;
   final ValueChanged<AppRole> onRoleChanged;
   final VoidCallback onSubmit;
+  final VoidCallback onResendOtp;
+  final VoidCallback onChangeNumber;
 
   @override
   Widget build(BuildContext context) {
+    final primaryLabel = role == AppRole.child
+        ? AppStrings.loginAction
+        : showOtp
+            ? AppStrings.verifyOtpAction
+            : (AppConfig.useDevAuth
+                ? AppStrings.loginAction
+                : AppStrings.sendOtpAction);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
       decoration: BoxDecoration(
@@ -284,74 +329,119 @@ class _LoginCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 22),
-          _LoginField(
-            label: AppStrings.nameLabel,
-            child: TextField(
-              controller: nameCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                hintText: 'Masukkan nama lengkap',
-                hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+          if (!showOtp) ...[
+            _LoginField(
+              label: AppStrings.nameLabel,
+              child: TextField(
+                controller: nameCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  hintText: 'Masukkan nama lengkap',
+                  hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          if (role == AppRole.child)
-            _LoginField(
-              label: AppStrings.inviteCodeLabel,
-              helper: Row(
-                children: [
-                  Icon(
-                    Icons.lightbulb_outline_rounded,
-                    size: 15,
-                    color: AppColors.amber.withValues(alpha: 0.95),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Minta kode 6 digit dari orang tua',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.inkSoft,
-                            fontSize: 13,
-                          ),
+            const SizedBox(height: 16),
+            if (role == AppRole.child)
+              _LoginField(
+                label: AppStrings.inviteCodeLabel,
+                helper: Row(
+                  children: [
+                    Icon(
+                      Icons.lightbulb_outline_rounded,
+                      size: 15,
+                      color: AppColors.amber.withValues(alpha: 0.95),
                     ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Minta kode 6 digit dari orang tua',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.inkSoft,
+                              fontSize: 13,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: inviteCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    hintText: 'Kode undangan',
+                    hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
                   ),
-                ],
-              ),
-              child: TextField(
-                controller: inviteCtrl,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  hintText: 'Kode undangan',
-                  hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+                ),
+              )
+            else
+              _LoginField(
+                label: AppStrings.phoneLabel,
+                child: TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    hintText: '+62812...',
+                    hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+                  ),
                 ),
               ),
-            )
-          else
+            const SizedBox(height: 20),
+            Text(
+              'Peran',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.teal,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 10),
+            _RoleSelector(
+              selected: role,
+              onChanged: onRoleChanged,
+            ),
+          ] else ...[
+            Text(
+              AppStrings.otpSentHint,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.inkSoft,
+                    height: 1.35,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              phoneCtrl.text.trim(),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.tealDeep,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 16),
             _LoginField(
-              label: AppStrings.phoneLabel,
+              label: AppStrings.otpLabel,
               child: TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
+                controller: otpCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
                 decoration: const InputDecoration(
-                  hintText: '+62812...',
+                  hintText: AppStrings.otpHint,
                   hintStyle: TextStyle(color: Color(0xFFB0BDB9)),
+                  counterText: '',
                 ),
               ),
             ),
-          const SizedBox(height: 20),
-          Text(
-            'Peran',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.teal,
-                  fontWeight: FontWeight.w800,
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: loading ? null : onResendOtp,
+                  child: const Text(AppStrings.resendOtp),
                 ),
-          ),
-          const SizedBox(height: 10),
-          _RoleSelector(
-            selected: role,
-            onChanged: onRoleChanged,
-          ),
+                TextButton(
+                  onPressed: loading ? null : onChangeNumber,
+                  child: const Text(AppStrings.changeNumber),
+                ),
+              ],
+            ),
+          ],
           if (error != null) ...[
             const SizedBox(height: 14),
             Text(
@@ -377,7 +467,7 @@ class _LoginCard extends StatelessWidget {
               elevation: 0,
             ),
             child: Text(
-              loading ? '...' : AppStrings.loginAction,
+              loading ? '...' : primaryLabel,
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w900,
