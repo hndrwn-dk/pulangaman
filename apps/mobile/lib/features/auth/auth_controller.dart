@@ -17,6 +17,7 @@ class AuthState {
     this.role,
     this.name,
     this.loading = false,
+    this.restoring = false,
     this.awaitingOtp = false,
     this.error,
   });
@@ -26,6 +27,8 @@ class AuthState {
   final AppRole? role;
   final String? name;
   final bool loading;
+  /// True only while reading/refreshing persisted session at app start.
+  final bool restoring;
   final bool awaitingOtp;
   final String? error;
 
@@ -37,6 +40,7 @@ class AuthState {
     AppRole? role,
     String? name,
     bool? loading,
+    bool? restoring,
     bool? awaitingOtp,
     String? error,
     bool clearError = false,
@@ -47,6 +51,7 @@ class AuthState {
       role: role ?? this.role,
       name: name ?? this.name,
       loading: loading ?? this.loading,
+      restoring: restoring ?? this.restoring,
       awaitingOtp: awaitingOtp ?? this.awaitingOtp,
       error: clearError ? null : (error ?? this.error),
     );
@@ -66,7 +71,7 @@ final authControllerProvider =
 
 class AuthController extends StateNotifier<AuthState> {
   AuthController({required this.api, required this.store})
-      : super(const AuthState()) {
+      : super(const AuthState(restoring: true)) {
     restore();
   }
 
@@ -80,7 +85,7 @@ class AuthController extends StateNotifier<AuthState> {
   AppRole? _pendingRole;
 
   Future<void> restore() async {
-    state = state.copyWith(loading: true, clearError: true);
+    state = state.copyWith(restoring: true, clearError: true);
     try {
       var token = await store.token();
       final userId = await store.userId();
@@ -125,6 +130,15 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// Wake Render free-tier before session calls (OTP / invite).
+  void _warmApiInBackground() {
+    unawaited(() async {
+      try {
+        await api.get('/health', timeout: const Duration(seconds: 60));
+      } catch (_) {}
+    }());
+  }
+
   Future<void> login({
     required String name,
     required String phone,
@@ -136,6 +150,7 @@ class AuthController extends StateNotifier<AuthState> {
         await _completeDevLogin(name: name, phone: phone, role: role);
         return;
       }
+      _warmApiInBackground();
       await _startPhoneOtp(
         name: name.trim(),
         phone: normalizePhoneE164(phone),
@@ -212,6 +227,7 @@ class AuthController extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(loading: true, awaitingOtp: false, clearError: true);
     try {
+      _warmApiInBackground();
       final joined = await api.post('/api/v1/child-invites/join', body: {
         'name': name.trim(),
         'code': inviteCode.trim().toUpperCase(),
@@ -395,6 +411,60 @@ class AuthController extends StateNotifier<AuthState> {
       role: role,
       name: name.trim(),
     );
+  }
+
+  /// Move children from a legacy parent phone onto the current Firebase parent.
+  Future<int> recoverChildrenFromPhone(String previousPhone) async {
+    if (state.role != AppRole.parent || state.token == null) {
+      throw StateError('Hanya orang tua yang sedang masuk yang bisa memulihkan.');
+    }
+    state = state.copyWith(loading: true, clearError: true);
+    try {
+      var token = state.token!;
+      if (!AppConfig.useDevAuth && Firebase.apps.isNotEmpty) {
+        final refreshed =
+            await FirebaseAuth.instance.currentUser?.getIdToken(true);
+        if (refreshed != null) {
+          token = refreshed;
+          api.setToken(token);
+        }
+      }
+
+      final phone = FirebaseAuth.instance.currentUser?.phoneNumber ??
+          _pendingPhone ??
+          '';
+      if (phone.isEmpty) {
+        throw StateError(
+          'Nomor Firebase tidak ditemukan. Keluar lalu masuk OTP lagi.',
+        );
+      }
+
+      final session = await api.post('/api/v1/auth/session', body: {
+        'name': state.name ?? 'Orang tua',
+        'phone': phone,
+        'role': AppRole.parent.name,
+        'recoverFromPhone': normalizePhoneE164(previousPhone),
+      });
+
+      final userId = session['userId'] as String;
+      final recovered = (session['recoveredChildren'] as num?)?.toInt() ?? 0;
+      await store.save(
+        token: token,
+        userId: userId,
+        role: AppRole.parent.name,
+        name: state.name ?? 'Orang tua',
+      );
+      state = AuthState(
+        token: token,
+        userId: userId,
+        role: AppRole.parent,
+        name: state.name,
+      );
+      return recovered;
+    } catch (e) {
+      state = state.copyWith(loading: false, error: _friendlyAuthError(e));
+      rethrow;
+    }
   }
 
   String _devUid(AppRole role, String phone) {

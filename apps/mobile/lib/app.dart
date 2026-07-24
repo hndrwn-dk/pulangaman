@@ -18,7 +18,7 @@ class PulangAmanApp extends ConsumerWidget {
       title: 'PulangAman',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: auth.loading
+      home: auth.restoring
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : !auth.isAuthenticated
               ? const LoginScreen()

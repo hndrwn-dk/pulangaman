@@ -405,15 +405,26 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   padding: EdgeInsets.symmetric(vertical: 48),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (items.isEmpty)
+              else if (items.isEmpty) ...[
                 const PaEmptyState(
                   icon: Icons.child_care,
                   title: 'Belum ada anak',
                   message:
                       'Ketuk “Tambah anak” di bawah untuk buat kode, '
-                      'lalu masukkan di HP anak.',
-                )
-              else ...[
+                      'lalu masukkan di HP anak. Jika pindah ke login OTP, '
+                      'pulihkan dulu dari nomor lama.',
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => _showRecoverChildren(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.tealDeep,
+                    side: const BorderSide(color: AppColors.teal),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Pulihkan anak dari nomor lama'),
+                ),
+              ] else ...[
                 Row(
                   children: [
                     const Expanded(
@@ -583,6 +594,70 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _showRecoverChildren(BuildContext context) async {
+    final phoneCtrl = TextEditingController(text: '+628126281233300011');
+    final previous = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pulihkan anak'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Masukkan nomor yang dipakai akun orang tua lama '
+              '(sebelum login OTP Firebase).',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Nomor lama',
+                hintText: '+62812...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, phoneCtrl.text.trim()),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+            child: const Text('Pulihkan'),
+          ),
+        ],
+      ),
+    );
+    phoneCtrl.dispose();
+    if (previous == null || previous.isEmpty || !context.mounted) return;
+
+    try {
+      final count = await ref
+          .read(authControllerProvider.notifier)
+          .recoverChildrenFromPhone(previous);
+      await ref.read(childrenControllerProvider.notifier).refresh();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            count > 0
+                ? 'Berhasil memulihkan $count anak. Lalu buat kode masuk ulang di menu anak.'
+                : 'Tidak ada anak yang dipindahkan. Cek nomor lama.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memulihkan: $e')),
+      );
+    }
   }
 
   Future<void> _showRelinkInvite(BuildContext context, ChildSummary child) async {
