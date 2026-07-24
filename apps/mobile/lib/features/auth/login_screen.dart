@@ -453,6 +453,16 @@ class _LoginCard extends StatelessWidget {
               ),
             ),
           ],
+          if (loading && showOtp) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Memverifikasi dan menghubungkan ke server. Render free tier bisa butuh 30-50 detik saat bangun.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.inkSoft,
+                    height: 1.35,
+                  ),
+            ),
+          ],
           const SizedBox(height: 22),
           FilledButton(
             onPressed: loading ? null : onSubmit,
@@ -467,7 +477,9 @@ class _LoginCard extends StatelessWidget {
               elevation: 0,
             ),
             child: Text(
-              loading ? '...' : primaryLabel,
+              loading
+                  ? (showOtp ? 'Menghubungkan...' : '...')
+                  : primaryLabel,
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w900,
