@@ -177,6 +177,12 @@ class MainActivity : FlutterActivity() {
                         startActivity(intent)
                         result.success(true)
                     }
+                    "dismissFullScreen" -> {
+                        sendBroadcast(
+                            Intent(ReminderFullScreenActivity.ACTION_DISMISS).setPackage(packageName),
+                        )
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

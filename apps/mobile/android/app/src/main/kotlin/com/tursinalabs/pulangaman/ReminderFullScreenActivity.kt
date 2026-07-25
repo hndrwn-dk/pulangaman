@@ -1,6 +1,10 @@
 package com.tursinalabs.pulangaman
 
 import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -9,11 +13,24 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.setPadding
 
 class ReminderFullScreenActivity : ComponentActivity() {
+    private val dismissReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ContextCompat.registerReceiver(
+            this,
+            dismissReceiver,
+            IntentFilter(ACTION_DISMISS),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         turnScreenOnAndUnlock()
 
         val title = intent.getStringExtra(ReminderReceiver.EXTRA_TITLE) ?: "Pengingat"
@@ -71,6 +88,14 @@ class ReminderFullScreenActivity : ComponentActivity() {
         setContentView(root)
     }
 
+    override fun onDestroy() {
+        try {
+            unregisterReceiver(dismissReceiver)
+        } catch (_: Exception) {
+        }
+        super.onDestroy()
+    }
+
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
 
@@ -98,5 +123,9 @@ class ReminderFullScreenActivity : ComponentActivity() {
             )
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    companion object {
+        const val ACTION_DISMISS = "com.tursinalabs.pulangaman.DISMISS_FULLSCREEN_ALERT"
     }
 }

@@ -283,12 +283,15 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   void _onEmergencyMeetingResolved([Map<String, dynamic>? payload]) {
     final activationId = payload?['activationId'] as String?;
     if (activationId != null) _empResolvedIds.add(activationId);
+    unawaited(_clearEmergencyMeetingUi());
+  }
+
+  Future<void> _clearEmergencyMeetingUi() async {
+    try {
+      await _reminderChannel.dismissFullScreen();
+    } catch (_) {}
     if (!mounted) return;
-    setState(() {
-      _empActive = null;
-      // Keep opened id so a poll echo of the same activation does not re-push.
-      if (activationId != null) _empAlertOpenedId = activationId;
-    });
+    setState(() => _empActive = null);
     if (_empScreenOpen) {
       _empScreenOpen = false;
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -305,15 +308,34 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           .get('/api/v1/emergency-meeting-points/active');
       final alert = data['alert'];
       if (alert is! Map<String, dynamic>) {
-        if (mounted && _empActive != null) {
-          setState(() => _empActive = null);
+        final hadActive = _empActive != null || _empScreenOpen;
+        if (hadActive) {
+          try {
+            await _reminderChannel.dismissFullScreen();
+          } catch (_) {}
+          if (mounted) {
+            setState(() => _empActive = null);
+            if (_empScreenOpen) {
+              _empScreenOpen = false;
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          }
         }
         return;
       }
       final activationId = alert['activationId'] as String?;
       if (activationId != null && _empResolvedIds.contains(activationId)) {
-        if (mounted && _empActive != null) {
-          setState(() => _empActive = null);
+        if (mounted && (_empActive != null || _empScreenOpen)) {
+          try {
+            await _reminderChannel.dismissFullScreen();
+          } catch (_) {}
+          if (mounted) {
+            setState(() => _empActive = null);
+            if (_empScreenOpen) {
+              _empScreenOpen = false;
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }
+          }
         }
         return;
       }

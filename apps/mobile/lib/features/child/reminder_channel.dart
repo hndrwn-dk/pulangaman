@@ -31,4 +31,10 @@ class ReminderChannel {
       'style': style,
     });
   }
+
+  /// Closes the native ReminderFullScreenActivity if it is on screen
+  /// (e.g. parent turned off an emergency meeting point).
+  Future<void> dismissFullScreen() async {
+    await _channel.invokeMethod<void>('dismissFullScreen');
+  }
 }
