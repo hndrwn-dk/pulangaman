@@ -289,7 +289,7 @@ export async function getChildPointStatus(childId: string) {
 async function approvedGuardianIds(childId: string): Promise<string[]> {
   const result = await pool.query<{ guardian_id: string }>(
     `SELECT guardian_id FROM child_approved_guardians
-     WHERE child_id = $1 AND status = 'approved'`,
+     WHERE child_id = $1 AND status = 'active'`,
     [childId],
   );
   return result.rows.map((r) => r.guardian_id);
@@ -357,19 +357,22 @@ export async function activateMeetingPoints(params: {
       ? `${note} — menuju ${point.name}`
       : `Segera menuju titik kumpul: ${point.name}`;
 
-    const data = {
+    const data: Record<string, string> = {
       type: 'emergency_meeting_alert',
-      activationId,
-      childId: t.childId,
-      meetingPointId: point.id,
-      meetingPointName: point.name,
+      activationId: String(activationId),
+      childId: String(t.childId),
+      meetingPointId: String(point.id),
+      meetingPointName: String(point.name),
       lat: String(point.lat),
       lng: String(point.lng),
       instructions: point.instructions ?? '',
       note: note ?? '',
     };
 
-    await sendFcmToUser(t.childId, { title, body }, data);
+    // FCM is best-effort — never fail the activation response if push/token errors.
+    await sendFcmToUser(t.childId, { title, body }, data).catch((err) => {
+      console.error('emp_activate_fcm_child_failed', { childId: t.childId, err });
+    });
     broadcastToRoom(childRoom(t.childId), 'parent:emergency_meeting_alert', {
       ...data,
       instructions: point.instructions,
@@ -411,14 +414,16 @@ export async function activateMeetingPoints(params: {
       },
       {
         type: 'emergency_meeting_alert_guardian',
-        activationId,
+        activationId: String(activationId),
         meetingPointName: info.pointName,
         lat: info.lat,
         lng: info.lng,
         childNames: names,
         note: note ?? '',
       },
-    );
+    ).catch((err) => {
+      console.error('emp_activate_fcm_guardian_failed', { guardianId, err });
+    });
     broadcastToRoom(guardianAlertRoom(guardianId), 'guardian:emergency_meeting_alert', {
       activationId,
       meetingPointName: info.pointName,

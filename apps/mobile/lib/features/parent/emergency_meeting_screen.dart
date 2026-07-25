@@ -344,39 +344,11 @@ class _EmergencyMeetingScreenState
   /// Always parent-scoped — chip selection must not affect this call.
   Future<void> _activate() async {
     final l10n = AppLocalizations.of(context);
-    final noteCtrl = TextEditingController();
-    final confirmed = await showDialog<bool>(
+    final note = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.empActivate),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(l10n.empActivateConfirm),
-            const SizedBox(height: 12),
-            TextField(
-              controller: noteCtrl,
-              decoration: InputDecoration(hintText: l10n.empActivateNoteHint),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.empActivateCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.empActivateContinue),
-          ),
-        ],
-      ),
+      builder: (ctx) => const _EmpActivateDialog(),
     );
-    final note = noteCtrl.text.trim();
-    noteCtrl.dispose();
-    if (confirmed != true) return;
+    if (note == null || !mounted) return;
 
     setState(() => _activating = true);
     try {
@@ -634,6 +606,60 @@ class _EmergencyMeetingScreenState
           ],
         ),
       ),
+    );
+  }
+}
+
+class _EmpActivateDialog extends StatefulWidget {
+  const _EmpActivateDialog();
+
+  @override
+  State<_EmpActivateDialog> createState() => _EmpActivateDialogState();
+}
+
+class _EmpActivateDialogState extends State<_EmpActivateDialog> {
+  late final TextEditingController _noteCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.empActivate),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(l10n.empActivateConfirm),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _noteCtrl,
+            decoration: InputDecoration(hintText: l10n.empActivateNoteHint),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.empActivateCancel),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+          onPressed: () => Navigator.pop(context, _noteCtrl.text.trim()),
+          child: Text(l10n.empActivateContinue),
+        ),
+      ],
     );
   }
 }
