@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/day_period.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
@@ -69,25 +70,37 @@ class ChildBerandaTab extends StatelessWidget {
   final String? empNote;
   final VoidCallback? onOpenEmp;
 
-  String _timeGreeting() {
-    final h = DateTime.now().hour;
-    if (h < 11) return 'Pagi';
-    if (h < 15) return 'Siang';
-    if (h < 18) return 'Sore';
-    return 'Malam';
-  }
+  String _timeGreeting() => dayPeriodFor().shortId;
 
   @override
   Widget build(BuildContext context) {
+    final period = dayPeriodFor();
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
-        Text(
-          '${_timeGreeting()}, $childName!',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w900,
+        Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: period.accent.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
               ),
+              child: Icon(period.icon, color: period.accent, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '${_timeGreeting()}, $childName!',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 4),
         const Text('Tetap aman, kumpulkan poin, dan beri kabar keluarga.'),
         const SizedBox(height: AppSpacing.md),
         Wrap(

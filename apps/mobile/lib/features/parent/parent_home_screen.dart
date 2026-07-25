@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../core/day_period.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
@@ -319,13 +320,11 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     }));
   }
 
-  String _greeting() {
-    final h = DateTime.now().hour;
-    if (h < 11) return 'Selamat pagi';
-    if (h < 15) return 'Selamat siang';
-    if (h < 18) return 'Selamat sore';
-    return 'Selamat malam';
-  }
+  String _greeting() => dayPeriodFor().greetingId;
+
+  IconData _greetingIcon() => dayPeriodFor().icon;
+
+  Color _greetingIconColor() => dayPeriodFor().accent;
 
   String _initials(String? name) {
     final parts = (name ?? '').trim().split(RegExp(r'\s+'));
@@ -450,6 +449,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             children: [
               _HomeHeader(
                 greeting: _greeting(),
+                greetingIcon: _greetingIcon(),
+                greetingIconColor: _greetingIconColor(),
                 name: auth.name ?? 'Orang tua',
                 initials: _initials(auth.name),
                 notificationCount: unread.length,
@@ -915,6 +916,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 class _HomeHeader extends StatelessWidget {
   const _HomeHeader({
     required this.greeting,
+    required this.greetingIcon,
+    required this.greetingIconColor,
     required this.name,
     required this.initials,
     required this.notificationCount,
@@ -923,6 +926,8 @@ class _HomeHeader extends StatelessWidget {
   });
 
   final String greeting;
+  final IconData greetingIcon;
+  final Color greetingIconColor;
   final String name;
   final String initials;
   final int notificationCount;
@@ -934,6 +939,20 @@ class _HomeHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: greetingIconColor.withValues(alpha: 0.16),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            greetingIcon,
+            color: greetingIconColor,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
