@@ -206,14 +206,7 @@ emergencyMeetingRouter.post('/deactivate', async (req: AuthedRequest, res, next)
       return;
     }
 
-    const body = z
-      .object({ activationId: z.string().uuid().nullable().optional() })
-      .parse(req.body ?? {});
-
-    const result = await resolveActivations({
-      parentId,
-      activationId: body.activationId,
-    });
+    const result = await resolveActivations({ parentId });
     res.json({ ok: true, ...result });
   } catch (error) {
     next(error);

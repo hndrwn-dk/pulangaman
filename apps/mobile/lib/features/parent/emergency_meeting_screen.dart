@@ -117,12 +117,10 @@ class _EmergencyMeetingScreenState
 
     setState(() => _deactivating = true);
     try {
+      // Clear every open activation for this household (not just the visible one).
       await ref.read(apiClientProvider).post(
         '/api/v1/emergency-meeting-points/deactivate',
-        body: {
-          if (_activation?['activationId'] is String)
-            'activationId': _activation!['activationId'],
-        },
+        body: {},
       );
       if (!mounted) return;
       setState(() {

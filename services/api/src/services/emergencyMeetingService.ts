@@ -538,10 +538,9 @@ export async function getActiveActivationForParent(
   };
 }
 
-/** Turn off open activations; children and guardians get a stand-down signal. */
+/** Turn off every open activation for this parent; children/guardians get stand-down. */
 export async function resolveActivations(params: {
   parentId: string;
-  activationId?: string | null;
 }): Promise<{ resolved: number }> {
   const result = await pool.query<{
     id: string;
@@ -552,9 +551,8 @@ export async function resolveActivations(params: {
      SET resolved_at = now()
      WHERE parent_id = $1
        AND resolved_at IS NULL
-       AND ($2::uuid IS NULL OR id = $2::uuid)
      RETURNING id, targets, resolved_at`,
-    [params.parentId, params.activationId ?? null],
+    [params.parentId],
   );
 
   for (const row of result.rows) {

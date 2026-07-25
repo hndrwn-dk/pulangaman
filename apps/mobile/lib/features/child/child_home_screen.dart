@@ -70,6 +70,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Map<String, dynamic>? _empActive;
   String? _empAlertOpenedId;
   bool _empScreenOpen = false;
+  /// Activations the child already stood down — ignore late WS/FCM/poll echoes.
+  final Set<String> _empResolvedIds = {};
 
   @override
   void initState() {
@@ -111,7 +113,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       unawaited(_syncReminders());
       unawaited(_connectReminderWs(force: true));
       unawaited(_pollPanicStatus());
-      unawaited(_pollEmergencyMeeting(openAlert: true));
+      // Refresh status only — do not force-open the alert on every resume
+      // (closing the native fullscreen also resumes the app).
+      unawaited(_pollEmergencyMeeting());
     }
   }
 
@@ -186,7 +190,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       return;
     }
     if (event == 'parent:emergency_meeting_resolved') {
-      _onEmergencyMeetingResolved();
+      _onEmergencyMeetingResolved(payload);
       return;
     }
     if (event == 'parent:home_by_status' || event == 'parent:home_by_ack') {
@@ -220,13 +224,32 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   }
 
   Future<void> _onEmergencyMeetingAlert(Map<String, dynamic> payload) async {
+    final activationId = payload['activationId'] as String?;
+    if (activationId != null && _empResolvedIds.contains(activationId)) {
+      return;
+    }
+    // Late FCM/WS can arrive after the parent already turned the alert off.
+    try {
+      final live = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/emergency-meeting-points/active');
+      final alert = live['alert'];
+      if (alert is! Map<String, dynamic>) {
+        if (activationId != null) _empResolvedIds.add(activationId);
+        return;
+      }
+      final liveId = alert['activationId'] as String?;
+      if (liveId != null && _empResolvedIds.contains(liveId)) return;
+    } catch (_) {
+      // Fall through and show from the push payload if the poll failed.
+    }
+
     final name = payload['meetingPointName'] as String? ?? 'Titik kumpul';
     final lat = parseCoord(payload['lat']);
     final lng = parseCoord(payload['lng']);
     if (lat == null || lng == null || !mounted) return;
     final note = payload['note'] as String?;
     final instructions = payload['instructions'] as String?;
-    final activationId = payload['activationId'] as String?;
     setState(() {
       _empActive = {
         'activationId': activationId,
@@ -257,11 +280,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     );
   }
 
-  void _onEmergencyMeetingResolved() {
+  void _onEmergencyMeetingResolved([Map<String, dynamic>? payload]) {
+    final activationId = payload?['activationId'] as String?;
+    if (activationId != null) _empResolvedIds.add(activationId);
     if (!mounted) return;
     setState(() {
       _empActive = null;
-      _empAlertOpenedId = null;
+      // Keep opened id so a poll echo of the same activation does not re-push.
+      if (activationId != null) _empAlertOpenedId = activationId;
     });
     if (_empScreenOpen) {
       _empScreenOpen = false;
@@ -284,8 +310,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         }
         return;
       }
-      if (!mounted) return;
       final activationId = alert['activationId'] as String?;
+      if (activationId != null && _empResolvedIds.contains(activationId)) {
+        if (mounted && _empActive != null) {
+          setState(() => _empActive = null);
+        }
+        return;
+      }
+      if (!mounted) return;
       setState(() => _empActive = alert);
       if (openAlert ||
           (activationId != null && activationId != _empAlertOpenedId)) {
