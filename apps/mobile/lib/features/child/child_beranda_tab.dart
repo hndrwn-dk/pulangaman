@@ -28,6 +28,11 @@ class ChildBerandaTab extends StatelessWidget {
     this.homeByAckVisible = false,
     this.homeByAckSent = false,
     this.onHomeByAck,
+    this.tripActive = false,
+    this.tripToLabel,
+    this.tripProgress = 0,
+    this.onStartTrip,
+    this.onCancelTrip,
   });
 
   final String childName;
@@ -50,6 +55,11 @@ class ChildBerandaTab extends StatelessWidget {
   final bool homeByAckVisible;
   final bool homeByAckSent;
   final VoidCallback? onHomeByAck;
+  final bool tripActive;
+  final String? tripToLabel;
+  final double tripProgress;
+  final VoidCallback? onStartTrip;
+  final VoidCallback? onCancelTrip;
 
   String _timeGreeting() {
     final h = DateTime.now().hour;
@@ -128,6 +138,54 @@ class ChildBerandaTab extends StatelessWidget {
                   FilledButton(
                     onPressed: onHomeByAck,
                     child: const Text('Beri kabar ke orang tua'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+        if (tripActive || onStartTrip != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          PaSectionCard(
+            color: AppColors.sky.withValues(alpha: 0.14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  tripActive
+                      ? (tripProgress <= 0 && onStartTrip != null
+                          ? 'Rute siap · ${tripToLabel ?? 'tujuan'}'
+                          : 'Menuju ${tripToLabel ?? 'tujuan'}')
+                      : 'Mulai perjalanan',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  textAlign: TextAlign.center,
+                ),
+                if (tripActive) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: tripProgress.clamp(0.0, 1.0),
+                      minHeight: 8,
+                      backgroundColor: const Color(0xFFE2E6EA),
+                      color: AppColors.teal,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (onStartTrip != null)
+                    FilledButton(
+                      onPressed: onStartTrip,
+                      child: const Text('Mulai perjalanan'),
+                    ),
+                  OutlinedButton(
+                    onPressed: onCancelTrip,
+                    child: const Text('Batalkan perjalanan'),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: onStartTrip,
+                    child: const Text('Pilih tujuan'),
                   ),
                 ],
               ],

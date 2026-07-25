@@ -143,4 +143,65 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get homeByNoChildren => 'Belum ada anak terhubung';
+
+  @override
+  String get tripSectionTitle => 'Rute Aman';
+
+  @override
+  String get tripCreateCta => 'Buat rute aman';
+
+  @override
+  String get tripSuggestSchoolHome => 'Sekolah → Rumah';
+
+  @override
+  String get tripPickFrom => 'Dari';
+
+  @override
+  String get tripPickTo => 'Ke';
+
+  @override
+  String get tripCreate => 'Buat rute';
+
+  @override
+  String get tripStart => 'Mulai pantau';
+
+  @override
+  String get tripCancel => 'Batalkan';
+
+  @override
+  String get tripActive => 'Dalam perjalanan';
+
+  @override
+  String get tripPlanned => 'Direncanakan';
+
+  @override
+  String get tripArrived => 'Sudah sampai';
+
+  @override
+  String get tripNeedTwoPlaces => 'Tambah minimal dua tempat dulu';
+
+  @override
+  String get tripNeedDistinct => 'Asal dan tujuan harus berbeda';
+
+  @override
+  String get tripCreated => 'Rute aman dibuat';
+
+  @override
+  String get tripChildStart => 'Mulai perjalanan';
+
+  @override
+  String get tripChildPickDest => 'Pilih tujuan';
+
+  @override
+  String tripChildActiveTo(String place) {
+    return 'Menuju $place';
+  }
+
+  @override
+  String get tripChildCancel => 'Batalkan perjalanan';
+
+  @override
+  String tripProgressMeta(String distance, String eta) {
+    return '$distance · $eta';
+  }
 }

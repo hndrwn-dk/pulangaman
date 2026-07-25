@@ -10,6 +10,7 @@ PulangAman is a community safety app for parents and children in Indonesia. It h
 - School attendance signals for partner schools
 - Community safety reports near common routes
 - Safe home time ("Jam Pulang Aman") with Maghrib-aware curfew checks
+- Safe routes between saved places with live trip progress
 - Optional rewards and screen-time support for families
 
 ## Tech Stack

@@ -59,9 +59,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Timer? _panicCooldownTimer;
   Timer? _panicStatusPoll;
   Timer? _homeByPoll;
+  Timer? _tripPoll;
   String? _homeByStatus;
   bool _homeByAcked = false;
   bool _homeByPreviewShown = false;
+  Map<String, dynamic>? _trip;
 
   @override
   void initState() {
@@ -73,6 +75,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     Future.microtask(_connectReminderWs);
     Future.microtask(_pollPanicStatus);
     Future.microtask(_pollHomeByStatus);
+    Future.microtask(_pollTrip);
     _panicStatusPoll = Timer.periodic(
       const Duration(seconds: 5),
       (_) => unawaited(_pollPanicStatus()),
@@ -80,6 +83,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     _homeByPoll = Timer.periodic(
       const Duration(seconds: 45),
       (_) => unawaited(_pollHomeByStatus()),
+    );
+    _tripPoll = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => unawaited(_pollTrip()),
     );
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
@@ -164,6 +171,23 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     }
     if (event == 'parent:home_by_status' || event == 'parent:home_by_ack') {
       unawaited(_pollHomeByStatus());
+      return;
+    }
+    if (event == 'parent:trip_progress' ||
+        event == 'parent:trip_started' ||
+        event == 'parent:trip_planned' ||
+        event == 'parent:trip_arrived' ||
+        event == 'parent:trip_cancelled') {
+      if (event == 'parent:trip_cancelled') {
+        if (mounted) setState(() => _trip = null);
+      } else if (event == 'parent:trip_arrived') {
+        if (mounted) setState(() => _trip = payload);
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) unawaited(_pollTrip());
+        });
+      } else {
+        if (mounted) setState(() => _trip = payload);
+      }
       return;
     }
     if (event == 'child:panic_acked' || event == 'child:panic_resolved') {
@@ -299,6 +323,182 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       );
     } finally {
       noteCtrl.dispose();
+    }
+  }
+
+  Future<void> _pollTrip() async {
+    if (!mounted) return;
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/trips/active');
+      if (!mounted) return;
+      setState(() => _trip = data['trip'] as Map<String, dynamic>?);
+    } catch (_) {}
+  }
+
+  Future<void> _cancelActiveTrip() async {
+    final id = _trip?['id'] as String?;
+    if (id == null) return;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/trips/$id/cancel');
+      if (!mounted) return;
+      setState(() => _trip = null);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
+    }
+  }
+
+  Future<void> _startPlannedTrip() async {
+    final id = _trip?['id'] as String?;
+    if (id == null) return;
+    try {
+      final data =
+          await ref.read(apiClientProvider).post('/api/v1/trips/$id/start');
+      if (!mounted) return;
+      setState(() => _trip = data['trip'] as Map<String, dynamic>?);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
+    }
+  }
+
+  Future<void> _openStartTripSheet() async {
+    List<Map<String, dynamic>> zones = [];
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/zones');
+      zones = (data['zones'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {}
+    if (!mounted) return;
+    if (zones.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Belum ada cukup tempat tersimpan')),
+      );
+      return;
+    }
+
+    String zoneLabel(Map<String, dynamic> z) {
+      final name = (z['name'] as String?)?.trim();
+      if (name != null && name.isNotEmpty) return name;
+      final type = z['type'] as String?;
+      if (type == 'home') return 'Rumah';
+      if (type == 'school') return 'Sekolah';
+      return 'Tempat';
+    }
+
+    Map<String, dynamic>? fromZone;
+    for (final z in zones) {
+      if (z['type'] == 'home') {
+        fromZone = z;
+        break;
+      }
+    }
+    fromZone ??= zones.first;
+    final fromZoneId = fromZone['id'];
+    Map<String, dynamic>? toZone;
+    for (final z in zones) {
+      if (z['id'] != fromZoneId && z['type'] != 'home') {
+        toZone = z;
+        break;
+      }
+    }
+    toZone ??= zones.firstWhere(
+      (z) => z['id'] != fromZoneId,
+      orElse: () => zones.last,
+    );
+
+    String? fromId = fromZone['id'] as String?;
+    String? toId = toZone['id'] as String?;
+
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Mulai perjalanan',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Dari', style: TextStyle(fontWeight: FontWeight.w700)),
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: fromId,
+                    items: [
+                      for (final z in zones)
+                        DropdownMenuItem(
+                          value: z['id'] as String,
+                          child: Text(zoneLabel(z)),
+                        ),
+                    ],
+                    onChanged: (v) => setSheet(() => fromId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('Ke', style: TextStyle(fontWeight: FontWeight.w700)),
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: toId,
+                    items: [
+                      for (final z in zones)
+                        DropdownMenuItem(
+                          value: z['id'] as String,
+                          child: Text(zoneLabel(z)),
+                        ),
+                    ],
+                    onChanged: (v) => setSheet(() => toId = v),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      if (fromId == null || toId == null || fromId == toId) {
+                        return;
+                      }
+                      Navigator.of(ctx).pop(true);
+                    },
+                    child: const Text('Mulai'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (ok != true || fromId == null || toId == null || !mounted) return;
+    try {
+      final data = await ref.read(apiClientProvider).post(
+        '/api/v1/trips',
+        body: {
+          'fromZoneId': fromId,
+          'toZoneId': toId,
+          'mode': 'walking',
+          'startImmediately': true,
+        },
+      );
+      if (!mounted) return;
+      setState(() => _trip = data['trip'] as Map<String, dynamic>?);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
     }
   }
 
@@ -785,6 +985,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     _panicCooldownTimer?.cancel();
     _panicStatusPoll?.cancel();
     _homeByPoll?.cancel();
+    _tripPoll?.cancel();
     _ws.removeHandler(_onReminderWs);
     unawaited(_ws.disconnect());
     // Keep native FGS running after Flutter dispose so background tracking continues.
@@ -884,6 +1085,18 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                     _homeByStatus == 'target_notified' ||
                     _homeByStatus == 'grace_notified'),
             onHomeByAck: () => unawaited(_openHomeByAckSheet()),
+            tripActive: _trip != null &&
+                (_trip!['status'] == 'active' || _trip!['status'] == 'planned'),
+            tripToLabel: _trip?['toLabel'] as String?,
+            tripProgress: (_trip?['progress'] as num?)?.toDouble() ?? 0,
+            onStartTrip: _trip == null
+                ? () => unawaited(_openStartTripSheet())
+                : _trip!['status'] == 'planned'
+                    ? () => unawaited(_startPlannedTrip())
+                    : null,
+            onCancelTrip: _trip != null
+                ? () => unawaited(_cancelActiveTrip())
+                : null,
           ),
           ChildLayarTab(
             usageAccess: _usageAccess,

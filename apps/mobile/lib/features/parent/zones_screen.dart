@@ -6,10 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/network/ws_client.dart';
 import '../../core/widgets/pa_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
+import 'trip_route_card.dart';
 
 class PlaceHit {
   PlaceHit({
@@ -77,10 +80,11 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
   String? _selectedChildId;
   List<Map<String, dynamic>> _zones = [];
   bool _loading = true;
-  Map<String, dynamic>? _route;
-  bool _routeLoading = false;
+  Map<String, dynamic>? _trip;
+  bool _tripLoading = false;
   bool _editMode = false;
   final _searchCtrl = TextEditingController();
+  final _ws = WsClient();
   String _query = '';
   final Map<String, ChildGender> _genders = {};
 
@@ -106,13 +110,52 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
       await ref.read(childrenControllerProvider.notifier).bootstrap();
       await _loadGenders();
       await _reloadForSelected();
+      await _connectWs();
     });
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _ws.removeHandler(_onWs);
+    unawaited(_ws.disconnect());
     super.dispose();
+  }
+
+  Future<void> _connectWs() async {
+    final token = ref.read(authControllerProvider).token;
+    if (token == null) return;
+    try {
+      await _ws.connect(token);
+      _ws.addHandler(_onWs);
+      final child = _selected;
+      if (child != null) _ws.subscribe('child:${child.id}');
+    } catch (_) {}
+  }
+
+  void _onWs(String event, Map<String, dynamic> payload) {
+    final child = _selected;
+    if (child == null) return;
+    if (payload['childId'] != child.id) return;
+    if (event == 'parent:trip_progress' ||
+        event == 'parent:trip_started' ||
+        event == 'parent:trip_planned' ||
+        event == 'parent:trip_arrived' ||
+        event == 'parent:trip_cancelled') {
+      if (event == 'parent:trip_cancelled' || event == 'parent:trip_arrived') {
+        setState(() => _trip = event == 'parent:trip_arrived' ? payload : null);
+        if (event == 'parent:trip_arrived') {
+          // Keep arrived card briefly then refresh.
+          Future.delayed(const Duration(seconds: 4), () {
+            if (mounted) unawaited(_loadTrip());
+          });
+        } else {
+          unawaited(_loadTrip());
+        }
+      } else {
+        setState(() => _trip = payload);
+      }
+    }
   }
 
   Future<void> _loadGenders() async {
@@ -138,14 +181,14 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     if (child == null) {
       setState(() {
         _zones = [];
-        _route = null;
+        _trip = null;
         _loading = false;
       });
       return;
     }
     setState(() {
       _loading = true;
-      _route = null;
+      _trip = null;
     });
     try {
       final data = await ref.read(apiClientProvider).get(
@@ -159,7 +202,8 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
             .toList();
         _loading = false;
       });
-      unawaited(_maybePlanRoute());
+      await _loadTrip();
+      _ws.subscribe('child:${child.id}');
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -172,7 +216,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     setState(() {
       _selectedChildId = id;
       _editMode = false;
-      _route = null;
+      _trip = null;
     });
     unawaited(_reloadForSelected());
   }
@@ -435,60 +479,239 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     }
   }
 
-  Future<void> _maybePlanRoute() async {
-    final home = _zoneOf('home');
-    final school = _zoneOf('school');
-    if (home == null || school == null) return;
-    setState(() => _routeLoading = true);
+  Future<void> _loadTrip() async {
+    final child = _selected;
+    if (child == null) return;
+    setState(() => _tripLoading = true);
     try {
-      final data = await ref.read(apiClientProvider).post(
-        '/api/v1/routes/safe',
-        body: {
-          'originLat': (school['lat'] as num).toDouble(),
-          'originLng': (school['lng'] as num).toDouble(),
-          'destLat': (home['lat'] as num).toDouble(),
-          'destLng': (home['lng'] as num).toDouble(),
-          'mode': 'walking',
-        },
+      final data = await ref.read(apiClientProvider).get(
+        '/api/v1/trips/active',
+        query: {'childId': child.id},
       );
       if (!mounted) return;
       setState(() {
-        _route = data;
-        _routeLoading = false;
+        _trip = data['trip'] as Map<String, dynamic>?;
+        _tripLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _route = null;
-        _routeLoading = false;
+        _trip = null;
+        _tripLoading = false;
       });
     }
   }
 
-  Future<void> _planRouteManual() async {
+  Future<void> _createTrip({
+    required String fromZoneId,
+    required String toZoneId,
+    bool startImmediately = false,
+  }) async {
+    final child = _selected;
+    if (child == null) return;
+    final l10n = AppLocalizations.of(context);
+    setState(() => _tripLoading = true);
+    try {
+      final data = await ref.read(apiClientProvider).post(
+        '/api/v1/trips',
+        body: {
+          'childId': child.id,
+          'fromZoneId': fromZoneId,
+          'toZoneId': toZoneId,
+          'mode': 'walking',
+          'startImmediately': startImmediately,
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _trip = data['trip'] as Map<String, dynamic>?;
+        _tripLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tripCreated)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _tripLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
+  }
+
+  Future<void> _startTrip() async {
+    final id = _trip?['id'] as String?;
+    if (id == null) return;
+    try {
+      final data = await ref.read(apiClientProvider).post('/api/v1/trips/$id/start');
+      if (!mounted) return;
+      setState(() => _trip = data['trip'] as Map<String, dynamic>?);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _cancelTrip() async {
+    final id = _trip?['id'] as String?;
+    if (id == null) return;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/trips/$id/cancel');
+      if (!mounted) return;
+      setState(() => _trip = null);
+    } catch (_) {}
+  }
+
+  Future<void> _suggestSchoolHome() async {
     final home = _zoneOf('home');
     final school = _zoneOf('school');
     if (home == null || school == null) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Isi Rumah dan Sekolah dulu, baru rute bisa dibuat.'),
-        ),
+        SnackBar(content: Text(l10n.tripNeedTwoPlaces)),
       );
       return;
     }
-    await _maybePlanRoute();
+    await _createTrip(
+      fromZoneId: school['id'] as String,
+      toZoneId: home['id'] as String,
+      startImmediately: false,
+    );
   }
 
-  String _routeDistanceLabel() {
-    final m = (_route?['distanceM'] as num?)?.toDouble() ?? 0;
+  Future<void> _openCreateTripSheet() async {
+    final l10n = AppLocalizations.of(context);
+    if (_zones.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tripNeedTwoPlaces)),
+      );
+      return;
+    }
+    String? fromId = _zoneOf('school')?['id'] as String? ?? _zones.first['id'] as String?;
+    String? toId = _zoneOf('home')?['id'] as String?;
+    if (toId == fromId) {
+      for (final z in _zones) {
+        final id = z['id'] as String?;
+        if (id != null && id != fromId) {
+          toId = id;
+          break;
+        }
+      }
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                16 + MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.tripCreateCta,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(l10n.tripPickFrom, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: fromId,
+                    items: [
+                      for (final z in _zones)
+                        DropdownMenuItem(
+                          value: z['id'] as String,
+                          child: Text(_displayTitle(z)),
+                        ),
+                    ],
+                    onChanged: (v) => setSheet(() => fromId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(l10n.tripPickTo, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  DropdownButton<String>(
+                    isExpanded: true,
+                    value: toId,
+                    items: [
+                      for (final z in _zones)
+                        DropdownMenuItem(
+                          value: z['id'] as String,
+                          child: Text(_displayTitle(z)),
+                        ),
+                    ],
+                    onChanged: (v) => setSheet(() => toId = v),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () async {
+                      if (fromId == null || toId == null) return;
+                      if (fromId == toId) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.tripNeedDistinct)),
+                        );
+                        return;
+                      }
+                      Navigator.of(ctx).pop();
+                      await _createTrip(
+                        fromZoneId: fromId!,
+                        toZoneId: toId!,
+                      );
+                    },
+                    child: Text(l10n.tripCreate),
+                  ),
+                  if (_zoneOf('home') != null && _zoneOf('school') != null) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () async {
+                        Navigator.of(ctx).pop();
+                        await _suggestSchoolHome();
+                      },
+                      child: Text(l10n.tripSuggestSchoolHome),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _tripDistanceLabel() {
+    final m = (_trip?['distanceM'] as num?)?.toDouble() ?? 0;
     if (m >= 1000) return '${(m / 1000).toStringAsFixed(1)} km';
     return '${m.round()} m';
   }
 
-  String _routeEtaLabel() {
-    final m = (_route?['distanceM'] as num?)?.toDouble() ?? 0;
+  String _tripEtaLabel() {
+    final sec = (_trip?['durationSec'] as num?)?.toInt();
+    if (sec != null && sec > 0) {
+      final minutes = (sec / 60).round().clamp(1, 180);
+      return 'Estimasi $minutes menit';
+    }
+    final m = (_trip?['distanceM'] as num?)?.toDouble() ?? 0;
     final minutes = (m / 83.33).round().clamp(1, 180);
     return 'Estimasi $minutes menit';
+  }
+
+  String _tripMeta(AppLocalizations l10n) {
+    final status = _trip?['status'] as String?;
+    final base = l10n.tripProgressMeta(_tripDistanceLabel(), _tripEtaLabel());
+    if (status == 'planned') return '${l10n.tripPlanned} · $base';
+    if (status == 'arrived') return '${l10n.tripArrived} · $base';
+    if (status == 'active') return '${l10n.tripActive} · $base';
+    return base;
   }
 
   @override
@@ -718,53 +941,58 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       }),
                   ],
                   const SizedBox(height: 18),
-                  const Text(
-                    'Rute Pulang',
-                    style: TextStyle(
+                  Text(
+                    AppLocalizations.of(context).tripSectionTitle,
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  if (_routeLoading)
+                  if (_tripLoading)
                     Container(
                       height: 96,
                       alignment: Alignment.center,
                       decoration: _cardDecoration,
                       child: const CircularProgressIndicator(),
                     )
-                  else if (_route != null && home != null && school != null)
-                    _RouteCard(
-                      fromLabel: 'Sekolah',
-                      toLabel: 'Rumah',
-                      meta: '${_routeDistanceLabel()} · ${_routeEtaLabel()}',
-                      onTap: _planRouteManual,
+                  else if (_trip != null)
+                    TripRouteCard(
+                      fromLabel: _trip!['fromLabel'] as String? ?? 'Dari',
+                      toLabel: _trip!['toLabel'] as String? ?? 'Ke',
+                      meta: _tripMeta(AppLocalizations.of(context)),
+                      progress: (_trip!['progress'] as num?)?.toDouble() ?? 0,
+                      status: _trip!['status'] as String?,
+                      onStart: _trip!['status'] == 'planned'
+                          ? () => unawaited(_startTrip())
+                          : null,
+                      onCancel: () => unawaited(_cancelTrip()),
                     )
                   else
                     Material(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       child: InkWell(
-                        onTap: _planRouteManual,
+                        onTap: _openCreateTripSheet,
                         borderRadius: BorderRadius.circular(20),
                         child: Ink(
                           decoration: _cardDecoration,
-                          child: const Padding(
-                            padding: EdgeInsets.all(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                Icon(Icons.route_rounded, color: AppColors.teal),
-                                SizedBox(width: 12),
+                                const Icon(Icons.route_rounded, color: AppColors.teal),
+                                const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Buat rute Sekolah → Rumah',
-                                    style: TextStyle(
+                                    AppLocalizations.of(context).tripCreateCta,
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 15,
                                     ),
                                   ),
                                 ),
-                                Icon(Icons.chevron_right_rounded),
+                                const Icon(Icons.chevron_right_rounded),
                               ],
                             ),
                           ),
@@ -992,133 +1220,6 @@ class _PlaceListCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _RouteCard extends StatelessWidget {
-  const _RouteCard({
-    required this.fromLabel,
-    required this.toLabel,
-    required this.meta,
-    required this.onTap,
-  });
-
-  final String fromLabel;
-  final String toLabel;
-  final String meta;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          decoration: _cardDecoration,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F6F1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.directions_walk_rounded,
-                        color: AppColors.tealDeep,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '$fromLabel → $toLabel',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            meta,
-                            style: const TextStyle(
-                              color: AppColors.inkSoft,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.inkSoft,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    _RouteDot(label: fromLabel),
-                    Expanded(
-                      child: Container(
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 14),
-                        decoration: BoxDecoration(
-                          color: AppColors.teal,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-                    _RouteDot(label: toLabel),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RouteDot extends StatelessWidget {
-  const _RouteDot({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: const BoxDecoration(
-            color: AppColors.teal,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: AppColors.inkSoft,
-          ),
-        ),
-      ],
     );
   }
 }

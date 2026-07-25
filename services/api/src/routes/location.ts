@@ -145,9 +145,18 @@ locationRouter.post('/', async (req: AuthedRequest, res, next) => {
       childId,
       lat: body.lat,
       lng: body.lng,
-    }).catch((error) => {
-      console.error('geofence_eval_failed', error);
-    });
+    })
+      .then(async () => {
+        const { updateTripFromLocation } = await import('../services/tripService.js');
+        await updateTripFromLocation({
+          childId,
+          lat: body.lat,
+          lng: body.lng,
+        });
+      })
+      .catch((error) => {
+        console.error('geofence_or_trip_update_failed', error);
+      });
 
     res.status(202).json({ accepted: true });
   } catch (error) {

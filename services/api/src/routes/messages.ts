@@ -49,6 +49,10 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
            WHEN ae.action = 'panic.triggered' THEN 'TOMBOL PANIK ditekan'
            WHEN ae.action = 'panic.parent_ack' THEN 'Orang tua sudah merespons panik'
            WHEN ae.action = 'panic.resolved' THEN 'Panik selesai / aman'
+           WHEN ae.action = 'trip.arrived' THEN
+             'Sudah sampai di ' || COALESCE(ae.payload->>'toLabel', 'tujuan')
+           WHEN ae.action = 'trip.started' THEN
+             'Mulai perjalanan ke ' || COALESCE(ae.payload->>'toLabel', 'tujuan')
            ELSE ae.payload->>'text'
          END AS text,
          CASE
@@ -56,6 +60,8 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
            WHEN ae.action = 'panic.triggered' THEN 'panic'
            WHEN ae.action = 'panic.parent_ack' THEN 'panic_acked'
            WHEN ae.action = 'panic.resolved' THEN 'panic_resolved'
+           WHEN ae.action = 'trip.arrived' THEN 'trip_arrived'
+           WHEN ae.action = 'trip.started' THEN 'trip_started'
            ELSE ae.payload->>'preset'
          END AS preset,
          ae.created_at AS sent_at
@@ -67,7 +73,9 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
            'child.message',
            'panic.triggered',
            'panic.parent_ack',
-           'panic.resolved'
+           'panic.resolved',
+           'trip.started',
+           'trip.arrived'
          )
          AND ae.created_at > now() - interval '24 hours'
        ORDER BY ae.created_at DESC

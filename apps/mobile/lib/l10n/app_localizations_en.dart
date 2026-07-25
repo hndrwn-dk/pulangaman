@@ -141,4 +141,65 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeByNoChildren => 'No child linked yet';
+
+  @override
+  String get tripSectionTitle => 'Safe Route';
+
+  @override
+  String get tripCreateCta => 'Create safe route';
+
+  @override
+  String get tripSuggestSchoolHome => 'School → Home';
+
+  @override
+  String get tripPickFrom => 'From';
+
+  @override
+  String get tripPickTo => 'To';
+
+  @override
+  String get tripCreate => 'Create route';
+
+  @override
+  String get tripStart => 'Start tracking';
+
+  @override
+  String get tripCancel => 'Cancel';
+
+  @override
+  String get tripActive => 'On the way';
+
+  @override
+  String get tripPlanned => 'Planned';
+
+  @override
+  String get tripArrived => 'Arrived';
+
+  @override
+  String get tripNeedTwoPlaces => 'Add at least two places first';
+
+  @override
+  String get tripNeedDistinct => 'Origin and destination must differ';
+
+  @override
+  String get tripCreated => 'Safe route created';
+
+  @override
+  String get tripChildStart => 'Start trip';
+
+  @override
+  String get tripChildPickDest => 'Choose destination';
+
+  @override
+  String tripChildActiveTo(String place) {
+    return 'Heading to $place';
+  }
+
+  @override
+  String get tripChildCancel => 'Cancel trip';
+
+  @override
+  String tripProgressMeta(String distance, String eta) {
+    return '$distance · $eta';
+  }
 }

@@ -61,5 +61,35 @@
   "homeByChildAckNoteHint": "Catatan singkat (opsional)",
   "homeByChildAckSubmit": "Kirim ke orang tua",
   "homeByChildAckTitle": "Beri kabar ke orang tua",
-  "homeByNoChildren": "Belum ada anak terhubung"
+  "homeByNoChildren": "Belum ada anak terhubung",
+  "tripSectionTitle": "Rute Aman",
+  "tripCreateCta": "Buat rute aman",
+  "tripSuggestSchoolHome": "Sekolah → Rumah",
+  "tripPickFrom": "Dari",
+  "tripPickTo": "Ke",
+  "tripCreate": "Buat rute",
+  "tripStart": "Mulai pantau",
+  "tripCancel": "Batalkan",
+  "tripActive": "Dalam perjalanan",
+  "tripPlanned": "Direncanakan",
+  "tripArrived": "Sudah sampai",
+  "tripNeedTwoPlaces": "Tambah minimal dua tempat dulu",
+  "tripNeedDistinct": "Asal dan tujuan harus berbeda",
+  "tripCreated": "Rute aman dibuat",
+  "tripChildStart": "Mulai perjalanan",
+  "tripChildPickDest": "Pilih tujuan",
+  "tripChildActiveTo": "Menuju {place}",
+  "@tripChildActiveTo": {
+    "placeholders": {
+      "place": { "type": "String" }
+    }
+  },
+  "tripChildCancel": "Batalkan perjalanan",
+  "tripProgressMeta": "{distance} · {eta}",
+  "@tripProgressMeta": {
+    "placeholders": {
+      "distance": { "type": "String" },
+      "eta": { "type": "String" }
+    }
+  }
 }

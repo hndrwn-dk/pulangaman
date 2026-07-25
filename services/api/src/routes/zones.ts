@@ -72,15 +72,32 @@ zonesRouter.post('/', async (req: AuthedRequest, res, next) => {
 
 zonesRouter.get('/', async (req: AuthedRequest, res, next) => {
   try {
-    const parentId = req.auth?.userId;
-    const childId = z.string().uuid().parse(req.query.childId);
-    if (!parentId) {
+    const userId = req.auth?.userId;
+    if (!userId) {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, childId))) {
-      res.status(404).json({ error: 'child_not_found' });
-      return;
+
+    let childId: string;
+    if (typeof req.query.childId === 'string' && req.query.childId.length > 0) {
+      childId = z.string().uuid().parse(req.query.childId);
+      if (childId !== userId) {
+        if (!(await assertParentOfChild(userId, childId))) {
+          res.status(404).json({ error: 'child_not_found' });
+          return;
+        }
+      }
+    } else {
+      // Child listing own zones.
+      const role = await pool.query(
+        `SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'child'`,
+        [userId],
+      );
+      if ((role.rowCount ?? 0) === 0) {
+        res.status(400).json({ error: 'child_id_required' });
+        return;
+      }
+      childId = userId;
     }
 
     const result = await pool.query(

@@ -50,6 +50,10 @@ IconData kabarPresetIcon(String? preset) {
       return Icons.mark_chat_read_rounded;
     case 'panic_resolved':
       return Icons.check_circle_rounded;
+    case 'trip_started':
+      return Icons.directions_walk_rounded;
+    case 'trip_arrived':
+      return Icons.flag_rounded;
     default:
       return Icons.chat_bubble_rounded;
   }
@@ -68,6 +72,10 @@ Color kabarPresetColor(String? preset) {
     case 'panic_acked':
       return AppColors.amber;
     case 'panic_resolved':
+      return AppColors.success;
+    case 'trip_started':
+      return AppColors.sky;
+    case 'trip_arrived':
       return AppColors.success;
     default:
       return AppColors.sky;

@@ -343,6 +343,120 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Belum ada anak terhubung'**
   String get homeByNoChildren;
+
+  /// No description provided for @tripSectionTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Rute Aman'**
+  String get tripSectionTitle;
+
+  /// No description provided for @tripCreateCta.
+  ///
+  /// In id, this message translates to:
+  /// **'Buat rute aman'**
+  String get tripCreateCta;
+
+  /// No description provided for @tripSuggestSchoolHome.
+  ///
+  /// In id, this message translates to:
+  /// **'Sekolah → Rumah'**
+  String get tripSuggestSchoolHome;
+
+  /// No description provided for @tripPickFrom.
+  ///
+  /// In id, this message translates to:
+  /// **'Dari'**
+  String get tripPickFrom;
+
+  /// No description provided for @tripPickTo.
+  ///
+  /// In id, this message translates to:
+  /// **'Ke'**
+  String get tripPickTo;
+
+  /// No description provided for @tripCreate.
+  ///
+  /// In id, this message translates to:
+  /// **'Buat rute'**
+  String get tripCreate;
+
+  /// No description provided for @tripStart.
+  ///
+  /// In id, this message translates to:
+  /// **'Mulai pantau'**
+  String get tripStart;
+
+  /// No description provided for @tripCancel.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan'**
+  String get tripCancel;
+
+  /// No description provided for @tripActive.
+  ///
+  /// In id, this message translates to:
+  /// **'Dalam perjalanan'**
+  String get tripActive;
+
+  /// No description provided for @tripPlanned.
+  ///
+  /// In id, this message translates to:
+  /// **'Direncanakan'**
+  String get tripPlanned;
+
+  /// No description provided for @tripArrived.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah sampai'**
+  String get tripArrived;
+
+  /// No description provided for @tripNeedTwoPlaces.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah minimal dua tempat dulu'**
+  String get tripNeedTwoPlaces;
+
+  /// No description provided for @tripNeedDistinct.
+  ///
+  /// In id, this message translates to:
+  /// **'Asal dan tujuan harus berbeda'**
+  String get tripNeedDistinct;
+
+  /// No description provided for @tripCreated.
+  ///
+  /// In id, this message translates to:
+  /// **'Rute aman dibuat'**
+  String get tripCreated;
+
+  /// No description provided for @tripChildStart.
+  ///
+  /// In id, this message translates to:
+  /// **'Mulai perjalanan'**
+  String get tripChildStart;
+
+  /// No description provided for @tripChildPickDest.
+  ///
+  /// In id, this message translates to:
+  /// **'Pilih tujuan'**
+  String get tripChildPickDest;
+
+  /// No description provided for @tripChildActiveTo.
+  ///
+  /// In id, this message translates to:
+  /// **'Menuju {place}'**
+  String tripChildActiveTo(String place);
+
+  /// No description provided for @tripChildCancel.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan perjalanan'**
+  String get tripChildCancel;
+
+  /// No description provided for @tripProgressMeta.
+  ///
+  /// In id, this message translates to:
+  /// **'{distance} · {eta}'**
+  String tripProgressMeta(String distance, String eta);
 }
 
 class _AppLocalizationsDelegate
