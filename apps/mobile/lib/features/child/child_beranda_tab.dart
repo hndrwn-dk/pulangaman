@@ -129,46 +129,85 @@ class ChildBerandaTab extends StatelessWidget {
         _QuickStatsRow(todayUsageSeconds: todayUsageSeconds, points: points),
         if (empActive) ...[
           const SizedBox(height: AppSpacing.md),
-          PaSectionCard(
-            color: AppColors.danger.withValues(alpha: 0.12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Titik Kumpul Darurat',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                    color: AppColors.danger,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Segera menuju: ${empPlaceName ?? 'titik kumpul'}',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                  textAlign: TextAlign.center,
-                ),
-                if (empNote != null && empNote!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    empNote!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.inkSoft,
-                      fontWeight: FontWeight.w600,
+          Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onOpenEmp,
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(width: 5, color: AppColors.tealDeep),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.teal.withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.place_rounded,
+                                color: AppColors.tealDeep,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Titik kumpul aktif',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12.5,
+                                      color: AppColors.tealDeep,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    empPlaceName ?? 'Titik kumpul',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  if (empNote != null &&
+                                      empNote!.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      empNote!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.inkSoft,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12.5,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              color: AppColors.inkSoft,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.danger,
-                  ),
-                  onPressed: onOpenEmp,
-                  child: const Text('Lihat titik kumpul'),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -197,7 +236,8 @@ class ChildBerandaTab extends StatelessWidget {
             ),
           ),
         ],
-        if (tripActive || onStartTrip != null) ...[
+        // Hide idle trip CTA while EMP is active — reduces stack noise.
+        if (tripActive || (onStartTrip != null && !empActive)) ...[
           const SizedBox(height: AppSpacing.md),
           PaSectionCard(
             color: AppColors.sky.withValues(alpha: 0.14),
@@ -247,11 +287,11 @@ class ChildBerandaTab extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.lg),
         PaSectionCard(
-          color: AppColors.coral.withValues(alpha: 0.12),
+          color: AppColors.coral.withValues(alpha: empActive ? 0.06 : 0.12),
           child: Column(
             children: [
               SizedBox(
-                height: 180,
+                height: empActive ? 112 : 180,
                 child: FilledButton(
                   onPressed: (panicInFlight || panicOnCooldown) ? null : onPanicTap,
                   style: FilledButton.styleFrom(
@@ -261,14 +301,22 @@ class ChildBerandaTab extends StatelessWidget {
                   child: Text(
                     AppStrings.panicButton,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
+                          fontSize: empActive ? 13 : null,
                         ),
                   ),
                 ),
               ),
-              const Text(AppStrings.panicConfirm, textAlign: TextAlign.center),
+              Text(
+                AppStrings.panicConfirm,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: empActive ? 12.5 : 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
                 panicInFlight
@@ -284,6 +332,7 @@ class ChildBerandaTab extends StatelessWidget {
                       ? AppColors.danger
                       : AppColors.inkSoft,
                   fontWeight: FontWeight.w600,
+                  fontSize: empActive ? 12 : 14,
                 ),
               ),
             ],
