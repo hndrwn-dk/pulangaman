@@ -257,131 +257,38 @@ class _EmergencyMeetingScreenState
     );
     if (hit == null || !mounted) return;
 
-    final nameCtrl = TextEditingController(text: hit.name);
-    final noteCtrl = TextEditingController();
-    final applyToOthers = ValueNotifier<bool>(siblings.isNotEmpty);
-    final selectedTargets = <String>{for (final c in siblings) c.id};
-
-    final saved = await showDialog<bool>(
+    final result = await showDialog<_EmpSaveResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          _primary == null ? l10n.empAdd : l10n.empEdit,
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(labelText: l10n.empNameHint),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                hit.address,
-                style: const TextStyle(color: AppColors.inkSoft),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: noteCtrl,
-                maxLines: 2,
-                decoration: InputDecoration(hintText: l10n.empInstructionsHint),
-              ),
-              if (siblings.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                ValueListenableBuilder<bool>(
-                  valueListenable: applyToOthers,
-                  builder: (context, apply, _) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: apply,
-                          title: Text(l10n.empApplyToOthers),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          onChanged: (v) => applyToOthers.value = v == true,
-                        ),
-                        if (apply)
-                          StatefulBuilder(
-                            builder: (context, setLocal) {
-                              return Column(
-                                children: [
-                                  for (final c in siblings)
-                                    CheckboxListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      dense: true,
-                                      value: selectedTargets.contains(c.id),
-                                      title: Text(c.name),
-                                      controlAffinity:
-                                          ListTileControlAffinity.leading,
-                                      onChanged: (v) {
-                                        setLocal(() {
-                                          if (v == true) {
-                                            selectedTargets.add(c.id);
-                                          } else {
-                                            selectedTargets.remove(c.id);
-                                          }
-                                        });
-                                      },
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.empActivateCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.empSave),
-          ),
-        ],
+      builder: (ctx) => _EmpSaveDialog(
+        hit: hit,
+        isEditing: _primary != null,
+        siblings: siblings,
       ),
     );
-    final name = nameCtrl.text.trim();
-    final note = noteCtrl.text.trim();
-    final shouldApply = applyToOthers.value;
-    final targets = selectedTargets.toList();
-    nameCtrl.dispose();
-    noteCtrl.dispose();
-    applyToOthers.dispose();
-    if (saved != true || name.isEmpty) return;
-
-    final instructions = note.isNotEmpty ? note : hit.address;
+    if (result == null || !mounted) return;
 
     try {
       await ref.read(apiClientProvider).post(
         '/api/v1/emergency-meeting-points',
         body: {
           'childId': childId,
-          'name': name,
+          'name': result.name,
           'lat': hit.lat,
           'lng': hit.lng,
-          'instructions': instructions,
+          'instructions': result.instructions,
           'isPrimary': true,
         },
       );
-      if (shouldApply && targets.isNotEmpty) {
+      if (result.applyToTargets.isNotEmpty) {
         await ref.read(apiClientProvider).post(
           '/api/v1/emergency-meeting-points/apply-to-all',
           body: {
             'sourceChildId': childId,
-            'targetChildIds': targets,
+            'targetChildIds': result.applyToTargets,
           },
         );
       }
+      if (!mounted) return;
       await _prefetchAll(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
@@ -731,6 +638,143 @@ class _EmergencyMeetingScreenState
   }
 }
 
+class _EmpSaveResult {
+  const _EmpSaveResult({
+    required this.name,
+    required this.instructions,
+    required this.applyToTargets,
+  });
+
+  final String name;
+  final String instructions;
+  final List<String> applyToTargets;
+}
+
+class _EmpSaveDialog extends StatefulWidget {
+  const _EmpSaveDialog({
+    required this.hit,
+    required this.isEditing,
+    required this.siblings,
+  });
+
+  final PlaceHit hit;
+  final bool isEditing;
+  final List<ChildSummary> siblings;
+
+  @override
+  State<_EmpSaveDialog> createState() => _EmpSaveDialogState();
+}
+
+class _EmpSaveDialogState extends State<_EmpSaveDialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _noteCtrl;
+  late bool _applyToOthers;
+  late final Set<String> _selectedTargets;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.hit.name);
+    _noteCtrl = TextEditingController();
+    _applyToOthers = widget.siblings.isNotEmpty;
+    _selectedTargets = {for (final c in widget.siblings) c.id};
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    final note = _noteCtrl.text.trim();
+    final instructions =
+        note.isNotEmpty ? note : widget.hit.address;
+    Navigator.pop(
+      context,
+      _EmpSaveResult(
+        name: name,
+        instructions: instructions,
+        applyToTargets: _applyToOthers
+            ? _selectedTargets.toList()
+            : const <String>[],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(widget.isEditing ? l10n.empEdit : l10n.empAdd),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(labelText: l10n.empNameHint),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              widget.hit.address,
+              style: const TextStyle(color: AppColors.inkSoft),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _noteCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(hintText: l10n.empInstructionsHint),
+            ),
+            if (widget.siblings.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: _applyToOthers,
+                title: Text(l10n.empApplyToOthers),
+                controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (v) => setState(() => _applyToOthers = v == true),
+              ),
+              if (_applyToOthers)
+                for (final c in widget.siblings)
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    value: _selectedTargets.contains(c.id),
+                    title: Text(c.name),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selectedTargets.add(c.id);
+                        } else {
+                          _selectedTargets.remove(c.id);
+                        }
+                      });
+                    },
+                  ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.empActivateCancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(l10n.empSave),
+        ),
+      ],
+    );
+  }
+}
+
 class _EmptyCard extends StatelessWidget {
   const _EmptyCard({required this.onAdd, this.childName});
 
@@ -849,6 +893,7 @@ class _PrimaryCard extends StatelessWidget {
                     )
                   : GoogleMap(
                       key: ValueKey(
+                        '${point['id'] ?? 'new'}-'
                         '${pos.latitude.toStringAsFixed(5)}-'
                         '${pos.longitude.toStringAsFixed(5)}',
                       ),
