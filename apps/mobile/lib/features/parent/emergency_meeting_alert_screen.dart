@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/open_maps.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/pa_widgets.dart';
 import '../../l10n/app_localizations.dart';
 
+/// Full-screen EMP alert — same visual language as [ReminderFullScreenActivity]
+/// (teal canvas, PULANGAMAN eyebrow, amber primary action).
 class EmergencyMeetingAlertScreen extends StatefulWidget {
   const EmergencyMeetingAlertScreen({
     super.key,
@@ -70,88 +72,148 @@ class _EmergencyMeetingAlertScreenState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFF1F0),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            PaScreenHeader(
-              title: l10n.empAlertTitle,
-              showBack: true,
-              padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      l10n.empAlertBody(widget.placeName),
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+    final note = widget.note?.trim() ?? '';
+    final instructions = widget.instructions?.trim() ?? '';
+    final names = widget.childNames ?? const <String>[];
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.tealDeep,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: Colors.white.withValues(alpha: 0.9),
+                    style: IconButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(40, 40),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ),
+                const Spacer(flex: 2),
+                const Text(
+                  'PULANGAMAN',
+                  style: TextStyle(
+                    color: Color(0xCCFFFFFF),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.empAlertTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  l10n.empAlertBody(widget.placeName),
+                  style: const TextStyle(
+                    color: Color(0xF2FFFFFF),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+                if (names.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    names.join(', '),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.78),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                if (note.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    note,
+                    style: const TextStyle(
+                      color: Color(0xF2FFFFFF),
+                      fontSize: 16,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                if (instructions.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    instructions,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Text(
+                  _loadingDistance
+                      ? '...'
+                      : (_distanceLabel == null
+                          ? l10n.empDistanceUnknown
+                          : l10n.empMyDistance(_distanceLabel!)),
+                  style: const TextStyle(
+                    color: AppColors.amber,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                const Spacer(flex: 3),
+                SizedBox(
+                  height: 56,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.amber,
+                      foregroundColor: const Color(0xFF18332D),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    if (widget.childNames != null &&
-                        widget.childNames!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.childNames!.join(', '),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.inkSoft,
-                        ),
-                      ),
-                    ],
-                    if (widget.note != null && widget.note!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.note!,
-                        style: const TextStyle(fontSize: 16, height: 1.35),
-                      ),
-                    ],
-                    if (widget.instructions != null &&
-                        widget.instructions!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.instructions!,
-                        style: const TextStyle(
-                          color: AppColors.inkSoft,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    Text(
-                      _loadingDistance
-                          ? '...'
-                          : (_distanceLabel == null
-                              ? l10n.empDistanceUnknown
-                              : l10n.empMyDistance(_distanceLabel!)),
+                    onPressed: () async {
+                      await openMapsDirections(
+                        lat: widget.lat,
+                        lng: widget.lng,
+                        label: widget.placeName,
+                      );
+                    },
+                    child: Text(
+                      l10n.empOpenMaps,
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: AppColors.tealDeep,
-                        fontSize: 16,
+                        fontSize: 18,
                       ),
                     ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () async {
-                        await openMapsDirections(
-                          lat: widget.lat,
-                          lng: widget.lng,
-                          label: widget.placeName,
-                        );
-                      },
-                      child: Text(l10n.empOpenMaps),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white.withValues(alpha: 0.85),
+                  ),
+                  child: const Text(
+                    'Mengerti',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
