@@ -518,6 +518,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (_) {
       await ref.read(offlineQueueProvider).enqueue('panic', body);
       await _smsFallback();
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal kirim panik. Dicoba lagi otomatis.'),
+          ),
+        );
+      }
     } finally {
       _panicInFlight = false;
     }

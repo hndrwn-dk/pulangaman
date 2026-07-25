@@ -22,6 +22,10 @@ export function childRoom(childId: string): string {
   return `child:${childId}`;
 }
 
+export function parentRoom(parentId: string): string {
+  return `parent:${parentId}`;
+}
+
 export function guardianAlertRoom(guardianId: string): string {
   return `guardian:${guardianId}`;
 }
@@ -51,6 +55,10 @@ async function canSubscribe(userId: string | undefined, room: string): Promise<b
     return (guardianLink.rowCount ?? 0) > 0;
   }
 
+  if (room.startsWith('parent:')) {
+    return room.slice('parent:'.length) === userId;
+  }
+
   if (room.startsWith('guardian:')) {
     const guardianId = room.slice('guardian:'.length);
     return guardianId === userId;
@@ -78,36 +86,44 @@ async function canSubscribe(userId: string | undefined, room: string): Promise<b
 export function attachWebSocketServer(server: Server): WebSocketServer {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
-  wss.on('connection', async (socket, req) => {
-    try {
-      const url = new URL(req.url ?? '', 'http://localhost');
-      const token = url.searchParams.get('token');
-      if (!token) {
-        socket.close(4401, 'missing_token');
-        return;
+  wss.on('connection', (socket, req) => {
+    // Buffer early frames until auth finishes — clients often subscribe
+    // immediately after the WS handshake, before verifyIdToken resolves.
+    const earlyMessages: Buffer[] = [];
+    let ready = false;
+    let client: Client | null = null;
+
+    const onEarlyMessage = (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      if (!ready) {
+        earlyMessages.push(Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer));
       }
+    };
+    socket.on('message', onEarlyMessage);
 
-      const verified = await verifyIdToken(token);
-      const userResult = await pool.query<{ id: string }>(
-        `SELECT id FROM users WHERE firebase_uid = $1 AND is_active = true LIMIT 1`,
-        [verified.uid],
-      );
+    void (async () => {
+      try {
+        const url = new URL(req.url ?? '', 'http://localhost');
+        const token = url.searchParams.get('token');
+        if (!token) {
+          socket.close(4401, 'missing_token');
+          return;
+        }
 
-      const client: Client = {
-        socket,
-        firebaseUid: verified.uid,
-        userId: userResult.rows[0]?.id,
-        rooms: new Set(),
-      };
-      clients.add(client);
+        const verified = await verifyIdToken(token);
+        const userResult = await pool.query<{ id: string }>(
+          `SELECT id FROM users WHERE firebase_uid = $1 AND is_active = true LIMIT 1`,
+          [verified.uid],
+        );
 
-      send(socket, 'connected', {
-        firebaseUid: verified.uid,
-        userId: client.userId ?? null,
-      });
+        client = {
+          socket,
+          firebaseUid: verified.uid,
+          userId: userResult.rows[0]?.id,
+          rooms: new Set(),
+        };
+        clients.add(client);
 
-      socket.on('message', (raw) => {
-        void (async () => {
+        const handleMessage = async (raw: Buffer | ArrayBuffer | Buffer[] | string) => {
           try {
             const message = JSON.parse(String(raw)) as {
               action?: string;
@@ -115,36 +131,54 @@ export function attachWebSocketServer(server: Server): WebSocketServer {
             };
 
             if (message.action === 'subscribe' && message.room) {
-              if (client.rooms.size >= 20) {
+              if (client!.rooms.size >= 20) {
                 send(socket, 'error', { error: 'too_many_subscriptions' });
                 return;
               }
-              const allowed = await canSubscribe(client.userId, message.room);
+              const allowed = await canSubscribe(client!.userId, message.room);
               if (!allowed) {
                 send(socket, 'error', { error: 'forbidden_room', room: message.room });
                 return;
               }
-              client.rooms.add(message.room);
+              client!.rooms.add(message.room);
               send(socket, 'subscribed', { room: message.room });
               return;
             }
 
             if (message.action === 'unsubscribe' && message.room) {
-              client.rooms.delete(message.room);
+              client!.rooms.delete(message.room);
               send(socket, 'unsubscribed', { room: message.room });
             }
           } catch {
             send(socket, 'error', { error: 'invalid_message' });
           }
-        })();
-      });
+        };
 
-      socket.on('close', () => {
-        clients.delete(client);
-      });
-    } catch {
-      socket.close(4401, 'invalid_token');
-    }
+        socket.off('message', onEarlyMessage);
+        socket.on('message', (raw) => {
+          void handleMessage(raw);
+        });
+        ready = true;
+
+        for (const buffered of earlyMessages) {
+          void handleMessage(buffered);
+        }
+        earlyMessages.length = 0;
+
+        send(socket, 'connected', {
+          firebaseUid: verified.uid,
+          userId: client.userId ?? null,
+        });
+
+        socket.on('close', () => {
+          if (client) {
+            clients.delete(client);
+          }
+        });
+      } catch {
+        socket.close(4401, 'invalid_token');
+      }
+    })();
   });
 
   return wss;

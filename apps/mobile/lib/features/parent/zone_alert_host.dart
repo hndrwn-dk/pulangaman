@@ -65,7 +65,7 @@ class ZoneArrivalNotice {
   }
 }
 
-/// Listens for geofence arrivals while parent app is open (any tab).
+/// Listens for geofence arrivals and panic while parent app is open (any tab).
 class ParentZoneAlertHost extends ConsumerStatefulWidget {
   const ParentZoneAlertHost({super.key, required this.child});
 
@@ -81,19 +81,31 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
   Set<String> _subscribed = {};
   ZoneArrivalNotice? _banner;
   Timer? _bannerClear;
+  Timer? _pollTimer;
   bool _dialogOpen = false;
+  String? _panicBanner;
+  String? _seenPanicAlertId;
+  bool _connecting = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(_connectWs);
+    Future.microtask(() async {
+      await _connectWs(force: true);
+      await _pollActivePanic();
+      _pollTimer = Timer.periodic(
+        const Duration(seconds: 8),
+        (_) => unawaited(_pollActivePanic()),
+      );
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _bannerClear?.cancel();
+    _pollTimer?.cancel();
     _ws.removeHandler(_onWs);
     unawaited(_ws.disconnect());
     super.dispose();
@@ -102,20 +114,33 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_connectWs());
+      unawaited(_connectWs(force: true));
+      unawaited(_pollActivePanic());
     }
   }
 
-  Future<void> _connectWs() async {
+  Future<void> _connectWs({bool force = false}) async {
+    if (_connecting) return;
     final token = ref.read(authControllerProvider).token;
+    final userId = ref.read(authControllerProvider).userId;
     if (token == null) return;
+
+    _connecting = true;
     try {
-      if (!_ws.isConnected) {
-        await _ws.connect(token);
+      if (force || !_ws.isConnected) {
         _ws.addHandler(_onWs);
+        await _ws.connect(token);
+        _subscribed = {};
+      }
+      if (userId != null) {
+        _ws.subscribe('parent:$userId');
       }
       _syncSubscriptions();
-    } catch (_) {}
+    } catch (_) {
+      // Will retry on resume / next poll cycle reconnect.
+    } finally {
+      _connecting = false;
+    }
   }
 
   void _syncSubscriptions() {
@@ -124,10 +149,14 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
     for (final id in ids.difference(_subscribed)) {
       _ws.subscribe('child:$id');
     }
-    _subscribed = ids;
+    _subscribed = {..._subscribed, ...ids};
   }
 
   void _onWs(String event, Map<String, dynamic> payload) {
+    if (event == 'child:panic_triggered') {
+      _handlePanic(payload);
+      return;
+    }
     if (event != 'parent:zone_event') return;
     final notice = ZoneArrivalNotice.fromPayload(payload);
     if (notice.childId.isEmpty) return;
@@ -159,6 +188,115 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
     if (notice.isEnter) {
       unawaited(_showArriveDialog(notice));
       unawaited(ref.read(childrenControllerProvider.notifier).refresh());
+    }
+  }
+
+  Future<void> _pollActivePanic() async {
+    if (!mounted) return;
+    try {
+      if (!_ws.isConnected) {
+        await _connectWs(force: true);
+      }
+      final api = ref.read(apiClientProvider);
+      final data = await api.get('/api/v1/panic/active');
+      final alerts = (data['alerts'] as List?) ?? const [];
+      if (alerts.isEmpty) return;
+      final first = alerts.first;
+      if (first is! Map) return;
+      final map = Map<String, dynamic>.from(first);
+      final alertId = map['alertId'] as String?;
+      if (alertId == null || alertId == _seenPanicAlertId) return;
+      _handlePanic({
+        'alertId': alertId,
+        'childId': map['childId'],
+        'location': map['location'],
+      });
+    } catch (_) {}
+  }
+
+  void _handlePanic(Map<String, dynamic> payload) {
+    if (!mounted) return;
+    final alertId = payload['alertId'] as String?;
+    if (alertId != null && alertId == _seenPanicAlertId && _panicBanner != null) {
+      return;
+    }
+    if (alertId != null) {
+      _seenPanicAlertId = alertId;
+    }
+
+    final childId = payload['childId'] as String? ?? '';
+    final children = ref.read(childrenControllerProvider).items;
+    var name = 'Anak';
+    for (final c in children) {
+      if (c.id == childId) {
+        name = c.name;
+        break;
+      }
+    }
+    final message = '$name memicu tombol panik. Buka lokasi sekarang.';
+
+    setState(() {
+      _panicBanner = message;
+      _banner = null;
+    });
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.danger,
+        duration: const Duration(seconds: 12),
+      ),
+    );
+    unawaited(_showPanicDialog(name, message));
+  }
+
+  Future<void> _showPanicDialog(String childName, String message) async {
+    if (_dialogOpen || !mounted) return;
+    _dialogOpen = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Color(0xFFFFE8E6),
+                  child: Icon(Icons.warning_amber_rounded, color: AppColors.danger),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'PANIK',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              message,
+              style: const TextStyle(height: 1.35, fontSize: 16),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+                child: const Text('Saya mengerti'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      _dialogOpen = false;
     }
   }
 
@@ -214,14 +352,45 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
       if (next.items.isNotEmpty) _syncSubscriptions();
     });
 
-    // Stack (not Column) so a zone banner never blocks the shell layout.
+    // Stack (not Column) so a zone/panic banner never blocks the shell layout.
     return Material(
       color: AppColors.canvas,
       child: Stack(
         fit: StackFit.expand,
         children: [
           widget.child,
-          if (_banner != null)
+          if (_panicBanner != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Material(
+                  elevation: 3,
+                  color: const Color(0xFFFFE8E6),
+                  child: ListTile(
+                    leading: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.danger,
+                    ),
+                    title: const Text(
+                      'PANIK',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.danger,
+                      ),
+                    ),
+                    subtitle: Text(_panicBanner!),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => setState(() => _panicBanner = null),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else if (_banner != null)
             Positioned(
               top: 0,
               left: 0,

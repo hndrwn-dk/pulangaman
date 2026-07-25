@@ -14,6 +14,54 @@ const triggerSchema = z.object({
   lng: z.number().min(-180).max(180),
 });
 
+/** Active panic alerts for the signed-in parent (HTTP fallback when WS misses). */
+panicRouter.get('/active', async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const result = await pool.query<{
+      id: string;
+      child_id: string;
+      status: string;
+      created_at: Date;
+      lat: number | null;
+      lng: number | null;
+    }>(
+      `SELECT pa.id,
+              pa.child_id,
+              pa.status,
+              pa.created_at,
+              ST_Y(pa.triggered_location::geometry) AS lat,
+              ST_X(pa.triggered_location::geometry) AS lng
+       FROM panic_alerts pa
+       WHERE pa.parent_id = $1
+         AND pa.status IN ('active', 'guardian_notified')
+       ORDER BY pa.created_at DESC
+       LIMIT 20`,
+      [userId],
+    );
+
+    res.json({
+      alerts: result.rows.map((row) => ({
+        alertId: row.id,
+        childId: row.child_id,
+        status: row.status,
+        createdAt: row.created_at,
+        location:
+          row.lat != null && row.lng != null
+            ? { lat: row.lat, lng: row.lng }
+            : null,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 panicRouter.post('/trigger', async (req: AuthedRequest, res, next) => {
   try {
     const childId = req.auth?.userId;

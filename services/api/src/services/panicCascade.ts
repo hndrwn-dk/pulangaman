@@ -2,7 +2,7 @@ import { pool } from '../db/pool.js';
 import { config } from '../config.js';
 import { sendFcmToUser } from './fcm.js';
 import { sendSms } from './sms.js';
-import { broadcastToRoom, childRoom, guardianAlertRoom } from '../ws/server.js';
+import { broadcastToRoom, childRoom, guardianAlertRoom, parentRoom } from '../ws/server.js';
 import { childLocationKey, getRedis } from '../redis/client.js';
 
 type CascadeTimers = {
@@ -223,25 +223,37 @@ export async function startPanicCascade(params: {
 }): Promise<void> {
   cancelPanicCascade(params.alertId);
 
-  await sendFcmToUser(
-    params.parentId,
-    {
-      title: 'PulangAman PANIK',
-      body: 'Anak memicu tombol panik. Buka aplikasi sekarang.',
-    },
-    {
-      type: 'panic',
-      alertId: params.alertId,
-      childId: params.childId,
-    },
-  );
-
-  broadcastToRoom(childRoom(params.childId), 'child:panic_triggered', {
+  const panicPayload = {
     alertId: params.alertId,
     childId: params.childId,
     location: { lat: params.lat, lng: params.lng },
     type: 'normal',
-  });
+  };
+
+  // WS first so in-app parent UI is not blocked by FCM.
+  broadcastToRoom(childRoom(params.childId), 'child:panic_triggered', panicPayload);
+  broadcastToRoom(parentRoom(params.parentId), 'child:panic_triggered', panicPayload);
+
+  try {
+    await sendFcmToUser(
+      params.parentId,
+      {
+        title: 'PulangAman PANIK',
+        body: 'Anak memicu tombol panik. Buka aplikasi sekarang.',
+      },
+      {
+        type: 'panic',
+        alertId: params.alertId,
+        childId: params.childId,
+      },
+    );
+  } catch (error) {
+    console.error('panic_fcm_failed', {
+      alertId: params.alertId,
+      parentId: params.parentId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   const entry: CascadeTimers = {};
   entry.sms = setTimeout(() => {
