@@ -272,6 +272,43 @@ class _EmergencyMeetingScreenState
     }
   }
 
+  Future<void> _deletePrimary() async {
+    final point = _primary;
+    final id = point?['id'] as String?;
+    if (id == null) return;
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.empDelete),
+        content: Text(l10n.empDeleteConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.empActivateCancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.empDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(apiClientProvider).delete(
+            '/api/v1/emergency-meeting-points/$id',
+          );
+      if (!mounted) return;
+      setState(() => _lastSummary = null);
+      await _reload();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
   /// Always parent-scoped — chip selection must not affect this call.
   Future<void> _activate() async {
     final l10n = AppLocalizations.of(context);
@@ -468,6 +505,7 @@ class _EmergencyMeetingScreenState
                                 distanceLabel: distanceLabel,
                                 onEdit: () =>
                                     unawaited(_pickAndSavePrimary()),
+                                onDelete: () => unawaited(_deletePrimary()),
                               ),
                             if (showActivate) ...[
                               const SizedBox(height: 20),
@@ -595,6 +633,7 @@ class _PrimaryCard extends StatelessWidget {
     required this.point,
     required this.childName,
     required this.onEdit,
+    required this.onDelete,
     this.mapPosition,
     this.distanceLabel,
   });
@@ -604,6 +643,7 @@ class _PrimaryCard extends StatelessWidget {
   final LatLng? mapPosition;
   final String? distanceLabel;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   static bool get _inWidgetTest =>
       Platform.environment.containsKey('FLUTTER_TEST');
@@ -722,18 +762,44 @@ class _PrimaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          OutlinedButton.icon(
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: Text(l10n.empEdit),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.ink,
-              side: const BorderSide(color: Color(0xFFD5DBE0)),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: Text(l10n.empEdit),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ink,
+                    side: const BorderSide(color: Color(0xFFD5DBE0)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                key: const Key('emp_delete_button'),
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: Text(l10n.empDelete),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: BorderSide(
+                    color: AppColors.danger.withValues(alpha: 0.45),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

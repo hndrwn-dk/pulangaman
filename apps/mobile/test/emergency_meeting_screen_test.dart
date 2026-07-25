@@ -146,6 +146,88 @@ void main() {
     await tester.pumpAndSettle();
     expect(activateCalls, 1);
   });
+
+  testWidgets('delete requires confirmation before DELETE', (tester) async {
+    var deleteCalls = 0;
+    final mock = MockClient((request) async {
+      if (request.method == 'DELETE' &&
+          request.url.path.contains('/emergency-meeting-points/')) {
+        deleteCalls += 1;
+        return http.Response(jsonEncode({'ok': true}), 200);
+      }
+      if (request.url.path.endsWith('/status')) {
+        return http.Response(
+          jsonEncode({
+            'point': {
+              'id': 'p1',
+              'name': 'Lapangan',
+              'isPrimary': true,
+              'lat': -6.2,
+              'lng': 106.8,
+            },
+            'distanceLabel': '120 m',
+          }),
+          200,
+        );
+      }
+      if (deleteCalls > 0) {
+        return http.Response(jsonEncode({'points': []}), 200);
+      }
+      return http.Response(
+        jsonEncode({
+          'points': [
+            {
+              'id': 'p1',
+              'name': 'Lapangan',
+              'isPrimary': true,
+              'instructions': null,
+              'lat': -6.2,
+              'lng': 106.8,
+            }
+          ],
+        }),
+        200,
+      );
+    });
+    final api = ApiClient(client: mock, baseUrl: 'http://test.local');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          childrenControllerProvider.overrideWith(
+            (ref) => _FakeChildren(ref, [
+              ChildSummary(id: 'c1', name: 'Andi'),
+            ]),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('id'),
+          home: EmergencyMeetingScreen(
+            lockedChild: ChildSummary(id: 'c1', name: 'Andi'),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('emp_delete_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Hapus titik kumpul ini?'), findsOneWidget);
+    expect(deleteCalls, 0);
+
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+    expect(deleteCalls, 0);
+
+    await tester.tap(find.byKey(const Key('emp_delete_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Hapus'));
+    await tester.pumpAndSettle();
+    expect(deleteCalls, 1);
+  });
 }
 
 class _FakeChildren extends ChildrenController {

@@ -536,6 +536,12 @@ abstract class AppLocalizations {
   /// **'Hapus'**
   String get empDelete;
 
+  /// No description provided for @empDeleteConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus titik kumpul ini?'**
+  String get empDeleteConfirm;
+
   /// No description provided for @empEdit.
   ///
   /// In id, this message translates to:

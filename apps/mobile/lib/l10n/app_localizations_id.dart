@@ -248,6 +248,9 @@ class AppLocalizationsId extends AppLocalizations {
   String get empDelete => 'Hapus';
 
   @override
+  String get empDeleteConfirm => 'Hapus titik kumpul ini?';
+
+  @override
   String get empEdit => 'Ubah titik kumpul';
 
   @override

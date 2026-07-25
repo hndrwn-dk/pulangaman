@@ -110,6 +110,7 @@
   "empNameHint": "Nama tempat (mis. Rumah Nenek)",
   "empSave": "Simpan",
   "empDelete": "Hapus",
+  "empDeleteConfirm": "Hapus titik kumpul ini?",
   "empEdit": "Ubah titik kumpul",
   "empMapPreview": "Preview peta",
   "empApplyToOthers": "Terapkan ke anak lain juga?",
