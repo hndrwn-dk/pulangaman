@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -512,6 +513,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     final l10n = AppLocalizations.of(context);
     setState(() => _tripLoading = true);
     try {
+      await ref.read(authControllerProvider.notifier).ensureFreshToken();
       final data = await ref.read(apiClientProvider).post(
         '/api/v1/trips',
         body: {
@@ -533,8 +535,11 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _tripLoading = false);
+      final message = e is ApiException && e.isUnauthorized
+          ? 'Sesi berakhir. Keluar lalu masuk ulang, lalu coba lagi.'
+          : '$e';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e')),
+        SnackBar(content: Text(message)),
       );
     }
   }

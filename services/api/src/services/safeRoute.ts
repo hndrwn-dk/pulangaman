@@ -125,25 +125,29 @@ export async function computeSafeRoute(params: {
     url.searchParams.set('mode', mode);
     url.searchParams.set('key', config.GOOGLE_MAPS_API_KEY);
 
-    const response = await fetch(url);
-    const data = (await response.json()) as {
-      status: string;
-      routes?: Array<{
-        overview_polyline?: { points?: string };
-        legs?: Array<{ distance?: { value: number }; duration?: { value: number } }>;
-      }>;
-    };
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(8_000) });
+      const data = (await response.json()) as {
+        status: string;
+        routes?: Array<{
+          overview_polyline?: { points?: string };
+          legs?: Array<{ distance?: { value: number }; duration?: { value: number } }>;
+        }>;
+      };
 
-    if (data.status === 'OK' && data.routes?.[0]) {
-      const route = data.routes[0];
-      polyline = route.overview_polyline?.points ?? null;
-      if (polyline) {
-        path = decodePolyline(polyline);
+      if (data.status === 'OK' && data.routes?.[0]) {
+        const route = data.routes[0];
+        polyline = route.overview_polyline?.points ?? null;
+        if (polyline) {
+          path = decodePolyline(polyline);
+        }
+        const leg = route.legs?.[0];
+        distanceM = leg?.distance?.value ?? distanceM;
+        durationSec = leg?.duration?.value ?? null;
+        provider = 'google_directions';
       }
-      const leg = route.legs?.[0];
-      distanceM = leg?.distance?.value ?? distanceM;
-      durationSec = leg?.duration?.value ?? null;
-      provider = 'google_directions';
+    } catch (error) {
+      console.error('google_directions_failed', error);
     }
   }
 

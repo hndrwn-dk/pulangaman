@@ -73,6 +73,7 @@ final authControllerProvider =
 class AuthController extends StateNotifier<AuthState> {
   AuthController({required this.api, required this.store})
       : super(const AuthState(restoring: true)) {
+    api.refreshToken = ensureFreshToken;
     restore();
   }
 
@@ -84,6 +85,40 @@ class AuthController extends StateNotifier<AuthState> {
   String? _pendingName;
   String? _pendingPhone;
   AppRole? _pendingRole;
+
+  /// Force-refresh Firebase ID token (or return current dev token).
+  Future<String?> ensureFreshToken() async {
+    if (AppConfig.useDevAuth) {
+      final token = state.token ?? await store.token();
+      if (token != null) api.setToken(token);
+      return token;
+    }
+    if (Firebase.apps.isEmpty) return state.token;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    try {
+      final token = await user.getIdToken(true);
+      if (token == null || token.isEmpty) return null;
+      api.setToken(token);
+      final userId = state.userId ?? await store.userId();
+      final role = state.role?.name ?? await store.role();
+      final name = state.name ?? await store.name() ?? '';
+      if (userId != null && role != null) {
+        await store.save(
+          token: token,
+          userId: userId,
+          role: role,
+          name: name,
+        );
+      }
+      if (state.isAuthenticated) {
+        state = state.copyWith(token: token);
+      }
+      return token;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> restore() async {
     state = state.copyWith(restoring: true, clearError: true);

@@ -61,11 +61,20 @@ export async function verifyIdToken(idToken: string): Promise<{ uid: string; pho
     throw new Error('Firebase is not configured');
   }
 
-  const decoded = await auth.verifyIdToken(idToken);
-  return {
-    uid: decoded.uid,
-    phone: typeof decoded.phone_number === 'string' ? decoded.phone_number : undefined,
-  };
+  try {
+    const decoded = await auth.verifyIdToken(idToken);
+    return {
+      uid: decoded.uid,
+      phone: typeof decoded.phone_number === 'string' ? decoded.phone_number : undefined,
+    };
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: string }).code)
+        : 'unknown';
+    console.error('verify_id_token_failed', { code });
+    throw error;
+  }
 }
 
 export async function createChildCustomToken(
