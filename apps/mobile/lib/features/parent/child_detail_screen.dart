@@ -7,13 +7,14 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/network/ws_client.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
-import '../screentime/screen_time_screen.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
 import 'kabar_inbox_screen.dart';
 import 'kabar_models.dart';
 import 'live_map_screen.dart';
+import 'parent_home_screen.dart';
 import 'reminders_screen.dart';
 import 'zones_screen.dart';
 
@@ -404,18 +405,23 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                 SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+                    padding: const EdgeInsets.fromLTRB(
+                      PaScreenHeader.edgePad,
+                      6,
+                      PaScreenHeader.edgePad,
+                      0,
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _MapRoundButton(
+                        PaRoundIconButton(
                           icon: Icons.arrow_back_rounded,
                           onTap: () => Navigator.of(context).pop(),
                         ),
                         const Spacer(),
                         Column(
                           children: [
-                            _MapRoundButton(
+                            PaRoundIconButton(
                               icon: Icons.gps_fixed_rounded,
                               iconColor: const Color(0xFFE85A7A),
                               onTap: () {
@@ -429,7 +435,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                               },
                             ),
                             const SizedBox(height: 8),
-                            _MapRoundButton(
+                            PaRoundIconButton(
                               icon: Icons.open_in_full_rounded,
                               onTap: () {
                                 Navigator.of(context).push(
@@ -541,11 +547,11 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                             icon: Icons.phone_android_rounded,
                             label: 'Waktu Layar',
                             onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const ScreenTimeScreen(),
-                                ),
-                              );
+                              ref
+                                  .read(parentShellTabProvider.notifier)
+                                  .state = 1;
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
                             },
                           ),
                         ),
@@ -648,37 +654,6 @@ final BoxDecoration _cardDecoration = BoxDecoration(
     ),
   ],
 );
-
-class _MapRoundButton extends StatelessWidget {
-  const _MapRoundButton({
-    required this.icon,
-    required this.onTap,
-    this.iconColor,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? iconColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      shape: const CircleBorder(),
-      elevation: 3,
-      shadowColor: Colors.black26,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(icon, size: 20, color: iconColor ?? AppColors.ink),
-        ),
-      ),
-    );
-  }
-}
 
 class _ProfileStatusCard extends StatelessWidget {
   const _ProfileStatusCard({

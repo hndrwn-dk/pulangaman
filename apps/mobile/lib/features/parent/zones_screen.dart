@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
@@ -524,60 +525,39 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              Row(
+              PaScreenHeader(
+                title: 'Zona Aman',
+                subtitle: 'Rumah, sekolah, dan tempat sering dikunjungi',
+                showBack: widget.showBack,
+                padding: EdgeInsets.zero,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (widget.showBack)
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
-                      ),
-                    ),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Zona Aman',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Rumah, sekolah, dan tempat sering dikunjungi',
-                          style: TextStyle(
-                            color: AppColors.inkSoft,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Material(
-                    color: const Color(0xFFD8F5E8),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: selected == null ? null : _showAddMenu,
-                      child: const SizedBox(
-                        width: 42,
-                        height: 42,
-                        child: Icon(
-                          Icons.add_rounded,
-                          color: AppColors.tealDeep,
-                        ),
+                titleStyle: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                  color: AppColors.ink,
+                ),
+                subtitleStyle: const TextStyle(
+                  color: AppColors.inkSoft,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                trailing: Material(
+                  color: const Color(0xFFD8F5E8),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: selected == null ? null : _showAddMenu,
+                    child: const SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: AppColors.tealDeep,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 14),
               TextField(

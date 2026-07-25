@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import 'children_controller.dart';
 import 'zones_screen.dart';
@@ -415,7 +416,12 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: Text('${AppStrings.liveMap} · ${widget.child.name}')),
+      appBar: AppBar(
+        leadingWidth: PaScreenHeader.appBarLeadingWidth,
+        titleSpacing: PaScreenHeader.appBarTitleSpacing,
+        leading: paAppBarLeading(context),
+        title: Text('${AppStrings.liveMap} · ${widget.child.name}'),
+      ),
       body: Column(
         children: [
           if (_stale)

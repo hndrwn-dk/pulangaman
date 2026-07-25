@@ -73,6 +73,9 @@ ThemeData buildAppTheme() {
       foregroundColor: AppColors.ink,
       elevation: 0,
       centerTitle: false,
+      // Match PaScreenHeader: circular back chip → title gap.
+      titleSpacing: 12,
+      leadingWidth: 54,
       titleTextStyle: TextStyle(
         color: AppColors.ink,
         fontSize: 20,

@@ -14,6 +14,8 @@ abstract final class AppStrings {
   static const otpHint = '6 digit dari SMS';
   static const otpSentHint = 'Kode verifikasi dikirim ke nomor Anda';
   static const verifyOtpAction = 'Verifikasi';
+  static const otpVerifyingHint = 'Memverifikasi kode. Mohon tunggu sebentar.';
+  static const otpSendingHint = 'Mengirim kode verifikasi. Mohon tunggu…';
   static const resendOtp = 'Kirim ulang kode';
   static const changeNumber = 'Ubah nomor';
   static const sendOtpAction = 'Kirim kode OTP';

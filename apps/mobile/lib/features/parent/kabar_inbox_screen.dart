@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import 'kabar_models.dart';
 
 /// Full kabar history with per-child filter — used when home only shows
@@ -11,11 +12,15 @@ class KabarInboxScreen extends StatefulWidget {
     required this.messages,
     this.initialChildId,
     this.childNames = const {},
+    this.unreadIds = const {},
+    this.onMarkAllRead,
   });
 
   final List<ChildKabarMessage> messages;
   final String? initialChildId;
   final Map<String, String> childNames;
+  final Set<String> unreadIds;
+  final Future<void> Function()? onMarkAllRead;
 
   @override
   State<KabarInboxScreen> createState() => _KabarInboxScreenState();
@@ -23,11 +28,22 @@ class KabarInboxScreen extends StatefulWidget {
 
 class _KabarInboxScreenState extends State<KabarInboxScreen> {
   String? _filterChildId;
+  bool _marking = false;
+  Set<String> _unreadIds = {};
 
   @override
   void initState() {
     super.initState();
     _filterChildId = widget.initialChildId;
+    _unreadIds = {...widget.unreadIds};
+  }
+
+  @override
+  void didUpdateWidget(covariant KabarInboxScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.unreadIds != widget.unreadIds) {
+      _unreadIds = {...widget.unreadIds};
+    }
   }
 
   List<ChildKabarMessage> get _filtered {
@@ -47,6 +63,26 @@ class _KabarInboxScreenState extends State<KabarInboxScreen> {
     return entries;
   }
 
+  Future<void> _markAllRead() async {
+    final onMark = widget.onMarkAllRead;
+    if (onMark == null || _marking) return;
+    setState(() => _marking = true);
+    try {
+      await onMark();
+      if (!mounted) return;
+      setState(() {
+        _unreadIds = {};
+        _marking = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Semua kabar ditandai sudah dibaca')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _marking = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtered = _filtered;
@@ -55,10 +91,24 @@ class _KabarInboxScreenState extends State<KabarInboxScreen> {
       final key = dayLabel(msg.sentAt);
       groups.putIfAbsent(key, () => []).add(msg);
     }
+    final unreadCount = filtered.where((m) => _unreadIds.contains(m.id)).length;
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: PaScreenHeader.appBarLeadingWidth,
+        titleSpacing: PaScreenHeader.appBarTitleSpacing,
+        leading: paAppBarLeading(context),
         title: const Text('Riwayat kabar'),
+        actions: [
+          if (widget.onMarkAllRead != null && unreadCount > 0)
+            TextButton(
+              onPressed: _marking ? null : _markAllRead,
+              child: Text(
+                _marking ? '...' : 'Tandai dibaca',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -88,15 +138,37 @@ class _KabarInboxScreenState extends State<KabarInboxScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              filtered.isEmpty
-                  ? 'Belum ada kabar'
-                  : '${filtered.length} kabar · 24 jam terakhir',
-              style: const TextStyle(
-                color: AppColors.inkSoft,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    filtered.isEmpty
+                        ? 'Belum ada kabar'
+                        : unreadCount > 0
+                            ? '$unreadCount belum dibaca · ${filtered.length} kabar · 24 jam'
+                            : '${filtered.length} kabar · 24 jam terakhir',
+                    style: const TextStyle(
+                      color: AppColors.inkSoft,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                if (widget.onMarkAllRead != null && unreadCount > 0)
+                  TextButton(
+                    onPressed: _marking ? null : _markAllRead,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.tealDeep,
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Tandai semua dibaca',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -123,7 +195,12 @@ class _KabarInboxScreenState extends State<KabarInboxScreen> {
                             ),
                           ),
                         ),
-                        ...entry.value.map((msg) => _HistoryTile(msg: msg)),
+                        ...entry.value.map(
+                          (msg) => _HistoryTile(
+                            msg: msg,
+                            unread: _unreadIds.contains(msg.id),
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -173,9 +250,10 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _HistoryTile extends StatelessWidget {
-  const _HistoryTile({required this.msg});
+  const _HistoryTile({required this.msg, required this.unread});
 
   final ChildKabarMessage msg;
+  final bool unread;
 
   @override
   Widget build(BuildContext context) {
@@ -186,56 +264,77 @@ class _HistoryTile extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: msg.isUrgent
-              ? AppColors.coral.withValues(alpha: 0.08)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.22)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(kabarPresetIcon(msg.preset), color: color, size: 22),
+      child: Opacity(
+        opacity: unread ? 1 : 0.72,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: msg.isUrgent
+                ? AppColors.coral.withValues(alpha: unread ? 0.10 : 0.05)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: unread
+                  ? color.withValues(alpha: 0.35)
+                  : color.withValues(alpha: 0.16),
+              width: unread ? 1.4 : 1,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          msg.childName,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      Text(
-                        time,
-                        style: const TextStyle(
-                          color: AppColors.inkSoft,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(msg.text),
-                ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(kabarPresetIcon(msg.preset), color: color, size: 22),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            msg.childName,
+                            style: TextStyle(
+                              fontWeight:
+                                  unread ? FontWeight.w900 : FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        if (unread)
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.coral,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                            color: AppColors.inkSoft,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(msg.text),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

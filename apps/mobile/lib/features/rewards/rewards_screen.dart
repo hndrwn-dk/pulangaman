@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import '../parent/child_avatar.dart';
 import '../parent/children_controller.dart';
@@ -197,27 +198,7 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Hadiah & Poin',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const PaScreenHeader(title: 'Hadiah & Poin'),
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.teal,

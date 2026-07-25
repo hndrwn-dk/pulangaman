@@ -124,9 +124,9 @@ remindersRouter.get('/:childId', async (req: AuthedRequest, res, next) => {
     const result = await pool.query(
       `SELECT *
        FROM child_reminders
-       WHERE child_id = $1 AND parent_id = $2
+       WHERE child_id = $1
        ORDER BY hour ASC, minute ASC, title ASC`,
-      [childId, parentId],
+      [childId],
     );
     res.json({ reminders: result.rows.map(mapReminder) });
   } catch (error) {
@@ -190,24 +190,37 @@ remindersRouter.put('/:id', async (req: AuthedRequest, res, next) => {
       return;
     }
 
+    const existing = await pool.query<{ child_id: string }>(
+      `SELECT child_id FROM child_reminders WHERE id = $1`,
+      [reminderId],
+    );
+    if (existing.rowCount === 0) {
+      res.status(404).json({ error: 'reminder_not_found' });
+      return;
+    }
+    if (!(await assertParentOfChild(parentId, existing.rows[0].child_id))) {
+      res.status(404).json({ error: 'reminder_not_found' });
+      return;
+    }
+
     const body = upsertSchema.parse(req.body);
     const uniqueDays = [...new Set(body.daysOfWeek)].sort((a, b) => a - b);
 
     const result = await pool.query(
       `UPDATE child_reminders
-       SET title = $3,
-           body = $4,
-           hour = $5,
-           minute = $6,
-           days_of_week = $7::integer[],
-           style = $8,
-           enabled = $9,
+       SET title = $2,
+           body = $3,
+           hour = $4,
+           minute = $5,
+           days_of_week = $6::integer[],
+           style = $7,
+           enabled = $8,
+           parent_id = $9,
            updated_at = now()
-       WHERE id = $1 AND parent_id = $2
+       WHERE id = $1
        RETURNING *`,
       [
         reminderId,
-        parentId,
         body.title,
         body.body,
         body.hour,
@@ -215,6 +228,7 @@ remindersRouter.put('/:id', async (req: AuthedRequest, res, next) => {
         uniqueDays,
         body.style,
         body.enabled,
+        parentId,
       ],
     );
 
@@ -239,11 +253,24 @@ remindersRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
       return;
     }
 
+    const existing = await pool.query<{ child_id: string }>(
+      `SELECT child_id FROM child_reminders WHERE id = $1`,
+      [reminderId],
+    );
+    if (existing.rowCount === 0) {
+      res.status(404).json({ error: 'reminder_not_found' });
+      return;
+    }
+    if (!(await assertParentOfChild(parentId, existing.rows[0].child_id))) {
+      res.status(404).json({ error: 'reminder_not_found' });
+      return;
+    }
+
     const result = await pool.query<{ child_id: string }>(
       `DELETE FROM child_reminders
-       WHERE id = $1 AND parent_id = $2
+       WHERE id = $1
        RETURNING child_id`,
-      [reminderId, parentId],
+      [reminderId],
     );
 
     if (result.rowCount === 0) {

@@ -97,6 +97,9 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: PaScreenHeader.appBarLeadingWidth,
+        titleSpacing: PaScreenHeader.appBarTitleSpacing,
+        leading: paAppBarLeading(context),
         title: const Text('Di mana'),
         actions: [
           IconButton(
@@ -262,7 +265,12 @@ class _ChildWhereDetailScreenState
   Widget build(BuildContext context) {
     final status = widget.child.commuteStatus;
     return Scaffold(
-      appBar: AppBar(title: Text('Di mana · ${widget.child.name}')),
+      appBar: AppBar(
+        leadingWidth: PaScreenHeader.appBarLeadingWidth,
+        titleSpacing: PaScreenHeader.appBarTitleSpacing,
+        leading: paAppBarLeading(context),
+        title: Text('Di mana · ${widget.child.name}'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [

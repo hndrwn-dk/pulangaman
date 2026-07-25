@@ -1244,6 +1244,9 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
+        leadingWidth: PaScreenHeader.appBarLeadingWidth,
+        titleSpacing: PaScreenHeader.appBarTitleSpacing,
+        leading: paAppBarLeading(context),
         title: Text('Aturan · ${widget.child.name}'),
         actions: [
           IconButton(

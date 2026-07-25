@@ -27,6 +27,7 @@ dependencies:
   battery_plus: 6.2.1
   firebase_core: ^4.12.1
   firebase_auth: ^6.5.6
+  flutter_inappwebview: ^6.1.5
 
 dev_dependencies:
   flutter_test:

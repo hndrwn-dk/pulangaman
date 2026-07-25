@@ -16,6 +16,7 @@ import 'child_home_map_card.dart';
 import 'children_controller.dart';
 import 'kabar_inbox_screen.dart';
 import 'kabar_models.dart';
+import 'kabar_read_store.dart';
 import 'live_map_screen.dart';
 import 'more_screen.dart';
 import 'zones_screen.dart';
@@ -31,6 +32,7 @@ class ParentHomeScreen extends ConsumerStatefulWidget {
 class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     with WidgetsBindingObserver {
   final _ws = WsClient();
+  final _kabarRead = KabarReadStore();
   final List<ChildKabarMessage> _messages = [];
   Set<String> _subscribedChildren = {};
   final Map<String, ChildGender> _genders = {};
@@ -48,6 +50,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
+      await _kabarRead.load();
       await ref.read(childrenControllerProvider.notifier).bootstrap();
       await _loadGenders();
       await _loadMessages();
@@ -260,20 +263,39 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     );
   }
 
+  Future<void> _markAllKabarRead() async {
+    DateTime? newest;
+    for (final m in _messages) {
+      if (newest == null || m.sentAt.isAfter(newest)) {
+        newest = m.sentAt;
+      }
+    }
+    await _kabarRead.markAllRead(newest ?? DateTime.now());
+    if (mounted) setState(() {});
+  }
+
   void _openInbox({String? childId}) {
     unawaited(_loadMessages().then((_) {
       if (!mounted) return;
       final children = ref.read(childrenControllerProvider).items;
       final names = {for (final c in children) c.id: c.name};
+      final unreadIds = {
+        for (final m in _messages)
+          if (_kabarRead.isUnread(m)) m.id,
+      };
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => KabarInboxScreen(
             messages: List<ChildKabarMessage>.from(_messages),
             initialChildId: childId,
             childNames: names,
+            unreadIds: unreadIds,
+            onMarkAllRead: _markAllKabarRead,
           ),
         ),
-      );
+      ).then((_) {
+        if (mounted) setState(() {});
+      });
     }));
   }
 
@@ -332,7 +354,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   Widget build(BuildContext context) {
     final children = ref.watch(childrenControllerProvider);
     final auth = ref.watch(authControllerProvider);
-    final urgent = _messages.where((m) => m.isUrgent).toList();
+    final unread = _kabarRead.unreadOf(_messages);
+    final urgent = _kabarRead.unreadUrgentOf(_messages);
     final items = children.items;
 
     if (items.isNotEmpty) {
@@ -391,7 +414,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 greeting: _greeting(),
                 name: auth.name ?? 'Orang tua',
                 initials: _initials(auth.name),
-                notificationCount: _messages.length,
+                notificationCount: unread.length,
                 onNotifications: () => _openInbox(),
                 onAccount: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -405,8 +428,28 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                       (msg) => _UrgentBanner(
                         msg: msg,
                         onOpen: () => _openInbox(childId: msg.childId),
+                        onDismiss: () async {
+                          await _kabarRead.markReadThrough(msg);
+                          if (mounted) setState(() {});
+                        },
                       ),
                     ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => unawaited(_markAllKabarRead()),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.coral,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Tandai semua dibaca',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
               ],
               const SizedBox(height: 18),
               if (children.loading && !children.hasData)
@@ -1134,10 +1177,15 @@ class _DashedBorderPainter extends CustomPainter {
 }
 
 class _UrgentBanner extends StatelessWidget {
-  const _UrgentBanner({required this.msg, required this.onOpen});
+  const _UrgentBanner({
+    required this.msg,
+    required this.onOpen,
+    required this.onDismiss,
+  });
 
   final ChildKabarMessage msg;
   final VoidCallback onOpen;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -1150,7 +1198,7 @@ class _UrgentBanner extends StatelessWidget {
           onTap: onOpen,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
             child: Row(
               children: [
                 Container(
@@ -1191,7 +1239,11 @@ class _UrgentBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: AppColors.coral),
+                IconButton(
+                  tooltip: 'Tandai dibaca',
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close, color: AppColors.coral),
+                ),
               ],
             ),
           ),
@@ -1201,6 +1253,13 @@ class _UrgentBanner extends StatelessWidget {
   }
 }
 
+/// Selected tab index for [ParentShell]'s bottom navigation.
+///
+/// Exposed as a provider so routes pushed on top of the shell (e.g. child
+/// detail) can switch tabs and pop back to the shell chrome instead of
+/// leaving the user on a bare, dead-end screen.
+final parentShellTabProvider = StateProvider<int>((ref) => 0);
+
 class ParentShell extends ConsumerStatefulWidget {
   const ParentShell({super.key});
 
@@ -1209,10 +1268,9 @@ class ParentShell extends ConsumerStatefulWidget {
 }
 
 class _ParentShellState extends ConsumerState<ParentShell> {
-  int _index = 0;
-
   @override
   Widget build(BuildContext context) {
+    final index = ref.watch(parentShellTabProvider);
     final pages = [
       const ParentHomeScreen(),
       const ScreenTimeScreen(),
@@ -1221,11 +1279,11 @@ class _ParentShellState extends ConsumerState<ParentShell> {
     ];
     return ParentZoneAlertHost(
       child: Scaffold(
-        body: IndexedStack(index: _index, children: pages),
+        body: IndexedStack(index: index, children: pages),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: _index,
+          selectedIndex: index,
           onDestinationSelected: (value) {
-            setState(() => _index = value);
+            ref.read(parentShellTabProvider.notifier).state = value;
             if (value == 0) {
               unawaited(
                 ref.read(childrenControllerProvider.notifier).refresh(),

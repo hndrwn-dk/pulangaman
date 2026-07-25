@@ -14,19 +14,32 @@ class PulangAmanApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
 
+    // Key forces a fresh navigator when auth flips, so logout leaves
+    // pushed routes (e.g. Pengaturan Akun) and shows LoginScreen cleanly.
+    final homeKey = ValueKey<String>(
+      auth.restoring
+          ? 'restoring'
+          : !auth.isAuthenticated
+              ? 'login'
+              : 'role-${auth.role!.name}',
+    );
+
     return MaterialApp(
       title: 'PulangAman',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: auth.restoring
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-          : !auth.isAuthenticated
-              ? const LoginScreen()
-              : switch (auth.role!) {
-                  AppRole.parent => const ParentShell(),
-                  AppRole.child => const ChildHomeScreen(),
-                  AppRole.guardian => const GuardianHomeScreen(),
-                },
+      home: KeyedSubtree(
+        key: homeKey,
+        child: auth.restoring
+            ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+            : !auth.isAuthenticated
+                ? const LoginScreen()
+                : switch (auth.role!) {
+                    AppRole.parent => const ParentShell(),
+                    AppRole.child => const ChildHomeScreen(),
+                    AppRole.guardian => const GuardianHomeScreen(),
+                  },
+      ),
     );
   }
 }

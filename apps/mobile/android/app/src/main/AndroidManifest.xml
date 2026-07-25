@@ -99,5 +99,9 @@
             <action android:name="android.intent.action.SENDTO"/>
             <data android:scheme="sms"/>
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
     </queries>
 </manifest>

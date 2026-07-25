@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
@@ -311,39 +312,9 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Wali Terpercaya',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        Text(
-                          '$activeCount wali aktif',
-                          style: const TextStyle(
-                            color: AppColors.inkSoft,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            PaScreenHeader(
+              title: 'Wali Terpercaya',
+              subtitle: '$activeCount wali aktif',
             ),
             Expanded(
               child: RefreshIndicator(
@@ -906,26 +877,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Wali · ${widget.child.name}',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            PaScreenHeader(title: 'Wali · ${widget.child.name}'),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())

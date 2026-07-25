@@ -190,6 +190,13 @@ authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) =
             [userId, legacyParent.rows[0].id],
           );
           recoveredChildren = moved.rowCount ?? 0;
+          // Keep reminder ownership aligned with the recovered parent link.
+          await client.query(
+            `UPDATE child_reminders
+             SET parent_id = $1, updated_at = now()
+             WHERE parent_id = $2`,
+            [userId, legacyParent.rows[0].id],
+          );
           await client.query(
             `INSERT INTO audit_events (actor_id, action, payload)
              VALUES ($1, 'auth.recover_children', $2::jsonb)`,

@@ -167,8 +167,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
         SnackBar(
           content: Text(
             'Pengingat "$title" disimpan.\n'
-            'Buka PulangAman di HP anak supaya jadwal aktif. '
-            'Untuk uji cepat, tekan "Coba 1 menit lagi".',
+            'Buka PulangAman di HP anak supaya jadwal aktif.',
           ),
           duration: const Duration(seconds: 5),
         ),
@@ -443,18 +442,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     }
   }
 
-  Future<void> _createTestInOneMinute() async {
-    final childId = _childId;
-    if (childId == null) return;
-    final now = DateTime.now().add(const Duration(minutes: 1));
-    await _createPreset(
-      title: 'Tes pengingat',
-      body: 'Ini tes layar penuh dari orang tua. Ketuk Mengerti untuk menutup.',
-      hour: now.hour,
-      minute: now.minute,
-    );
-  }
-
   String _daysLabel(List<int> days) {
     if (days.length >= 7) return 'Setiap hari';
     const names = {
@@ -515,39 +502,9 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Pengingat Jadwal',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        Text(
-                          '$activeCount pengingat aktif',
-                          style: const TextStyle(
-                            color: AppColors.inkSoft,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            PaScreenHeader(
+              title: 'Pengingat Jadwal',
+              subtitle: '$activeCount pengingat aktif',
             ),
             Expanded(
               child: RefreshIndicator(
@@ -713,30 +670,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                                 minute: 0,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Material(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              child: InkWell(
-                                onTap: _showCustomDialog,
-                                borderRadius: BorderRadius.circular(14),
-                                child: Container(
-                                  width: 44,
-                                  height: 44,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: const Color(0xFFE2E6EA),
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.add_rounded,
-                                    color: Color(0xFF7C3AED),
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -828,25 +761,6 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                             ),
                           );
                         }),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: _createTestInOneMinute,
-                        icon: const Icon(Icons.timer_outlined),
-                        label: const Text('Coba 1 menit lagi'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.tealDeep,
-                          side: const BorderSide(color: Color(0xFFE2E6EA)),
-                          backgroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          textStyle: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
                     ],
                   ],
                 ),
