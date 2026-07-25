@@ -1212,6 +1212,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             onOpenUsageSettings: _screenTimeChannel.openUsageAccessSettings,
             onOpenAccessibilitySettings:
                 _screenTimeChannel.openAccessibilitySettings,
+            onOpenAppInfo: _screenTimeChannel.openAppInfoSettings,
             onOpenReminderPermissions: _openReminderPermissions,
             homeByAckVisible: (_homeByStatus == 'pre_notified' ||
                     _homeByStatus == 'target_notified') &&

@@ -38,6 +38,16 @@ class MainActivity : FlutterActivity() {
                         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         result.success(null)
                     }
+                    // Android 13+ locks accessibility for sideloaded apps until the
+                    // user taps "Allow restricted settings" on this page.
+                    "openAppInfoSettings" -> {
+                        startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:$packageName")
+                            },
+                        )
+                        result.success(null)
+                    }
                     "getTodayUsage" -> result.success(getUsageStats("today"))
                     "getUsageStats" -> {
                         val period = call.argument<String>("period") ?: "today"

@@ -26,6 +26,7 @@ class ChildBerandaTab extends StatelessWidget {
     required this.onOpenUsageSettings,
     required this.onOpenAccessibilitySettings,
     required this.onOpenReminderPermissions,
+    this.onOpenAppInfo,
     this.homeByAckVisible = false,
     this.homeByAckSent = false,
     this.onHomeByAck,
@@ -57,6 +58,7 @@ class ChildBerandaTab extends StatelessWidget {
   final VoidCallback onOpenUsageSettings;
   final VoidCallback onOpenAccessibilitySettings;
   final VoidCallback onOpenReminderPermissions;
+  final VoidCallback? onOpenAppInfo;
   final bool homeByAckVisible;
   final bool homeByAckSent;
   final VoidCallback? onHomeByAck;
@@ -362,11 +364,36 @@ class ChildBerandaTab extends StatelessWidget {
                     onPressed: onOpenUsageSettings,
                     child: const Text('Izinkan akses pemakaian'),
                   ),
-                if (!accessibility)
+                if (!accessibility) ...[
                   OutlinedButton(
                     onPressed: onOpenAccessibilitySettings,
                     child: const Text('Aktifkan pemblokiran aplikasi'),
                   ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Tombolnya terkunci ("Setelan dibatasi")? Buka Info aplikasi, '
+                    'ketuk menu titik tiga di kanan atas, lalu pilih '
+                    '"Izinkan setelan yang dibatasi". Setelah itu coba lagi.',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: AppColors.inkSoft,
+                    ),
+                  ),
+                  if (onOpenAppInfo != null) ...[
+                    const SizedBox(height: 6),
+                    TextButton(
+                      onPressed: onOpenAppInfo,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.tealDeep,
+                      ),
+                      child: const Text(
+                        'Buka Info aplikasi',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),

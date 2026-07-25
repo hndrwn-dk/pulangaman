@@ -15,6 +15,10 @@ class ScreenTimeChannel {
 
   Future<void> openAccessibilitySettings() => _channel.invokeMethod('openAccessibilitySettings');
 
+  /// App info page — needed to lift Android 13+ "restricted settings"
+  /// before the accessibility toggle can be turned on (sideloaded installs).
+  Future<void> openAppInfoSettings() => _channel.invokeMethod('openAppInfoSettings');
+
   Future<List<Map<String, dynamic>>> getTodayUsage() async {
     return getUsageStats('today');
   }
