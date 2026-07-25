@@ -91,5 +91,65 @@
       "distance": { "type": "String" },
       "eta": { "type": "String" }
     }
-  }
+  },
+  "empTitle": "Titik Kumpul Darurat",
+  "empSubtitle": "Tempat bertemu saat kondisi darurat",
+  "empEmpty": "Belum ada titik kumpul untuk {childName}",
+  "@empEmpty": {
+    "placeholders": {
+      "childName": { "type": "String" }
+    }
+  },
+  "empAdd": "Tambah titik kumpul",
+  "empAddBackup": "Titik cadangan",
+  "empPrimary": "Utama",
+  "empBackup": "Cadangan",
+  "empInstructionsHint": "Contoh: Kalau kondisi darurat dan gak bisa saling hubungi, ketemu di sini",
+  "empNameHint": "Nama tempat (mis. Rumah Nenek)",
+  "empSave": "Simpan",
+  "empDelete": "Hapus",
+  "empApplyToOthers": "Terapkan ke anak lain juga?",
+  "empApply": "Terapkan",
+  "empActivate": "Aktifkan Titik Kumpul",
+  "empActivateConfirm": "Semua anak dan wali akan dapat notifikasi untuk segera menuju titik kumpul masing-masing. Lanjutkan?",
+  "empActivateNoteHint": "Catatan singkat (opsional)",
+  "empActivateContinue": "Aktifkan sekarang",
+  "empActivateCancel": "Batal",
+  "empSummarySent": "Terkirim ke {count} anak",
+  "@empSummarySent": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "empSummarySkipped": "{childName} belum punya titik kumpul",
+  "@empSummarySkipped": {
+    "placeholders": {
+      "childName": { "type": "String" }
+    }
+  },
+  "empRateLimited": "Aktivasi dibatasi — coba lagi nanti",
+  "empOpenMaps": "Buka di Peta",
+  "empDistanceUnknown": "Jarak belum diketahui",
+  "empDistanceFromChild": "Jarak anak: {distance}",
+  "@empDistanceFromChild": {
+    "placeholders": {
+      "distance": { "type": "String" }
+    }
+  },
+  "empAlertTitle": "Titik Kumpul Darurat",
+  "empAlertBody": "Segera menuju {place}",
+  "@empAlertBody": {
+    "placeholders": {
+      "place": { "type": "String" }
+    }
+  },
+  "empMyDistance": "Jarakmu: {distance}",
+  "@empMyDistance": {
+    "placeholders": {
+      "distance": { "type": "String" }
+    }
+  },
+  "empMenuHint": "Titik bertemu saat darurat",
+  "empPickPlace": "Cari lokasi titik kumpul",
+  "empNoChildren": "Belum ada anak terhubung"
 }

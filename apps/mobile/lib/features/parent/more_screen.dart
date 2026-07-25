@@ -7,6 +7,7 @@ import '../community/reports_screen.dart';
 import '../rewards/rewards_screen.dart';
 import 'account_settings_screen.dart';
 import 'children_controller.dart';
+import 'emergency_meeting_screen.dart';
 import 'guardians_screen.dart';
 import 'home_by_screen.dart';
 import 'reminders_screen.dart';
@@ -242,6 +243,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     title: 'Wali Terpercaya',
                     subtitle: _guardianHint,
                     onTap: () => _open(const GuardiansEntryScreen()),
+                  ),
+                  _MenuRow(
+                    icon: Icons.groups_rounded,
+                    iconBg: const Color(0xFFFFE8E6),
+                    iconColor: const Color(0xFFDC2626),
+                    title: 'Titik Kumpul Darurat',
+                    subtitle: 'Tempat bertemu saat darurat',
+                    onTap: () => _open(const EmergencyMeetingScreen()),
                   ),
                   _MenuRow(
                     icon: Icons.warning_amber_rounded,

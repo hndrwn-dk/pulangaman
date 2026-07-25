@@ -202,4 +202,108 @@ class AppLocalizationsEn extends AppLocalizations {
   String tripProgressMeta(String distance, String eta) {
     return '$distance · $eta';
   }
+
+  @override
+  String get empTitle => 'Emergency Meeting Point';
+
+  @override
+  String get empSubtitle => 'Where to meet in an emergency';
+
+  @override
+  String empEmpty(String childName) {
+    return 'No meeting point for $childName yet';
+  }
+
+  @override
+  String get empAdd => 'Add meeting point';
+
+  @override
+  String get empAddBackup => 'Backup point';
+
+  @override
+  String get empPrimary => 'Primary';
+
+  @override
+  String get empBackup => 'Backup';
+
+  @override
+  String get empInstructionsHint =>
+      'Example: If we cannot reach each other, meet here';
+
+  @override
+  String get empNameHint => 'Place name (e.g. Grandma\'s house)';
+
+  @override
+  String get empSave => 'Save';
+
+  @override
+  String get empDelete => 'Delete';
+
+  @override
+  String get empApplyToOthers => 'Apply to other children too?';
+
+  @override
+  String get empApply => 'Apply';
+
+  @override
+  String get empActivate => 'Activate Meeting Point';
+
+  @override
+  String get empActivateConfirm =>
+      'All children and guardians will be notified to go to their meeting points. Continue?';
+
+  @override
+  String get empActivateNoteHint => 'Short note (optional)';
+
+  @override
+  String get empActivateContinue => 'Activate now';
+
+  @override
+  String get empActivateCancel => 'Cancel';
+
+  @override
+  String empSummarySent(int count) {
+    return 'Sent to $count children';
+  }
+
+  @override
+  String empSummarySkipped(String childName) {
+    return '$childName has no meeting point yet';
+  }
+
+  @override
+  String get empRateLimited => 'Activation limited — try again later';
+
+  @override
+  String get empOpenMaps => 'Open in Maps';
+
+  @override
+  String get empDistanceUnknown => 'Distance unknown';
+
+  @override
+  String empDistanceFromChild(String distance) {
+    return 'Child distance: $distance';
+  }
+
+  @override
+  String get empAlertTitle => 'Emergency Meeting Point';
+
+  @override
+  String empAlertBody(String place) {
+    return 'Head to $place now';
+  }
+
+  @override
+  String empMyDistance(String distance) {
+    return 'Your distance: $distance';
+  }
+
+  @override
+  String get empMenuHint => 'Meet here in an emergency';
+
+  @override
+  String get empPickPlace => 'Search for a meeting place';
+
+  @override
+  String get empNoChildren => 'No child linked yet';
 }

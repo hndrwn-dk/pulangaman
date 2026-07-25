@@ -14,6 +14,7 @@ import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../auth/auth_controller.dart';
+import '../parent/emergency_meeting_alert_screen.dart';
 import '../screentime/screen_time_channel.dart';
 import 'child_beranda_tab.dart';
 import 'child_kabar_tab.dart';
@@ -169,6 +170,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       unawaited(_syncReminders());
       return;
     }
+    if (event == 'parent:emergency_meeting_alert') {
+      unawaited(_onEmergencyMeetingAlert(payload));
+      return;
+    }
     if (event == 'parent:home_by_status' || event == 'parent:home_by_ack') {
       unawaited(_pollHomeByStatus());
       return;
@@ -197,6 +202,36 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             : 'Panik ditandai selesai / aman',
       ));
     }
+  }
+
+  Future<void> _onEmergencyMeetingAlert(Map<String, dynamic> payload) async {
+    final name = payload['meetingPointName'] as String? ?? 'Titik kumpul';
+    final lat = (payload['lat'] as num?)?.toDouble();
+    final lng = (payload['lng'] as num?)?.toDouble();
+    if (lat == null || lng == null || !mounted) return;
+    final note = payload['note'] as String?;
+    final instructions = payload['instructions'] as String?;
+    try {
+      await _reminderChannel.previewNow(
+        title: 'Titik Kumpul Darurat',
+        body: note != null && note.isNotEmpty
+            ? '$note — menuju $name'
+            : 'Segera menuju titik kumpul: $name',
+        style: 'fullscreen',
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EmergencyMeetingAlertScreen(
+          placeName: name,
+          lat: lat,
+          lng: lng,
+          instructions: instructions,
+          note: note,
+        ),
+      ),
+    );
   }
 
   Future<void> _pollHomeByStatus() async {

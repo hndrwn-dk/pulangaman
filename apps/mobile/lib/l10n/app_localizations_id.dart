@@ -204,4 +204,108 @@ class AppLocalizationsId extends AppLocalizations {
   String tripProgressMeta(String distance, String eta) {
     return '$distance · $eta';
   }
+
+  @override
+  String get empTitle => 'Titik Kumpul Darurat';
+
+  @override
+  String get empSubtitle => 'Tempat bertemu saat kondisi darurat';
+
+  @override
+  String empEmpty(String childName) {
+    return 'Belum ada titik kumpul untuk $childName';
+  }
+
+  @override
+  String get empAdd => 'Tambah titik kumpul';
+
+  @override
+  String get empAddBackup => 'Titik cadangan';
+
+  @override
+  String get empPrimary => 'Utama';
+
+  @override
+  String get empBackup => 'Cadangan';
+
+  @override
+  String get empInstructionsHint =>
+      'Contoh: Kalau kondisi darurat dan gak bisa saling hubungi, ketemu di sini';
+
+  @override
+  String get empNameHint => 'Nama tempat (mis. Rumah Nenek)';
+
+  @override
+  String get empSave => 'Simpan';
+
+  @override
+  String get empDelete => 'Hapus';
+
+  @override
+  String get empApplyToOthers => 'Terapkan ke anak lain juga?';
+
+  @override
+  String get empApply => 'Terapkan';
+
+  @override
+  String get empActivate => 'Aktifkan Titik Kumpul';
+
+  @override
+  String get empActivateConfirm =>
+      'Semua anak dan wali akan dapat notifikasi untuk segera menuju titik kumpul masing-masing. Lanjutkan?';
+
+  @override
+  String get empActivateNoteHint => 'Catatan singkat (opsional)';
+
+  @override
+  String get empActivateContinue => 'Aktifkan sekarang';
+
+  @override
+  String get empActivateCancel => 'Batal';
+
+  @override
+  String empSummarySent(int count) {
+    return 'Terkirim ke $count anak';
+  }
+
+  @override
+  String empSummarySkipped(String childName) {
+    return '$childName belum punya titik kumpul';
+  }
+
+  @override
+  String get empRateLimited => 'Aktivasi dibatasi — coba lagi nanti';
+
+  @override
+  String get empOpenMaps => 'Buka di Peta';
+
+  @override
+  String get empDistanceUnknown => 'Jarak belum diketahui';
+
+  @override
+  String empDistanceFromChild(String distance) {
+    return 'Jarak anak: $distance';
+  }
+
+  @override
+  String get empAlertTitle => 'Titik Kumpul Darurat';
+
+  @override
+  String empAlertBody(String place) {
+    return 'Segera menuju $place';
+  }
+
+  @override
+  String empMyDistance(String distance) {
+    return 'Jarakmu: $distance';
+  }
+
+  @override
+  String get empMenuHint => 'Titik bertemu saat darurat';
+
+  @override
+  String get empPickPlace => 'Cari lokasi titik kumpul';
+
+  @override
+  String get empNoChildren => 'Belum ada anak terhubung';
 }

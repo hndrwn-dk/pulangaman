@@ -1,0 +1,433 @@
+import { pool } from '../db/pool.js';
+import { childLocationKey, getRedis } from '../redis/client.js';
+import { sendFcmToUser } from './fcm.js';
+import { broadcastToRoom, childRoom, guardianAlertRoom, parentRoom } from '../ws/server.js';
+import {
+  buildActivationTargets,
+  formatDistanceLabel,
+  haversineMeters,
+  type ActivateTargetResult,
+} from './emergencyMeetingLogic.js';
+
+export type MeetingPointRow = {
+  id: string;
+  child_id: string;
+  parent_id: string;
+  name: string;
+  instructions: string | null;
+  is_primary: boolean;
+  lat: number;
+  lng: number;
+  created_at: Date;
+  updated_at: Date;
+};
+
+export function mapPoint(row: MeetingPointRow) {
+  return {
+    id: row.id,
+    childId: row.child_id,
+    parentId: row.parent_id,
+    name: row.name,
+    instructions: row.instructions,
+    isPrimary: row.is_primary,
+    lat: Number(row.lat),
+    lng: Number(row.lng),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+const pointSelect = `
+  SELECT id, child_id, parent_id, name, instructions, is_primary,
+         ST_Y(center::geometry) AS lat,
+         ST_X(center::geometry) AS lng,
+         created_at, updated_at
+  FROM emergency_meeting_points
+`;
+
+export async function listPointsForChild(childId: string): Promise<MeetingPointRow[]> {
+  const result = await pool.query<MeetingPointRow>(
+    `${pointSelect}
+     WHERE child_id = $1
+     ORDER BY is_primary DESC, created_at ASC`,
+    [childId],
+  );
+  return result.rows;
+}
+
+export async function getPrimaryPoint(childId: string): Promise<MeetingPointRow | null> {
+  const result = await pool.query<MeetingPointRow>(
+    `${pointSelect}
+     WHERE child_id = $1 AND is_primary = true
+     LIMIT 1`,
+    [childId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function getPointById(id: string): Promise<MeetingPointRow | null> {
+  const result = await pool.query<MeetingPointRow>(
+    `${pointSelect} WHERE id = $1`,
+    [id],
+  );
+  return result.rows[0] ?? null;
+}
+
+async function clearPrimary(childId: string): Promise<void> {
+  await pool.query(
+    `UPDATE emergency_meeting_points
+     SET is_primary = false, updated_at = now()
+     WHERE child_id = $1 AND is_primary = true`,
+    [childId],
+  );
+}
+
+export async function createPoint(params: {
+  childId: string;
+  parentId: string;
+  name: string;
+  lat: number;
+  lng: number;
+  instructions?: string | null;
+  isPrimary?: boolean;
+}): Promise<MeetingPointRow> {
+  const existing = await listPointsForChild(params.childId);
+  const wantPrimary = params.isPrimary !== false || existing.length === 0;
+  if (wantPrimary) {
+    await clearPrimary(params.childId);
+  }
+
+  const inserted = await pool.query<{ id: string }>(
+    `INSERT INTO emergency_meeting_points
+       (child_id, parent_id, name, center, instructions, is_primary)
+     VALUES (
+       $1, $2, $3,
+       ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+       $6, $7
+     )
+     RETURNING id`,
+    [
+      params.childId,
+      params.parentId,
+      params.name.trim(),
+      params.lng,
+      params.lat,
+      params.instructions?.trim() || null,
+      wantPrimary,
+    ],
+  );
+  const row = await getPointById(inserted.rows[0].id);
+  if (!row) throw new Error('point_create_failed');
+  return row;
+}
+
+export async function updatePoint(params: {
+  id: string;
+  name?: string;
+  lat?: number;
+  lng?: number;
+  instructions?: string | null;
+  isPrimary?: boolean;
+}): Promise<MeetingPointRow | null> {
+  const current = await getPointById(params.id);
+  if (!current) return null;
+
+  if (params.isPrimary === true) {
+    await clearPrimary(current.child_id);
+  }
+
+  const name = params.name?.trim() ?? current.name;
+  const instructions =
+    params.instructions !== undefined
+      ? params.instructions?.trim() || null
+      : current.instructions;
+  const isPrimary =
+    params.isPrimary !== undefined ? params.isPrimary : current.is_primary;
+  const lat = params.lat ?? Number(current.lat);
+  const lng = params.lng ?? Number(current.lng);
+
+  await pool.query(
+    `UPDATE emergency_meeting_points SET
+       name = $2,
+       instructions = $3,
+       is_primary = $4,
+       center = ST_SetSRID(ST_MakePoint($5, $6), 4326)::geography,
+       updated_at = now()
+     WHERE id = $1`,
+    [params.id, name, instructions, isPrimary, lng, lat],
+  );
+  return getPointById(params.id);
+}
+
+export async function deletePoint(id: string): Promise<boolean> {
+  const result = await pool.query(`DELETE FROM emergency_meeting_points WHERE id = $1`, [
+    id,
+  ]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function applyPrimaryToChildren(params: {
+  parentId: string;
+  sourceChildId: string;
+  targetChildIds: string[];
+}): Promise<{ applied: string[] }> {
+  const source = await getPrimaryPoint(params.sourceChildId);
+  if (!source || source.parent_id !== params.parentId) {
+    throw new Error('source_point_not_found');
+  }
+
+  const applied: string[] = [];
+  for (const targetId of params.targetChildIds) {
+    if (targetId === params.sourceChildId) continue;
+    await clearPrimary(targetId);
+    await pool.query(
+      `INSERT INTO emergency_meeting_points
+         (child_id, parent_id, name, center, instructions, is_primary)
+       VALUES (
+         $1, $2, $3,
+         ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+         $6, true
+       )`,
+      [
+        targetId,
+        params.parentId,
+        source.name,
+        Number(source.lng),
+        Number(source.lat),
+        source.instructions,
+      ],
+    );
+    applied.push(targetId);
+  }
+  return { applied };
+}
+
+async function latestChildLocation(
+  childId: string,
+): Promise<{ lat: number; lng: number; recordedAt: string | null } | null> {
+  try {
+    const redis = getRedis();
+    if (redis.status !== 'ready') {
+      await redis.connect();
+    }
+    const cached = await redis.get(childLocationKey(childId));
+    if (cached) {
+      const parsed = JSON.parse(cached) as {
+        lat?: number;
+        lng?: number;
+        recordedAt?: string;
+      };
+      if (typeof parsed.lat === 'number' && typeof parsed.lng === 'number') {
+        return {
+          lat: parsed.lat,
+          lng: parsed.lng,
+          recordedAt: parsed.recordedAt ?? null,
+        };
+      }
+    }
+  } catch (_) {
+    // Fall through to DB.
+  }
+
+  const last = await pool.query<{
+    lat: number;
+    lng: number;
+    recorded_at: Date;
+  }>(
+    `SELECT ST_Y(location::geometry) AS lat,
+            ST_X(location::geometry) AS lng,
+            recorded_at
+     FROM location_history
+     WHERE child_id = $1
+     ORDER BY recorded_at DESC
+     LIMIT 1`,
+    [childId],
+  );
+  if (!last.rows[0]) return null;
+  return {
+    lat: Number(last.rows[0].lat),
+    lng: Number(last.rows[0].lng),
+    recordedAt: last.rows[0].recorded_at.toISOString(),
+  };
+}
+
+export async function getChildPointStatus(childId: string) {
+  const point = await getPrimaryPoint(childId);
+  if (!point) {
+    return {
+      point: null,
+      childDistanceMeters: null,
+      childLastSeenAt: null,
+      distanceLabel: '',
+    };
+  }
+  const loc = await latestChildLocation(childId);
+  const distance =
+    loc == null
+      ? null
+      : haversineMeters(
+          { lat: loc.lat, lng: loc.lng },
+          { lat: Number(point.lat), lng: Number(point.lng) },
+        );
+  return {
+    point: mapPoint(point),
+    childDistanceMeters: distance,
+    childLastSeenAt: loc?.recordedAt ?? null,
+    distanceLabel: formatDistanceLabel(distance),
+  };
+}
+
+async function approvedGuardianIds(childId: string): Promise<string[]> {
+  const result = await pool.query<{ guardian_id: string }>(
+    `SELECT guardian_id FROM child_approved_guardians
+     WHERE child_id = $1 AND status = 'approved'`,
+    [childId],
+  );
+  return result.rows.map((r) => r.guardian_id);
+}
+
+export async function activateMeetingPoints(params: {
+  parentId: string;
+  note?: string | null;
+}): Promise<{
+  activationId: string;
+  targets: ActivateTargetResult[];
+  activatedAt: string;
+}> {
+  const recent = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM emergency_meeting_activations
+     WHERE parent_id = $1 AND activated_at > now() - interval '1 hour'`,
+    [params.parentId],
+  );
+  if (Number(recent.rows[0]?.count ?? 0) >= 3) {
+    throw new Error('activation_rate_limited');
+  }
+
+  const children = await pool.query<{ id: string; name: string }>(
+    `SELECT u.id, u.name
+     FROM parent_children pc
+     JOIN users u ON u.id = pc.child_id
+     WHERE pc.parent_id = $1
+     ORDER BY u.name`,
+    [params.parentId],
+  );
+
+  const inputs = [];
+  for (const child of children.rows) {
+    const point = await getPrimaryPoint(child.id);
+    const guardians = point ? await approvedGuardianIds(child.id) : [];
+    inputs.push({
+      childId: child.id,
+      childName: child.name,
+      meetingPointId: point?.id ?? null,
+      meetingPointName: point?.name ?? null,
+      guardianIds: guardians,
+    });
+  }
+
+  const targets = buildActivationTargets(inputs);
+  const note = params.note?.trim() || null;
+
+  const inserted = await pool.query<{ id: string; activated_at: Date }>(
+    `INSERT INTO emergency_meeting_activations (parent_id, note, targets)
+     VALUES ($1, $2, $3::jsonb)
+     RETURNING id, activated_at`,
+    [params.parentId, note, JSON.stringify(targets)],
+  );
+
+  const activationId = inserted.rows[0].id;
+  const activatedAt = inserted.rows[0].activated_at.toISOString();
+
+  for (const t of targets) {
+    if (!t.notified || !t.meetingPointId) continue;
+    const point = await getPointById(t.meetingPointId);
+    if (!point) continue;
+
+    const title = 'Titik Kumpul Darurat';
+    const body = note
+      ? `${note} — menuju ${point.name}`
+      : `Segera menuju titik kumpul: ${point.name}`;
+
+    const data = {
+      type: 'emergency_meeting_alert',
+      activationId,
+      childId: t.childId,
+      meetingPointId: point.id,
+      meetingPointName: point.name,
+      lat: String(point.lat),
+      lng: String(point.lng),
+      instructions: point.instructions ?? '',
+      note: note ?? '',
+    };
+
+    await sendFcmToUser(t.childId, { title, body }, data);
+    broadcastToRoom(childRoom(t.childId), 'parent:emergency_meeting_alert', {
+      ...data,
+      instructions: point.instructions,
+      note,
+      at: activatedAt,
+    });
+  }
+
+  const guardianPayloadById = new Map<
+    string,
+    { childNames: string[]; pointName: string; lat: string; lng: string }
+  >();
+  for (const t of targets) {
+    if (!t.notified || !t.meetingPointId) continue;
+    const point = await getPointById(t.meetingPointId);
+    if (!point) continue;
+    for (const gid of t.guardianIds) {
+      const existing = guardianPayloadById.get(gid);
+      if (existing) {
+        existing.childNames.push(t.childName);
+      } else {
+        guardianPayloadById.set(gid, {
+          childNames: [t.childName],
+          pointName: point.name,
+          lat: String(point.lat),
+          lng: String(point.lng),
+        });
+      }
+    }
+  }
+
+  for (const [guardianId, info] of guardianPayloadById) {
+    const names = info.childNames.join(', ');
+    await sendFcmToUser(
+      guardianId,
+      {
+        title: 'Titik Kumpul Darurat',
+        body: `${names} diminta menuju ${info.pointName}`,
+      },
+      {
+        type: 'emergency_meeting_alert_guardian',
+        activationId,
+        meetingPointName: info.pointName,
+        lat: info.lat,
+        lng: info.lng,
+        childNames: names,
+        note: note ?? '',
+      },
+    );
+    broadcastToRoom(guardianAlertRoom(guardianId), 'guardian:emergency_meeting_alert', {
+      activationId,
+      meetingPointName: info.pointName,
+      lat: Number(info.lat),
+      lng: Number(info.lng),
+      childNames: info.childNames,
+      note,
+      at: activatedAt,
+    });
+  }
+
+  const payload = {
+    activationId,
+    targets,
+    activatedAt,
+    note,
+  };
+  broadcastToRoom(parentRoom(params.parentId), 'parent:emergency_meeting_activated', payload);
+
+  return { activationId, targets, activatedAt };
+}

@@ -295,7 +295,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     final selected = await showModalBottomSheet<PlaceHit>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _PlaceSearchSheet(
+      builder: (ctx) => PlaceSearchSheet(
         title: type == 'home'
             ? 'Cari alamat rumah'
             : type == 'school'
@@ -1326,8 +1326,9 @@ class _DashedBorderPainter extends CustomPainter {
       oldDelegate.color != color || oldDelegate.radius != radius;
 }
 
-class _PlaceSearchSheet extends ConsumerStatefulWidget {
-  const _PlaceSearchSheet({
+class PlaceSearchSheet extends ConsumerStatefulWidget {
+  const PlaceSearchSheet({
+    super.key,
     required this.title,
     required this.hint,
   });
@@ -1336,10 +1337,10 @@ class _PlaceSearchSheet extends ConsumerStatefulWidget {
   final String hint;
 
   @override
-  ConsumerState<_PlaceSearchSheet> createState() => _PlaceSearchSheetState();
+  ConsumerState<PlaceSearchSheet> createState() => PlaceSearchSheetState();
 }
 
-class _PlaceSearchSheetState extends ConsumerState<_PlaceSearchSheet> {
+class PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
   final _ctrl = TextEditingController();
   Timer? _debounce;
   bool _loading = false;

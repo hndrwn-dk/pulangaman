@@ -457,6 +457,186 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'{distance} · {eta}'**
   String tripProgressMeta(String distance, String eta);
+
+  /// No description provided for @empTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik Kumpul Darurat'**
+  String get empTitle;
+
+  /// No description provided for @empSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tempat bertemu saat kondisi darurat'**
+  String get empSubtitle;
+
+  /// No description provided for @empEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada titik kumpul untuk {childName}'**
+  String empEmpty(String childName);
+
+  /// No description provided for @empAdd.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah titik kumpul'**
+  String get empAdd;
+
+  /// No description provided for @empAddBackup.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik cadangan'**
+  String get empAddBackup;
+
+  /// No description provided for @empPrimary.
+  ///
+  /// In id, this message translates to:
+  /// **'Utama'**
+  String get empPrimary;
+
+  /// No description provided for @empBackup.
+  ///
+  /// In id, this message translates to:
+  /// **'Cadangan'**
+  String get empBackup;
+
+  /// No description provided for @empInstructionsHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Contoh: Kalau kondisi darurat dan gak bisa saling hubungi, ketemu di sini'**
+  String get empInstructionsHint;
+
+  /// No description provided for @empNameHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Nama tempat (mis. Rumah Nenek)'**
+  String get empNameHint;
+
+  /// No description provided for @empSave.
+  ///
+  /// In id, this message translates to:
+  /// **'Simpan'**
+  String get empSave;
+
+  /// No description provided for @empDelete.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus'**
+  String get empDelete;
+
+  /// No description provided for @empApplyToOthers.
+  ///
+  /// In id, this message translates to:
+  /// **'Terapkan ke anak lain juga?'**
+  String get empApplyToOthers;
+
+  /// No description provided for @empApply.
+  ///
+  /// In id, this message translates to:
+  /// **'Terapkan'**
+  String get empApply;
+
+  /// No description provided for @empActivate.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktifkan Titik Kumpul'**
+  String get empActivate;
+
+  /// No description provided for @empActivateConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua anak dan wali akan dapat notifikasi untuk segera menuju titik kumpul masing-masing. Lanjutkan?'**
+  String get empActivateConfirm;
+
+  /// No description provided for @empActivateNoteHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Catatan singkat (opsional)'**
+  String get empActivateNoteHint;
+
+  /// No description provided for @empActivateContinue.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktifkan sekarang'**
+  String get empActivateContinue;
+
+  /// No description provided for @empActivateCancel.
+  ///
+  /// In id, this message translates to:
+  /// **'Batal'**
+  String get empActivateCancel;
+
+  /// No description provided for @empSummarySent.
+  ///
+  /// In id, this message translates to:
+  /// **'Terkirim ke {count} anak'**
+  String empSummarySent(int count);
+
+  /// No description provided for @empSummarySkipped.
+  ///
+  /// In id, this message translates to:
+  /// **'{childName} belum punya titik kumpul'**
+  String empSummarySkipped(String childName);
+
+  /// No description provided for @empRateLimited.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktivasi dibatasi — coba lagi nanti'**
+  String get empRateLimited;
+
+  /// No description provided for @empOpenMaps.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka di Peta'**
+  String get empOpenMaps;
+
+  /// No description provided for @empDistanceUnknown.
+  ///
+  /// In id, this message translates to:
+  /// **'Jarak belum diketahui'**
+  String get empDistanceUnknown;
+
+  /// No description provided for @empDistanceFromChild.
+  ///
+  /// In id, this message translates to:
+  /// **'Jarak anak: {distance}'**
+  String empDistanceFromChild(String distance);
+
+  /// No description provided for @empAlertTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik Kumpul Darurat'**
+  String get empAlertTitle;
+
+  /// No description provided for @empAlertBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Segera menuju {place}'**
+  String empAlertBody(String place);
+
+  /// No description provided for @empMyDistance.
+  ///
+  /// In id, this message translates to:
+  /// **'Jarakmu: {distance}'**
+  String empMyDistance(String distance);
+
+  /// No description provided for @empMenuHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik bertemu saat darurat'**
+  String get empMenuHint;
+
+  /// No description provided for @empPickPlace.
+  ///
+  /// In id, this message translates to:
+  /// **'Cari lokasi titik kumpul'**
+  String get empPickPlace;
+
+  /// No description provided for @empNoChildren.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada anak terhubung'**
+  String get empNoChildren;
 }
 
 class _AppLocalizationsDelegate
