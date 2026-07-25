@@ -479,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @empAdd.
   ///
   /// In id, this message translates to:
-  /// **'Tambah titik kumpul'**
+  /// **'+ Tambah titik kumpul'**
   String get empAdd;
 
   /// No description provided for @empAddBackup.
@@ -487,6 +487,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Titik cadangan'**
   String get empAddBackup;
+
+  /// No description provided for @empPrimaryLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik kumpul utama'**
+  String get empPrimaryLabel;
 
   /// No description provided for @empPrimary.
   ///
@@ -524,6 +530,18 @@ abstract class AppLocalizations {
   /// **'Hapus'**
   String get empDelete;
 
+  /// No description provided for @empEdit.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah titik kumpul'**
+  String get empEdit;
+
+  /// No description provided for @empMapPreview.
+  ///
+  /// In id, this message translates to:
+  /// **'Preview peta'**
+  String get empMapPreview;
+
   /// No description provided for @empApplyToOthers.
   ///
   /// In id, this message translates to:
@@ -539,7 +557,7 @@ abstract class AppLocalizations {
   /// No description provided for @empActivate.
   ///
   /// In id, this message translates to:
-  /// **'Aktifkan Titik Kumpul'**
+  /// **'Aktifkan titik kumpul'**
   String get empActivate;
 
   /// No description provided for @empActivateConfirm.
@@ -565,6 +583,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Batal'**
   String get empActivateCancel;
+
+  /// No description provided for @empActivateCaption.
+  ///
+  /// In id, this message translates to:
+  /// **'Berlaku untuk {names}, juga wali mereka'**
+  String empActivateCaption(String names);
 
   /// No description provided for @empSummarySent.
   ///
@@ -595,6 +619,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Jarak belum diketahui'**
   String get empDistanceUnknown;
+
+  /// No description provided for @empDistanceLive.
+  ///
+  /// In id, this message translates to:
+  /// **'{childName} sekarang {distance} dari sini'**
+  String empDistanceLive(String childName, String distance);
 
   /// No description provided for @empDistanceFromChild.
   ///

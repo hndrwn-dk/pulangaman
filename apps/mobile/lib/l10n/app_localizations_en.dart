@@ -215,10 +215,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get empAdd => 'Add meeting point';
+  String get empAdd => '+ Add meeting point';
 
   @override
   String get empAddBackup => 'Backup point';
+
+  @override
+  String get empPrimaryLabel => 'Primary meeting point';
 
   @override
   String get empPrimary => 'Primary';
@@ -240,13 +243,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get empDelete => 'Delete';
 
   @override
+  String get empEdit => 'Change meeting point';
+
+  @override
+  String get empMapPreview => 'Map preview';
+
+  @override
   String get empApplyToOthers => 'Apply to other children too?';
 
   @override
   String get empApply => 'Apply';
 
   @override
-  String get empActivate => 'Activate Meeting Point';
+  String get empActivate => 'Activate meeting point';
 
   @override
   String get empActivateConfirm =>
@@ -260,6 +269,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get empActivateCancel => 'Cancel';
+
+  @override
+  String empActivateCaption(String names) {
+    return 'Applies to $names, and their guardians';
+  }
 
   @override
   String empSummarySent(int count) {
@@ -279,6 +293,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get empDistanceUnknown => 'Distance unknown';
+
+  @override
+  String empDistanceLive(String childName, String distance) {
+    return '$childName is now $distance from here';
+  }
 
   @override
   String empDistanceFromChild(String distance) {

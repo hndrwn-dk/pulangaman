@@ -100,21 +100,30 @@
       "childName": { "type": "String" }
     }
   },
-  "empAdd": "Tambah titik kumpul",
+  "empAdd": "+ Tambah titik kumpul",
   "empAddBackup": "Titik cadangan",
+  "empPrimaryLabel": "Titik kumpul utama",
   "empPrimary": "Utama",
   "empBackup": "Cadangan",
   "empInstructionsHint": "Contoh: Kalau kondisi darurat dan gak bisa saling hubungi, ketemu di sini",
   "empNameHint": "Nama tempat (mis. Rumah Nenek)",
   "empSave": "Simpan",
   "empDelete": "Hapus",
+  "empEdit": "Ubah titik kumpul",
+  "empMapPreview": "Preview peta",
   "empApplyToOthers": "Terapkan ke anak lain juga?",
   "empApply": "Terapkan",
-  "empActivate": "Aktifkan Titik Kumpul",
+  "empActivate": "Aktifkan titik kumpul",
   "empActivateConfirm": "Semua anak dan wali akan dapat notifikasi untuk segera menuju titik kumpul masing-masing. Lanjutkan?",
   "empActivateNoteHint": "Catatan singkat (opsional)",
   "empActivateContinue": "Aktifkan sekarang",
   "empActivateCancel": "Batal",
+  "empActivateCaption": "Berlaku untuk {names}, juga wali mereka",
+  "@empActivateCaption": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
   "empSummarySent": "Terkirim ke {count} anak",
   "@empSummarySent": {
     "placeholders": {
@@ -130,6 +139,13 @@
   "empRateLimited": "Aktivasi dibatasi — coba lagi nanti",
   "empOpenMaps": "Buka di Peta",
   "empDistanceUnknown": "Jarak belum diketahui",
+  "empDistanceLive": "{childName} sekarang {distance} dari sini",
+  "@empDistanceLive": {
+    "placeholders": {
+      "childName": { "type": "String" },
+      "distance": { "type": "String" }
+    }
+  },
   "empDistanceFromChild": "Jarak anak: {distance}",
   "@empDistanceFromChild": {
     "placeholders": {

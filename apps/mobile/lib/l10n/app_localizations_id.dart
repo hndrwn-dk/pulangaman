@@ -217,10 +217,13 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
-  String get empAdd => 'Tambah titik kumpul';
+  String get empAdd => '+ Tambah titik kumpul';
 
   @override
   String get empAddBackup => 'Titik cadangan';
+
+  @override
+  String get empPrimaryLabel => 'Titik kumpul utama';
 
   @override
   String get empPrimary => 'Utama';
@@ -242,13 +245,19 @@ class AppLocalizationsId extends AppLocalizations {
   String get empDelete => 'Hapus';
 
   @override
+  String get empEdit => 'Ubah titik kumpul';
+
+  @override
+  String get empMapPreview => 'Preview peta';
+
+  @override
   String get empApplyToOthers => 'Terapkan ke anak lain juga?';
 
   @override
   String get empApply => 'Terapkan';
 
   @override
-  String get empActivate => 'Aktifkan Titik Kumpul';
+  String get empActivate => 'Aktifkan titik kumpul';
 
   @override
   String get empActivateConfirm =>
@@ -262,6 +271,11 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get empActivateCancel => 'Batal';
+
+  @override
+  String empActivateCaption(String names) {
+    return 'Berlaku untuk $names, juga wali mereka';
+  }
 
   @override
   String empSummarySent(int count) {
@@ -281,6 +295,11 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get empDistanceUnknown => 'Jarak belum diketahui';
+
+  @override
+  String empDistanceLive(String childName, String distance) {
+    return '$childName sekarang $distance dari sini';
+  }
 
   @override
   String empDistanceFromChild(String distance) {

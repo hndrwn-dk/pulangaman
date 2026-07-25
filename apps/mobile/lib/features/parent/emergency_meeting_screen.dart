@@ -24,10 +24,11 @@ class EmergencyMeetingScreen extends ConsumerStatefulWidget {
 class _EmergencyMeetingScreenState
     extends ConsumerState<EmergencyMeetingScreen> {
   String? _childId;
-  List<Map<String, dynamic>> _points = [];
+  Map<String, dynamic>? _primary;
   Map<String, dynamic>? _status;
   bool _loading = true;
   bool _activating = false;
+  String? _lastSummary;
 
   bool get _locked => widget.lockedChild != null;
 
@@ -36,8 +37,8 @@ class _EmergencyMeetingScreenState
     super.initState();
     _childId = widget.lockedChild?.id;
     Future.microtask(() async {
+      await ref.read(childrenControllerProvider.notifier).bootstrap();
       if (_childId == null) {
-        await ref.read(childrenControllerProvider.notifier).bootstrap();
         final items = ref.read(childrenControllerProvider).items;
         if (items.isNotEmpty) _childId = items.first.id;
       }
@@ -49,7 +50,7 @@ class _EmergencyMeetingScreenState
     final id = _childId;
     if (id == null) {
       setState(() {
-        _points = [];
+        _primary = null;
         _status = null;
         _loading = false;
       });
@@ -62,12 +63,22 @@ class _EmergencyMeetingScreenState
         '/api/v1/emergency-meeting-points',
         query: {'childId': id},
       );
-      final status = await api.get('/api/v1/emergency-meeting-points/$id/status');
+      final status =
+          await api.get('/api/v1/emergency-meeting-points/$id/status');
+      final points = (list['points'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      Map<String, dynamic>? primary;
+      for (final p in points) {
+        if (p['isPrimary'] == true) {
+          primary = p;
+          break;
+        }
+      }
+      primary ??= points.isEmpty ? null : points.first;
       if (!mounted) return;
       setState(() {
-        _points = (list['points'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .toList();
+        _primary = primary;
         _status = status;
         _loading = false;
       });
@@ -79,11 +90,14 @@ class _EmergencyMeetingScreenState
 
   void _selectChild(String id) {
     if (_locked || _childId == id) return;
-    setState(() => _childId = id);
+    setState(() {
+      _childId = id;
+      _lastSummary = null;
+    });
     unawaited(_reload());
   }
 
-  Future<void> _addPoint({bool backup = false}) async {
+  Future<void> _pickAndSavePrimary() async {
     final childId = _childId;
     if (childId == null) return;
     final l10n = AppLocalizations.of(context);
@@ -102,7 +116,9 @@ class _EmergencyMeetingScreenState
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(backup ? l10n.empAddBackup : l10n.empAdd),
+        title: Text(
+          _primary == null ? l10n.empAdd : l10n.empEdit,
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -111,7 +127,13 @@ class _EmergencyMeetingScreenState
               decoration: InputDecoration(labelText: l10n.empNameHint),
             ),
             const SizedBox(height: 8),
-            Text(hit.address, style: const TextStyle(color: AppColors.inkSoft)),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                hit.address,
+                style: const TextStyle(color: AppColors.inkSoft),
+              ),
+            ),
             const SizedBox(height: 8),
             TextField(
               controller: noteCtrl,
@@ -133,10 +155,12 @@ class _EmergencyMeetingScreenState
       ),
     );
     final name = nameCtrl.text.trim();
-    final instructions = noteCtrl.text.trim();
+    final note = noteCtrl.text.trim();
     nameCtrl.dispose();
     noteCtrl.dispose();
     if (saved != true || name.isEmpty) return;
+
+    final instructions = note.isNotEmpty ? note : hit.address;
 
     try {
       await ref.read(apiClientProvider).post(
@@ -146,13 +170,13 @@ class _EmergencyMeetingScreenState
           'name': name,
           'lat': hit.lat,
           'lng': hit.lng,
-          if (instructions.isNotEmpty) 'instructions': instructions,
-          'isPrimary': !backup,
+          'instructions': instructions,
+          'isPrimary': true,
         },
       );
       await _reload();
       if (!mounted) return;
-      if (!backup) await _offerApplyToOthers();
+      await _offerApplyToOthers();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -224,15 +248,7 @@ class _EmergencyMeetingScreenState
     }
   }
 
-  Future<void> _deletePoint(String id) async {
-    try {
-      await ref.read(apiClientProvider).delete(
-        '/api/v1/emergency-meeting-points/$id',
-      );
-      await _reload();
-    } catch (_) {}
-  }
-
+  /// Always parent-scoped — chip selection must not affect this call.
   Future<void> _activate() async {
     final l10n = AppLocalizations.of(context);
     final noteCtrl = TextEditingController();
@@ -290,9 +306,7 @@ class _EmergencyMeetingScreenState
       for (final name in skipped) {
         msg.write(' ${l10n.empSummarySkipped(name)}');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg.toString())),
-      );
+      setState(() => _lastSummary = msg.toString());
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException && e.statusCode == 429
@@ -304,6 +318,19 @@ class _EmergencyMeetingScreenState
     } finally {
       if (mounted) setState(() => _activating = false);
     }
+  }
+
+  String _namesCaption(List<ChildSummary> children) {
+    if (children.isEmpty) return '';
+    if (children.length == 1) return children.first.name;
+    if (children.length == 2) {
+      return '${children[0].name} dan ${children[1].name}';
+    }
+    final head = children
+        .take(children.length - 1)
+        .map((c) => c.name)
+        .join(', ');
+    return '$head, dan ${children.last.name}';
   }
 
   @override
@@ -319,19 +346,22 @@ class _EmergencyMeetingScreenState
         }
       }
     }
+    final distanceLabel = _status?['distanceLabel'] as String?;
+    final captionNames = _namesCaption(
+      children.isNotEmpty
+          ? children
+          : (widget.lockedChild != null ? [widget.lockedChild!] : <ChildSummary>[]),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       body: SafeArea(
         child: Column(
           children: [
-            PaScreenHeader(
-              title: l10n.empTitle,
-              subtitle: selectedName ?? l10n.empSubtitle,
-            ),
+            PaScreenHeader(title: l10n.empTitle),
             if (!_locked && children.length > 1)
               SizedBox(
-                height: 44,
+                height: 48,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -340,7 +370,22 @@ class _EmergencyMeetingScreenState
                   itemBuilder: (context, i) {
                     final c = children[i];
                     final selected = c.id == _childId;
+                    final initial =
+                        c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase();
                     return ChoiceChip(
+                      avatar: CircleAvatar(
+                        backgroundColor: selected
+                            ? Colors.white.withValues(alpha: 0.25)
+                            : AppColors.teal.withValues(alpha: 0.15),
+                        child: Text(
+                          initial,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                            color: selected ? Colors.white : AppColors.tealDeep,
+                          ),
+                        ),
+                      ),
                       label: Text(c.name),
                       selected: selected,
                       onSelected: (_) => _selectChild(c.id),
@@ -359,101 +404,80 @@ class _EmergencyMeetingScreenState
                   : _childId == null
                       ? Center(child: Text(l10n.empNoChildren))
                       : ListView(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
                           children: [
-                            Text(
-                              l10n.empSubtitle,
-                              style: const TextStyle(
-                                color: AppColors.inkSoft,
-                                fontWeight: FontWeight.w600,
+                            if (_primary == null)
+                              _EmptyCard(
+                                childName: selectedName ?? '',
+                                onAdd: () => unawaited(_pickAndSavePrimary()),
+                              )
+                            else
+                              _PrimaryCard(
+                                point: _primary!,
+                                childName: selectedName ?? '',
+                                distanceLabel: distanceLabel,
+                                onEdit: () =>
+                                    unawaited(_pickAndSavePrimary()),
+                              ),
+                            const SizedBox(height: 20),
+                            const Divider(height: 1),
+                            const SizedBox(height: 16),
+                            if (captionNames.isNotEmpty)
+                              Text(
+                                l10n.empActivateCaption(captionNames),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.inkSoft,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              key: const Key('emp_activate_button'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.danger,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: _activating
+                                  ? null
+                                  : () => unawaited(_activate()),
+                              icon: const Icon(Icons.warning_amber_rounded),
+                              label: Text(
+                                _activating ? '...' : l10n.empActivate,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            if (_points.isEmpty)
+                            if (_lastSummary != null) ...[
+                              const SizedBox(height: 14),
                               Container(
-                                padding: const EdgeInsets.all(20),
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      l10n.empEmpty(selectedName ?? ''),
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    FilledButton(
-                                      onPressed: () => unawaited(_addPoint()),
-                                      child: Text(l10n.empAdd),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else ...[
-                              for (final p in _points)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _PointCard(
-                                    point: p,
-                                    distanceLabel: p['isPrimary'] == true
-                                        ? (_status?['distanceLabel'] as String?)
-                                        : null,
-                                    onDelete: () => unawaited(
-                                      _deletePoint(p['id'] as String),
-                                    ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E6EA),
                                   ),
                                 ),
-                              OutlinedButton(
-                                onPressed: () =>
-                                    unawaited(_addPoint(backup: true)),
-                                child: Text(l10n.empAddBackup),
+                                child: Text(
+                                  _lastSummary!,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.35,
+                                  ),
+                                ),
                               ),
                             ],
-                            const SizedBox(height: 28),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF1F0),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: AppColors.danger.withValues(alpha: 0.35),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    l10n.empActivate,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  FilledButton(
-                                    key: const Key('emp_activate_button'),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: AppColors.danger,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                    ),
-                                    onPressed: _activating
-                                        ? null
-                                        : () => unawaited(_activate()),
-                                    child: Text(
-                                      _activating
-                                          ? '...'
-                                          : l10n.empActivate,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                           ],
                         ),
             ),
@@ -464,85 +488,176 @@ class _EmergencyMeetingScreenState
   }
 }
 
-class _PointCard extends StatelessWidget {
-  const _PointCard({
-    required this.point,
-    required this.onDelete,
-    this.distanceLabel,
-  });
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.childName, required this.onAdd});
 
-  final Map<String, dynamic> point;
-  final VoidCallback onDelete;
-  final String? distanceLabel;
+  final String childName;
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final primary = point['isPrimary'] == true;
-    final name = point['name'] as String? ?? '';
-    final instructions = point['instructions'] as String?;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E6EA)),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(
+            Icons.place_outlined,
+            size: 40,
+            color: AppColors.inkSoft.withValues(alpha: 0.7),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            l10n.empEmpty(childName),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 14),
+          FilledButton(
+            onPressed: onAdd,
+            child: Text(l10n.empAdd),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrimaryCard extends StatelessWidget {
+  const _PrimaryCard({
+    required this.point,
+    required this.childName,
+    required this.onEdit,
+    this.distanceLabel,
+  });
+
+  final Map<String, dynamic> point;
+  final String childName;
+  final String? distanceLabel;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final name = point['name'] as String? ?? '';
+    final subtitle = (point['instructions'] as String?)?.trim() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.empPrimaryLabel,
+            style: const TextStyle(
+              color: AppColors.inkSoft,
+              fontWeight: FontWeight.w700,
+              fontSize: 12.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            height: 120,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEF1F4),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.location_on_rounded,
+                  color: AppColors.tealDeep.withValues(alpha: 0.85),
+                  size: 28,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.empMapPreview,
+                  style: const TextStyle(
+                    color: AppColors.inkSoft,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            name,
+            style: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+            ),
+          ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.inkSoft,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
           Row(
             children: [
+              const Icon(
+                Icons.route_rounded,
+                size: 18,
+                color: AppColors.tealDeep,
+              ),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  name,
+                  (distanceLabel == null || distanceLabel!.isEmpty)
+                      ? l10n.empDistanceUnknown
+                      : l10n.empDistanceLive(childName, distanceLabel!),
                   style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.tealDeep,
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: primary
-                      ? AppColors.teal.withValues(alpha: 0.15)
-                      : const Color(0xFFF0F2F5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  primary ? l10n.empPrimary : l10n.empBackup,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11,
-                    color: primary ? AppColors.tealDeep : AppColors.inkSoft,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: AppColors.inkSoft,
               ),
             ],
           ),
-          if (instructions != null && instructions.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              instructions,
-              style: const TextStyle(color: AppColors.inkSoft),
-            ),
-          ],
-          if (distanceLabel != null && distanceLabel!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              l10n.empDistanceFromChild(distanceLabel!),
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.tealDeep,
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: Text(l10n.empEdit),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.ink,
+              side: const BorderSide(color: Color(0xFFD5DBE0)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
