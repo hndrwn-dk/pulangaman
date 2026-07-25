@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
 import '../../core/network/ws_client.dart';
+import '../../core/parse_coord.dart';
 import '../../core/storage/offline_queue.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
@@ -61,10 +62,13 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Timer? _panicStatusPoll;
   Timer? _homeByPoll;
   Timer? _tripPoll;
+  Timer? _empPoll;
   String? _homeByStatus;
   bool _homeByAcked = false;
   bool _homeByPreviewShown = false;
   Map<String, dynamic>? _trip;
+  Map<String, dynamic>? _empActive;
+  String? _empAlertOpenedId;
 
   @override
   void initState() {
@@ -77,6 +81,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     Future.microtask(_pollPanicStatus);
     Future.microtask(_pollHomeByStatus);
     Future.microtask(_pollTrip);
+    Future.microtask(_pollEmergencyMeeting);
     _panicStatusPoll = Timer.periodic(
       const Duration(seconds: 5),
       (_) => unawaited(_pollPanicStatus()),
@@ -88,6 +93,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     _tripPoll = Timer.periodic(
       const Duration(seconds: 20),
       (_) => unawaited(_pollTrip()),
+    );
+    _empPoll = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => unawaited(_pollEmergencyMeeting()),
     );
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
@@ -101,6 +110,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       unawaited(_syncReminders());
       unawaited(_connectReminderWs(force: true));
       unawaited(_pollPanicStatus());
+      unawaited(_pollEmergencyMeeting(openAlert: true));
     }
   }
 
@@ -206,11 +216,22 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
 
   Future<void> _onEmergencyMeetingAlert(Map<String, dynamic> payload) async {
     final name = payload['meetingPointName'] as String? ?? 'Titik kumpul';
-    final lat = (payload['lat'] as num?)?.toDouble();
-    final lng = (payload['lng'] as num?)?.toDouble();
+    final lat = parseCoord(payload['lat']);
+    final lng = parseCoord(payload['lng']);
     if (lat == null || lng == null || !mounted) return;
     final note = payload['note'] as String?;
     final instructions = payload['instructions'] as String?;
+    final activationId = payload['activationId'] as String?;
+    setState(() {
+      _empActive = {
+        'activationId': activationId,
+        'meetingPointName': name,
+        'lat': lat,
+        'lng': lng,
+        'note': note,
+        'instructions': instructions,
+      };
+    });
     try {
       await _reminderChannel.previewNow(
         title: 'Titik Kumpul Darurat',
@@ -221,10 +242,67 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       );
     } catch (_) {}
     if (!mounted) return;
+    await _openEmergencyMeetingScreen(
+      placeName: name,
+      lat: lat,
+      lng: lng,
+      instructions: instructions,
+      note: note,
+      activationId: activationId,
+    );
+  }
+
+  Future<void> _pollEmergencyMeeting({bool openAlert = false}) async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/emergency-meeting-points/active');
+      final alert = data['alert'];
+      if (alert is! Map<String, dynamic>) {
+        if (mounted && _empActive != null) {
+          setState(() => _empActive = null);
+        }
+        return;
+      }
+      if (!mounted) return;
+      final activationId = alert['activationId'] as String?;
+      setState(() => _empActive = alert);
+      if (openAlert ||
+          (activationId != null && activationId != _empAlertOpenedId)) {
+        final lat = parseCoord(alert['lat']);
+        final lng = parseCoord(alert['lng']);
+        final name = alert['meetingPointName'] as String? ?? 'Titik kumpul';
+        if (lat != null && lng != null) {
+          await _openEmergencyMeetingScreen(
+            placeName: name,
+            lat: lat,
+            lng: lng,
+            instructions: alert['instructions'] as String?,
+            note: alert['note'] as String?,
+            activationId: activationId,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openEmergencyMeetingScreen({
+    required String placeName,
+    required double lat,
+    required double lng,
+    String? instructions,
+    String? note,
+    String? activationId,
+  }) async {
+    if (!mounted) return;
+    if (activationId != null) {
+      if (activationId == _empAlertOpenedId) return;
+      _empAlertOpenedId = activationId;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => EmergencyMeetingAlertScreen(
-          placeName: name,
+          placeName: placeName,
           lat: lat,
           lng: lng,
           instructions: instructions,
@@ -1021,6 +1099,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     _panicStatusPoll?.cancel();
     _homeByPoll?.cancel();
     _tripPoll?.cancel();
+    _empPoll?.cancel();
     _ws.removeHandler(_onReminderWs);
     unawaited(_ws.disconnect());
     // Keep native FGS running after Flutter dispose so background tracking continues.
@@ -1132,6 +1211,32 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             onCancelTrip: _trip != null
                 ? () => unawaited(_cancelActiveTrip())
                 : null,
+            empActive: _empActive != null,
+            empPlaceName: _empActive?['meetingPointName'] as String?,
+            empNote: _empActive?['note'] as String?,
+            onOpenEmp: _empActive == null
+                ? null
+                : () {
+                    final lat = parseCoord(_empActive!['lat']);
+                    final lng = parseCoord(_empActive!['lng']);
+                    final name = _empActive!['meetingPointName'] as String? ??
+                        'Titik kumpul';
+                    if (lat == null || lng == null) return;
+                    // Allow reopen from the beranda card.
+                    _empAlertOpenedId = null;
+                    unawaited(
+                      _openEmergencyMeetingScreen(
+                        placeName: name,
+                        lat: lat,
+                        lng: lng,
+                        instructions:
+                            _empActive!['instructions'] as String?,
+                        note: _empActive!['note'] as String?,
+                        activationId:
+                            _empActive!['activationId'] as String?,
+                      ),
+                    );
+                  },
           ),
           ChildLayarTab(
             usageAccess: _usageAccess,

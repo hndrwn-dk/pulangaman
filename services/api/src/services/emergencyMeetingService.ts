@@ -374,7 +374,12 @@ export async function activateMeetingPoints(params: {
       console.error('emp_activate_fcm_child_failed', { childId: t.childId, err });
     });
     broadcastToRoom(childRoom(t.childId), 'parent:emergency_meeting_alert', {
-      ...data,
+      activationId: String(activationId),
+      childId: String(t.childId),
+      meetingPointId: String(point.id),
+      meetingPointName: String(point.name),
+      lat: Number(point.lat),
+      lng: Number(point.lng),
       instructions: point.instructions,
       note,
       at: activatedAt,
@@ -444,4 +449,49 @@ export async function activateMeetingPoints(params: {
   broadcastToRoom(parentRoom(params.parentId), 'parent:emergency_meeting_activated', payload);
 
   return { activationId, targets, activatedAt };
+}
+
+/** Latest still-relevant activation for a child (last 6 hours, notified target). */
+export async function getActiveAlertForChild(childId: string): Promise<{
+  activationId: string;
+  activatedAt: string;
+  note: string | null;
+  meetingPointName: string;
+  lat: number;
+  lng: number;
+  instructions: string | null;
+} | null> {
+  const result = await pool.query<{
+    id: string;
+    note: string | null;
+    activated_at: Date;
+    targets: ActivateTargetResult[];
+  }>(
+    `SELECT a.id, a.note, a.activated_at, a.targets
+     FROM emergency_meeting_activations a
+     JOIN parent_children pc
+       ON pc.parent_id = a.parent_id AND pc.child_id = $1
+     WHERE a.activated_at > now() - interval '6 hours'
+     ORDER BY a.activated_at DESC
+     LIMIT 8`,
+    [childId],
+  );
+
+  for (const row of result.rows) {
+    const targets = Array.isArray(row.targets) ? row.targets : [];
+    const mine = targets.find((t) => t.childId === childId && t.notified);
+    if (!mine?.meetingPointId) continue;
+    const point = await getPointById(mine.meetingPointId);
+    if (!point) continue;
+    return {
+      activationId: row.id,
+      activatedAt: row.activated_at.toISOString(),
+      note: row.note,
+      meetingPointName: point.name,
+      lat: Number(point.lat),
+      lng: Number(point.lng),
+      instructions: point.instructions,
+    };
+  }
+  return null;
 }

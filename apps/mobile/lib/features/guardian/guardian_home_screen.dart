@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../core/network/ws_client.dart';
+import '../../core/parse_coord.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../auth/auth_controller.dart';
@@ -58,12 +59,15 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
 
   Future<void> _openEmergencyMeeting(Map<String, dynamic> payload) async {
     final name = payload['meetingPointName'] as String? ?? 'Titik kumpul';
-    final lat = (payload['lat'] as num?)?.toDouble();
-    final lng = (payload['lng'] as num?)?.toDouble();
+    final lat = parseCoord(payload['lat']);
+    final lng = parseCoord(payload['lng']);
     if (lat == null || lng == null || !mounted) return;
-    final names = (payload['childNames'] as List<dynamic>? ?? [])
-        .map((e) => '$e')
-        .toList();
+    final namesRaw = payload['childNames'];
+    final names = namesRaw is List
+        ? namesRaw.map((e) => '$e').toList()
+        : (namesRaw is String && namesRaw.isNotEmpty
+            ? namesRaw.split(',').map((e) => e.trim()).toList()
+            : <String>[]);
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => EmergencyMeetingAlertScreen(

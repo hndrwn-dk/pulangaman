@@ -9,6 +9,7 @@ import {
   createPoint,
   deleteAllPointsForParent,
   deletePoint,
+  getActiveAlertForChild,
   getChildPointStatus,
   getPointById,
   listPointsForChild,
@@ -175,6 +176,25 @@ emergencyMeetingRouter.post('/activate', async (req: AuthedRequest, res, next) =
       }
       throw e;
     }
+  } catch (error) {
+    next(error);
+  }
+});
+
+emergencyMeetingRouter.get('/active', async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+    if (!(await assertIsChild(userId))) {
+      res.status(403).json({ error: 'child_role_required' });
+      return;
+    }
+
+    const alert = await getActiveAlertForChild(userId);
+    res.json({ alert });
   } catch (error) {
     next(error);
   }

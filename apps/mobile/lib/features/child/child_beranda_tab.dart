@@ -33,6 +33,10 @@ class ChildBerandaTab extends StatelessWidget {
     this.tripProgress = 0,
     this.onStartTrip,
     this.onCancelTrip,
+    this.empActive = false,
+    this.empPlaceName,
+    this.empNote,
+    this.onOpenEmp,
   });
 
   final String childName;
@@ -60,6 +64,10 @@ class ChildBerandaTab extends StatelessWidget {
   final double tripProgress;
   final VoidCallback? onStartTrip;
   final VoidCallback? onCancelTrip;
+  final bool empActive;
+  final String? empPlaceName;
+  final String? empNote;
+  final VoidCallback? onOpenEmp;
 
   String _timeGreeting() {
     final h = DateTime.now().hour;
@@ -119,6 +127,51 @@ class ChildBerandaTab extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         _QuickStatsRow(todayUsageSeconds: todayUsageSeconds, points: points),
+        if (empActive) ...[
+          const SizedBox(height: AppSpacing.md),
+          PaSectionCard(
+            color: AppColors.danger.withValues(alpha: 0.12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Titik Kumpul Darurat',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: AppColors.danger,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Segera menuju: ${empPlaceName ?? 'titik kumpul'}',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  textAlign: TextAlign.center,
+                ),
+                if (empNote != null && empNote!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    empNote!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.inkSoft,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                  ),
+                  onPressed: onOpenEmp,
+                  child: const Text('Lihat titik kumpul'),
+                ),
+              ],
+            ),
+          ),
+        ],
         if (homeByAckVisible || homeByAckSent) ...[
           const SizedBox(height: AppSpacing.md),
           PaSectionCard(
