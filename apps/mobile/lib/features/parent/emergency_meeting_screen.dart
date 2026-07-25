@@ -273,9 +273,7 @@ class _EmergencyMeetingScreenState
   }
 
   Future<void> _deletePrimary() async {
-    final point = _primary;
-    final id = point?['id'] as String?;
-    if (id == null) return;
+    if (_primary == null) return;
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -297,11 +295,17 @@ class _EmergencyMeetingScreenState
     );
     if (confirmed != true) return;
     try {
+      // Family-scoped: remove copies on every child (same as activate / apply-to-all).
       await ref.read(apiClientProvider).delete(
-            '/api/v1/emergency-meeting-points/$id',
+            '/api/v1/emergency-meeting-points/clear-all',
           );
       if (!mounted) return;
-      setState(() => _lastSummary = null);
+      setState(() {
+        _lastSummary = null;
+        _primary = null;
+        _status = null;
+        _householdHasPoint = false;
+      });
       await _reload();
     } catch (e) {
       if (!mounted) return;

@@ -166,6 +166,15 @@ export async function deletePoint(id: string): Promise<boolean> {
   return (result.rowCount ?? 0) > 0;
 }
 
+/** Removes every meeting point owned by this parent (all children). */
+export async function deleteAllPointsForParent(parentId: string): Promise<number> {
+  const result = await pool.query(
+    `DELETE FROM emergency_meeting_points WHERE parent_id = $1`,
+    [parentId],
+  );
+  return result.rowCount ?? 0;
+}
+
 export async function applyPrimaryToChildren(params: {
   parentId: string;
   sourceChildId: string;

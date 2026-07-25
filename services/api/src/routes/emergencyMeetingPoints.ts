@@ -7,6 +7,7 @@ import {
   applyPrimaryToChildren,
   activateMeetingPoints,
   createPoint,
+  deleteAllPointsForParent,
   deletePoint,
   getChildPointStatus,
   getPointById,
@@ -227,6 +228,21 @@ emergencyMeetingRouter.put('/:id', async (req: AuthedRequest, res, next) => {
 
     const point = await updatePoint({ id, ...body });
     res.json({ point: point ? mapPoint(point) : null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+emergencyMeetingRouter.delete('/clear-all', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const deleted = await deleteAllPointsForParent(parentId);
+    res.json({ ok: true, deleted });
   } catch (error) {
     next(error);
   }

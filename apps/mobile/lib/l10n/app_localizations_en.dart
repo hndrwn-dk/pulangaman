@@ -246,7 +246,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get empDelete => 'Delete';
 
   @override
-  String get empDeleteConfirm => 'Delete this meeting point?';
+  String get empDeleteConfirm => 'Delete the meeting point for all children?';
 
   @override
   String get empEdit => 'Change meeting point';

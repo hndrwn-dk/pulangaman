@@ -148,29 +148,31 @@ void main() {
   });
 
   testWidgets('delete requires confirmation before DELETE', (tester) async {
-    var deleteCalls = 0;
+    var clearAllCalls = 0;
     final mock = MockClient((request) async {
       if (request.method == 'DELETE' &&
-          request.url.path.contains('/emergency-meeting-points/')) {
-        deleteCalls += 1;
-        return http.Response(jsonEncode({'ok': true}), 200);
+          request.url.path.endsWith('/emergency-meeting-points/clear-all')) {
+        clearAllCalls += 1;
+        return http.Response(jsonEncode({'ok': true, 'deleted': 2}), 200);
       }
       if (request.url.path.endsWith('/status')) {
         return http.Response(
           jsonEncode({
-            'point': {
-              'id': 'p1',
-              'name': 'Lapangan',
-              'isPrimary': true,
-              'lat': -6.2,
-              'lng': 106.8,
-            },
-            'distanceLabel': '120 m',
+            'point': clearAllCalls > 0
+                ? null
+                : {
+                    'id': 'p1',
+                    'name': 'Lapangan',
+                    'isPrimary': true,
+                    'lat': -6.2,
+                    'lng': 106.8,
+                  },
+            'distanceLabel': clearAllCalls > 0 ? null : '120 m',
           }),
           200,
         );
       }
-      if (deleteCalls > 0) {
+      if (clearAllCalls > 0) {
         return http.Response(jsonEncode({'points': []}), 200);
       }
       return http.Response(
@@ -215,18 +217,19 @@ void main() {
 
     await tester.tap(find.byKey(const Key('emp_delete_button')));
     await tester.pumpAndSettle();
-    expect(find.text('Hapus titik kumpul ini?'), findsOneWidget);
-    expect(deleteCalls, 0);
+    expect(find.text('Hapus titik kumpul untuk semua anak?'), findsOneWidget);
+    expect(clearAllCalls, 0);
 
     await tester.tap(find.text('Batal'));
     await tester.pumpAndSettle();
-    expect(deleteCalls, 0);
+    expect(clearAllCalls, 0);
 
     await tester.tap(find.byKey(const Key('emp_delete_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Hapus'));
     await tester.pumpAndSettle();
-    expect(deleteCalls, 1);
+    expect(clearAllCalls, 1);
+    expect(find.byKey(const Key('emp_activate_button')), findsNothing);
   });
 }
 

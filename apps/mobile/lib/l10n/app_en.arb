@@ -73,7 +73,7 @@
   "empNameHint": "Place name (e.g. Grandma's house)",
   "empSave": "Save",
   "empDelete": "Delete",
-  "empDeleteConfirm": "Delete this meeting point?",
+  "empDeleteConfirm": "Delete the meeting point for all children?",
   "empEdit": "Change meeting point",
   "empMapPreview": "Map preview",
   "empApplyToOthers": "Apply to other children too?",

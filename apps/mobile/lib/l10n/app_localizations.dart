@@ -539,7 +539,7 @@ abstract class AppLocalizations {
   /// No description provided for @empDeleteConfirm.
   ///
   /// In id, this message translates to:
-  /// **'Hapus titik kumpul ini?'**
+  /// **'Hapus titik kumpul untuk semua anak?'**
   String get empDeleteConfirm;
 
   /// No description provided for @empEdit.
