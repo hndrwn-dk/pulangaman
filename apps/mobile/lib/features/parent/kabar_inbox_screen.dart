@@ -94,7 +94,9 @@ class _KabarInboxScreenState extends State<KabarInboxScreen> {
     final unreadCount = filtered.where((m) => _unreadIds.contains(m.id)).length;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF0F2F5),
         leadingWidth: PaScreenHeader.appBarLeadingWidth,
         titleSpacing: PaScreenHeader.appBarTitleSpacing,
         leading: paAppBarLeading(context),
