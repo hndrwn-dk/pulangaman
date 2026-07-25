@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
-import { createChildCustomToken, ensureFirebaseUser } from '../firebase/admin.js';
+import { createChildCustomToken } from '../firebase/admin.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
@@ -278,12 +278,23 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         ],
       );
 
-      // Provision Auth before COMMIT so a Firebase failure rolls back the invite.
-      await ensureFirebaseUser({
-        uid: firebaseUid,
-        displayName,
-      });
-      const tokenResult = await createChildCustomToken(firebaseUid);
+      // Custom tokens do not require the Auth user to exist beforehand.
+      // Creating the user explicitly was failing (and rolling back the invite).
+      let customToken: string | null = null;
+      try {
+        const tokenResult = await createChildCustomToken(firebaseUid);
+        customToken = tokenResult.customToken;
+      } catch (firebaseError) {
+        console.error('child_invite_custom_token_failed', firebaseError);
+        const message =
+          firebaseError instanceof Error ? firebaseError.message : String(firebaseError);
+        await client.query('ROLLBACK');
+        res.status(502).json({
+          error: 'child_token_failed',
+          detail: message.slice(0, 300),
+        });
+        return;
+      }
 
       await client.query('COMMIT');
 
@@ -294,7 +305,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         name: displayName,
         parentId: inviteRow.parent_id,
         relinked: Boolean(inviteRow.relink_child_id),
-        customToken: tokenResult.customToken,
+        customToken,
         /** Dev-auth token: Bearer dev:<firebaseUid> */
         tokenHint: `dev:${firebaseUid}`,
       });

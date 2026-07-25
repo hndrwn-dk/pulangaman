@@ -1,3 +1,4 @@
+import { readFileSync, existsSync } from 'node:fs';
 import admin from 'firebase-admin';
 import { config, isFirebaseConfigured } from '../config.js';
 
@@ -8,9 +9,25 @@ export function initFirebase(): void {
     return;
   }
 
-  admin.initializeApp({
-    projectId: config.FIREBASE_PROJECT_ID,
-  });
+  const credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  if (credPath && existsSync(credPath)) {
+    const serviceAccount = JSON.parse(readFileSync(credPath, 'utf8')) as admin.ServiceAccount;
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: config.FIREBASE_PROJECT_ID || serviceAccount.projectId,
+    });
+  } else {
+    // Falls back to ADC. createCustomToken needs a real service-account key;
+    // without one, child invite join will fail while verifyIdToken may still work.
+    console.warn('firebase_admin_no_service_account_file', {
+      credPath: credPath || null,
+      hint: 'Set GOOGLE_APPLICATION_CREDENTIALS to the service account JSON path',
+    });
+    admin.initializeApp({
+      projectId: config.FIREBASE_PROJECT_ID,
+    });
+  }
+
   initialized = true;
 }
 
@@ -58,8 +75,16 @@ export async function createChildCustomToken(
   if (!auth) {
     return { customToken: `dev-custom:${firebaseUid}`, firebaseUid };
   }
-  const customToken = await auth.createCustomToken(firebaseUid, { role: 'child' });
-  return { customToken, firebaseUid };
+  try {
+    const customToken = await auth.createCustomToken(firebaseUid, { role: 'child' });
+    return { customToken, firebaseUid };
+  } catch (error) {
+    console.error('create_custom_token_failed', {
+      firebaseUid,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 export async function ensureFirebaseUser(params: {
