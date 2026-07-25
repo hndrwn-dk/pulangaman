@@ -173,7 +173,7 @@ class _EmergencyMeetingAlertScreenState
                     fontSize: 16,
                   ),
                 ),
-                const Spacer(flex: 3),
+                const SizedBox(height: 32),
                 SizedBox(
                   height: 56,
                   child: FilledButton(
@@ -211,6 +211,7 @@ class _EmergencyMeetingAlertScreenState
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                   ),
                 ),
+                const Spacer(flex: 3),
               ],
             ),
           ),
