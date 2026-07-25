@@ -482,6 +482,18 @@ abstract class AppLocalizations {
   /// **'Belum ada titik kumpul'**
   String get empEmptyGeneric;
 
+  /// No description provided for @empLoadError.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal memuat titik kumpul'**
+  String get empLoadError;
+
+  /// No description provided for @empRetry.
+  ///
+  /// In id, this message translates to:
+  /// **'Coba lagi'**
+  String get empRetry;
+
   /// No description provided for @empAdd.
   ///
   /// In id, this message translates to:

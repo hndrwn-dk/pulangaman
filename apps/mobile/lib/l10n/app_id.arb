@@ -101,6 +101,8 @@
     }
   },
   "empEmptyGeneric": "Belum ada titik kumpul",
+  "empLoadError": "Gagal memuat titik kumpul",
+  "empRetry": "Coba lagi",
   "empAdd": "+ Tambah titik kumpul",
   "empAddBackup": "Titik cadangan",
   "empPrimaryLabel": "Titik kumpul utama",

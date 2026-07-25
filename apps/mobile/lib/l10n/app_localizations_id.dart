@@ -220,6 +220,12 @@ class AppLocalizationsId extends AppLocalizations {
   String get empEmptyGeneric => 'Belum ada titik kumpul';
 
   @override
+  String get empLoadError => 'Gagal memuat titik kumpul';
+
+  @override
+  String get empRetry => 'Coba lagi';
+
+  @override
   String get empAdd => '+ Tambah titik kumpul';
 
   @override

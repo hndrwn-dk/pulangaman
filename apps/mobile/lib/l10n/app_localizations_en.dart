@@ -218,6 +218,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get empEmptyGeneric => 'No meeting point yet';
 
   @override
+  String get empLoadError => 'Could not load meeting point';
+
+  @override
+  String get empRetry => 'Try again';
+
+  @override
   String get empAdd => '+ Add meeting point';
 
   @override

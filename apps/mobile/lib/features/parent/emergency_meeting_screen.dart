@@ -37,8 +37,11 @@ class _EmergencyMeetingScreenState
   bool _activating = false;
   bool _householdHasPoint = false;
   String? _lastSummary;
+  String? _loadError;
   final Map<String, _ChildEmpCache> _cache = {};
   final Set<String> _fetching = {};
+
+  static const _empTimeout = Duration(seconds: 12);
 
   bool get _locked => widget.lockedChild != null;
 
@@ -52,14 +55,41 @@ class _EmergencyMeetingScreenState
   void initState() {
     super.initState();
     _childId = widget.lockedChild?.id;
-    Future.microtask(() async {
-      await ref.read(childrenControllerProvider.notifier).bootstrap();
-      if (_childId == null) {
-        final items = ref.read(childrenControllerProvider).items;
-        if (items.isNotEmpty) _childId = items.first.id;
+    Future.microtask(_bootstrap);
+  }
+
+  Future<void> _bootstrap() async {
+    // Prefer already-loaded children — never block EMP on a full children refresh.
+    var items = ref.read(childrenControllerProvider).items;
+    if (items.isEmpty) {
+      try {
+        await ref
+            .read(childrenControllerProvider.notifier)
+            .bootstrap()
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {
+        // Fall through with whatever is in the provider.
       }
-      await _prefetchAll(showSpinner: true);
-    });
+      if (!mounted) return;
+      items = ref.read(childrenControllerProvider).items;
+    }
+    if (_childId == null && items.isNotEmpty) {
+      _childId = items.first.id;
+    }
+    final id = _childId;
+    if (id == null) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _householdHasPoint = false;
+      });
+      return;
+    }
+
+    // Show selected child ASAP — sibling prefetch is background-only.
+    await _refreshChild(id, forceSpinner: true);
+    if (!mounted) return;
+    unawaited(_prefetchSiblings(except: id));
   }
 
   bool _computeHouseholdHasPoint() {
@@ -74,9 +104,17 @@ class _EmergencyMeetingScreenState
     final list = await api.get(
       '/api/v1/emergency-meeting-points',
       query: {'childId': childId},
+      timeout: _empTimeout,
     );
-    final status =
-        await api.get('/api/v1/emergency-meeting-points/$childId/status');
+    Map<String, dynamic>? status;
+    try {
+      status = await api.get(
+        '/api/v1/emergency-meeting-points/$childId/status',
+        timeout: _empTimeout,
+      );
+    } catch (_) {
+      // Distance is optional; still render the meeting point card.
+    }
     final points = (list['points'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
         .toList();
@@ -91,7 +129,30 @@ class _EmergencyMeetingScreenState
     return _ChildEmpCache(primary: primary, status: status);
   }
 
-  Future<void> _prefetchAll({required bool showSpinner}) async {
+  Future<void> _prefetchSiblings({required String except}) async {
+    final children = ref.read(childrenControllerProvider).items;
+    final ids = _locked
+        ? <String>[]
+        : children.map((c) => c.id).where((id) => id != except).toList();
+    if (ids.isEmpty) return;
+    for (final id in ids) {
+      try {
+        final data = await _fetchChild(id);
+        if (!mounted) return;
+        setState(() {
+          _cache[id] = data;
+          _householdHasPoint = _computeHouseholdHasPoint();
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _cache.putIfAbsent(id, () => const _ChildEmpCache());
+        });
+      }
+    }
+  }
+
+  Future<void> _prefetchAll({bool showSpinner = false}) async {
     final children = ref.read(childrenControllerProvider).items;
     if (children.isEmpty) {
       if (!mounted) return;
@@ -99,6 +160,7 @@ class _EmergencyMeetingScreenState
         _cache.clear();
         _householdHasPoint = false;
         _loading = false;
+        _loadError = null;
       });
       return;
     }
@@ -107,47 +169,59 @@ class _EmergencyMeetingScreenState
         ? [widget.lockedChild!.id]
         : children.map((c) => c.id).toList();
 
-    if (showSpinner && mounted) {
+    if (showSpinner && mounted && _cache.isEmpty) {
       setState(() => _loading = true);
     }
 
-    try {
-      final results = await Future.wait([
-        for (final id in ids) _fetchChild(id),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        for (var i = 0; i < ids.length; i++) {
-          _cache[ids[i]] = results[i];
-        }
-        _householdHasPoint = _computeHouseholdHasPoint();
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loading = false);
+    for (final id in ids) {
+      try {
+        final data = await _fetchChild(id);
+        if (!mounted) return;
+        setState(() {
+          _cache[id] = data;
+          _householdHasPoint = _computeHouseholdHasPoint();
+          _loading = false;
+          _loadError = null;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _cache.putIfAbsent(id, () => const _ChildEmpCache());
+          _loading = false;
+        });
+      }
     }
   }
 
-  /// Soft refresh one child without blanking the UI (uses cache until done).
+  /// Soft refresh one child without blanking the UI when cache exists.
   Future<void> _refreshChild(String childId, {bool forceSpinner = false}) async {
     if (_fetching.contains(childId)) return;
     _fetching.add(childId);
     final hadCache = _cache.containsKey(childId);
-    if (forceSpinner || !hadCache) {
-      if (mounted) setState(() => _loading = true);
+    if ((forceSpinner || !hadCache) && mounted) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
     }
     try {
-      final data = await _fetchChild(childId);
+      final data = await _fetchChild(childId).timeout(_empTimeout);
       if (!mounted) return;
       setState(() {
         _cache[childId] = data;
         _householdHasPoint = _computeHouseholdHasPoint();
         _loading = false;
+        _loadError = null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _cache.putIfAbsent(childId, () => const _ChildEmpCache());
+        _loading = false;
+        if (!hadCache) {
+          _loadError = 'load_failed';
+        }
+      });
     } finally {
       _fetching.remove(childId);
     }
@@ -158,17 +232,12 @@ class _EmergencyMeetingScreenState
     setState(() {
       _childId = id;
       _lastSummary = null;
-      // Instant switch from cache — no full-screen spinner.
-      if (_cache.containsKey(id)) {
-        _loading = false;
-      }
+      _loadError = null;
+      _loading = false;
+      // Seed empty cache so the body never blanks while fetching.
+      _cache.putIfAbsent(id, () => const _ChildEmpCache());
     });
-    if (!_cache.containsKey(id)) {
-      unawaited(_refreshChild(id, forceSpinner: true));
-    } else {
-      // Background refresh for fresher distance without blocking UI.
-      unawaited(_refreshChild(id));
-    }
+    unawaited(_refreshChild(id));
   }
 
   Future<void> _pickAndSavePrimary() async {
@@ -348,12 +417,17 @@ class _EmergencyMeetingScreenState
             '/api/v1/emergency-meeting-points/clear-all',
           );
       if (!mounted) return;
+      final children = ref.read(childrenControllerProvider).items;
       setState(() {
         _lastSummary = null;
         _cache.clear();
+        for (final c in children) {
+          _cache[c.id] = const _ChildEmpCache();
+        }
         _householdHasPoint = false;
+        _loading = false;
       });
-      await _prefetchAll(showSpinner: true);
+      unawaited(_prefetchAll(showSpinner: false));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -488,6 +562,11 @@ class _EmergencyMeetingScreenState
     final showChips =
         !_locked && _householdHasPoint && children.length > 1;
     final showActivate = _householdHasPoint;
+    final selectedId = _childId;
+    final hasCachedSelected =
+        selectedId != null && _cache.containsKey(selectedId);
+    // Only blank the body while the first load for the selected child is in flight.
+    final showFullSpinner = _loading && !hasCachedSelected;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -536,13 +615,36 @@ class _EmergencyMeetingScreenState
                 ),
               ),
             Expanded(
-              child: _loading
+              child: showFullSpinner
                   ? const Center(child: CircularProgressIndicator())
-                  : _childId == null
+                  : selectedId == null
                       ? Center(child: Text(l10n.empNoChildren))
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
                           children: [
+                            if (_loadError != null) ...[
+                              Text(
+                                l10n.empLoadError,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.inkSoft,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Center(
+                                child: TextButton(
+                                  onPressed: () => unawaited(
+                                    _refreshChild(
+                                      selectedId,
+                                      forceSpinner: true,
+                                    ),
+                                  ),
+                                  child: Text(l10n.empRetry),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             if (_primary == null)
                               _EmptyCard(
                                 childName: showChips ? (selectedName ?? '') : null,
