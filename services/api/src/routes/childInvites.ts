@@ -278,6 +278,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         ],
       );
 
+      // Provision Auth before COMMIT so a Firebase failure rolls back the invite.
       await ensureFirebaseUser({
         uid: firebaseUid,
         displayName,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config.dart';
@@ -253,7 +254,7 @@ class AuthController extends StateNotifier<AuthState> {
             await FirebaseAuth.instance.signInWithCustomToken(customToken);
         final idToken = await cred.user?.getIdToken();
         if (idToken == null) {
-          throw StateError('Gagal mengambil ID token Firebase.');
+          throw StateError('Gagal mengambil token sesi. Coba lagi.');
         }
         token = idToken;
       }
@@ -278,15 +279,25 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Clear local session first so UI returns to login immediately.
+    // Awaiting Firebase signOut before this made "Keluar" look broken when
+    // signOut was slow, and a later completion looked like the back arrow
+    // had logged the user out.
+    _verificationId = null;
+    _resendToken = null;
+    _pendingName = null;
+    _pendingPhone = null;
+    _pendingRole = null;
+    api.setToken(null);
+    state = const AuthState();
+    try {
+      await store.clear();
+    } catch (_) {}
     if (!AppConfig.useDevAuth && Firebase.apps.isNotEmpty) {
       try {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
     }
-    await store.clear();
-    api.setToken(null);
-    cancelOtp();
-    state = const AuthState();
   }
 
   Future<void> _completeDevLogin({
@@ -330,6 +341,14 @@ class AuthController extends StateNotifier<AuthState> {
     _pendingPhone = phone;
     _pendingRole = role;
 
+    // Debug builds: skip Play Integrity / reCAPTCHA so test numbers reach
+    // codeSent on physical devices (Samsung etc.) without hanging on "...".
+    if (kDebugMode) {
+      await FirebaseAuth.instance.setSettings(
+        appVerificationDisabledForTesting: true,
+      );
+    }
+
     final completer = Completer<void>();
 
     await FirebaseAuth.instance.verifyPhoneNumber(
@@ -365,11 +384,36 @@ class AuthController extends StateNotifier<AuthState> {
       },
       codeAutoRetrievalTimeout: (String verificationId) {
         _verificationId = verificationId;
+        // Auto-retrieval timed out; ensure OTP entry is available.
+        if (!state.isAuthenticated && !state.awaitingOtp) {
+          state = state.copyWith(
+            loading: false,
+            awaitingOtp: true,
+            clearError: true,
+          );
+          if (!completer.isCompleted) completer.complete();
+        }
       },
       timeout: const Duration(seconds: 60),
     );
 
-    await completer.future;
+    try {
+      await completer.future.timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          throw TimeoutException(
+            'Pengiriman kode terlalu lama. Coba lagi.',
+          );
+        },
+      );
+    } on TimeoutException catch (e) {
+      state = state.copyWith(
+        loading: false,
+        awaitingOtp: false,
+        error: e.message ?? 'Pengiriman kode terlalu lama. Coba lagi.',
+      );
+      rethrow;
+    }
   }
 
   Future<void> _signInAndCreateSession({
@@ -381,7 +425,7 @@ class AuthController extends StateNotifier<AuthState> {
     final cred = await FirebaseAuth.instance.signInWithCredential(credential);
     final idToken = await cred.user?.getIdToken();
     if (idToken == null) {
-      throw StateError('Gagal mengambil ID token Firebase.');
+      throw StateError('Gagal mengambil token sesi. Coba lagi.');
     }
 
     api.setToken(idToken);
@@ -413,12 +457,12 @@ class AuthController extends StateNotifier<AuthState> {
     );
   }
 
-  /// Move children from a legacy parent phone onto the current Firebase parent.
+  /// Move children from a legacy parent phone onto the current parent account.
   Future<int> recoverChildrenFromPhone(String previousPhone) async {
     if (state.role != AppRole.parent || state.token == null) {
       throw StateError('Hanya orang tua yang sedang masuk yang bisa memulihkan.');
     }
-    state = state.copyWith(loading: true, clearError: true);
+    // Do not flip auth.loading — that rebuilds shells and can crash the dialog route.
     try {
       var token = state.token!;
       if (!AppConfig.useDevAuth && Firebase.apps.isNotEmpty) {
@@ -435,7 +479,7 @@ class AuthController extends StateNotifier<AuthState> {
           '';
       if (phone.isEmpty) {
         throw StateError(
-          'Nomor Firebase tidak ditemukan. Keluar lalu masuk OTP lagi.',
+          'Nomor telepon tidak ditemukan. Keluar lalu masuk ulang.',
         );
       }
 
@@ -454,15 +498,16 @@ class AuthController extends StateNotifier<AuthState> {
         role: AppRole.parent.name,
         name: state.name ?? 'Orang tua',
       );
-      state = AuthState(
+      // Preserve existing session fields; only refresh ids after recover.
+      state = state.copyWith(
         token: token,
         userId: userId,
         role: AppRole.parent,
-        name: state.name,
+        clearError: true,
       );
       return recovered;
     } catch (e) {
-      state = state.copyWith(loading: false, error: _friendlyAuthError(e));
+      state = state.copyWith(error: _friendlyAuthError(e));
       rethrow;
     }
   }
@@ -500,7 +545,7 @@ String _friendlyAuthError(Object e) {
       case 'session-expired':
         return 'Kode OTP kedaluwarsa. Kirim ulang.';
       case 'missing-client-identifier':
-        return 'Konfigurasi Firebase Android belum lengkap (SHA / google-services).';
+        return 'Konfigurasi aplikasi belum lengkap. Hubungi pengembang.';
       default:
         return e.message ?? e.code;
     }

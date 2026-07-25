@@ -411,7 +411,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   title: 'Belum ada anak',
                   message:
                       'Ketuk “Tambah anak” di bawah untuk buat kode, '
-                      'lalu masukkan di HP anak. Jika pindah ke login OTP, '
+                      'lalu masukkan di HP anak. Jika ganti cara masuk, '
                       'pulihkan dulu dari nomor lama.',
                 ),
                 const SizedBox(height: 12),
@@ -607,8 +607,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Masukkan nomor yang dipakai akun orang tua lama '
-              '(sebelum login OTP Firebase).',
+              'Masukkan nomor yang dipakai akun orang tua sebelumnya.',
             ),
             const SizedBox(height: 12),
             TextField(
@@ -634,13 +633,17 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         ],
       ),
     );
-    phoneCtrl.dispose();
+    // Dispose after the dialog route is fully gone (avoids red-screen assertion).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      phoneCtrl.dispose();
+    });
     if (previous == null || previous.isEmpty || !context.mounted) return;
 
     try {
       final count = await ref
           .read(authControllerProvider.notifier)
           .recoverChildrenFromPhone(previous);
+      if (!context.mounted) return;
       await ref.read(childrenControllerProvider.notifier).refresh();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

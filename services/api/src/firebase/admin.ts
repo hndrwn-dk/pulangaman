@@ -76,11 +76,15 @@ export async function ensureFirebaseUser(params: {
     await auth.getUser(params.uid);
     return params.uid;
   } catch {
-    const created = await auth.createUser({
+    const createRequest: admin.auth.CreateRequest = {
       uid: params.uid,
       displayName: params.displayName,
-      phoneNumber: params.phone,
-    });
+    };
+    // Only set phone when valid E.164 — undefined can make Admin SDK throw.
+    if (params.phone && params.phone.startsWith('+')) {
+      createRequest.phoneNumber = params.phone;
+    }
+    const created = await auth.createUser(createRequest);
     return created.uid;
   }
 }
