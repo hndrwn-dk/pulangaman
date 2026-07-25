@@ -58,6 +58,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   final ReminderChannel _reminderChannel = ReminderChannel();
   Timer? _panicCooldownTimer;
   Timer? _panicStatusPoll;
+  Timer? _homeByPoll;
+  String? _homeByStatus;
+  bool _homeByAcked = false;
+  bool _homeByPreviewShown = false;
 
   @override
   void initState() {
@@ -68,9 +72,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     Future.microtask(_syncReminders);
     Future.microtask(_connectReminderWs);
     Future.microtask(_pollPanicStatus);
+    Future.microtask(_pollHomeByStatus);
     _panicStatusPoll = Timer.periodic(
       const Duration(seconds: 5),
       (_) => unawaited(_pollPanicStatus()),
+    );
+    _homeByPoll = Timer.periodic(
+      const Duration(seconds: 45),
+      (_) => unawaited(_pollHomeByStatus()),
     );
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
@@ -153,12 +162,143 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       unawaited(_syncReminders());
       return;
     }
+    if (event == 'parent:home_by_status' || event == 'parent:home_by_ack') {
+      unawaited(_pollHomeByStatus());
+      return;
+    }
     if (event == 'child:panic_acked' || event == 'child:panic_resolved') {
       unawaited(_clearPanicState(
         message: event == 'child:panic_acked'
             ? 'Orang tua sudah merespons panik'
             : 'Panik ditandai selesai / aman',
       ));
+    }
+  }
+
+  Future<void> _pollHomeByStatus() async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null || !mounted) return;
+    try {
+      final data =
+          await ref.read(apiClientProvider).get('/api/v1/home-by/$userId/today');
+      final today = data['today'] as Map<String, dynamic>?;
+      final status = today?['status'] as String?;
+      final ackAt = today?['childAckAt'];
+      final acked = ackAt != null;
+      if (!mounted) return;
+
+      final shouldPreview = status == 'pre_notified' && !_homeByPreviewShown;
+      setState(() {
+        _homeByStatus = status;
+        _homeByAcked = acked;
+      });
+
+      if (shouldPreview) {
+        _homeByPreviewShown = true;
+        final name = ref.read(authControllerProvider).name ?? 'Anak';
+        try {
+          await _reminderChannel.previewNow(
+            title: 'Waktunya pulang',
+            body: '$name, sebentar lagi waktu pulang ya',
+            style: 'fullscreen',
+          );
+        } catch (_) {}
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openHomeByAckSheet() async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null) return;
+    final reasons = <({String id, String label})>[
+      (id: 'in_transit', label: 'Di jalan'),
+      (id: 'stopped_by', label: 'Mampir dulu'),
+      (id: 'school_activity', label: 'Ada kegiatan sekolah'),
+      (id: 'other', label: 'Lainnya'),
+    ];
+    String selected = 'in_transit';
+    final noteCtrl = TextEditingController();
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.viewInsetsOf(ctx).bottom + 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModal) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Beri kabar ke orang tua',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final r in reasons)
+                        ChoiceChip(
+                          label: Text(r.label),
+                          selected: selected == r.id,
+                          onSelected: (_) => setModal(() => selected = r.id),
+                        ),
+                    ],
+                  ),
+                  if (selected == 'other') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLength: 140,
+                      decoration: const InputDecoration(
+                        hintText: 'Catatan singkat (opsional)',
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Kirim ke orang tua'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+    if (ok != true || !mounted) {
+      noteCtrl.dispose();
+      return;
+    }
+    try {
+      await ref.read(apiClientProvider).post(
+        '/api/v1/home-by/$userId/ack',
+        body: {
+          'reason': selected,
+          if (selected == 'other' && noteCtrl.text.trim().isNotEmpty)
+            'note': noteCtrl.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      setState(() => _homeByAcked = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sudah dikirim ke orang tua')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
+    } finally {
+      noteCtrl.dispose();
     }
   }
 
@@ -644,6 +784,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     _connectivitySub?.cancel();
     _panicCooldownTimer?.cancel();
     _panicStatusPoll?.cancel();
+    _homeByPoll?.cancel();
     _ws.removeHandler(_onReminderWs);
     unawaited(_ws.disconnect());
     // Keep native FGS running after Flutter dispose so background tracking continues.
@@ -735,6 +876,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             onOpenAccessibilitySettings:
                 _screenTimeChannel.openAccessibilitySettings,
             onOpenReminderPermissions: _openReminderPermissions,
+            homeByAckVisible: (_homeByStatus == 'pre_notified' ||
+                    _homeByStatus == 'target_notified') &&
+                !_homeByAcked,
+            homeByAckSent: _homeByAcked &&
+                (_homeByStatus == 'pre_notified' ||
+                    _homeByStatus == 'target_notified' ||
+                    _homeByStatus == 'grace_notified'),
+            onHomeByAck: () => unawaited(_openHomeByAckSheet()),
           ),
           ChildLayarTab(
             usageAccess: _usageAccess,

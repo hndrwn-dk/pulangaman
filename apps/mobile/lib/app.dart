@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'l10n/app_localizations.dart';
 import 'core/theme.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
@@ -28,6 +29,9 @@ class PulangAmanApp extends ConsumerWidget {
       title: 'PulangAman',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      locale: const Locale('id'),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
       home: KeyedSubtree(
         key: homeKey,
         child: auth.restoring

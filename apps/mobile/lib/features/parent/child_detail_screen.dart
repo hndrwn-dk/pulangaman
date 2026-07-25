@@ -9,16 +9,20 @@ import '../../core/network/ws_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../auth/auth_controller.dart';
+import '../child/child_usage_utils.dart';
+import '../screentime/screen_time_screen.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
+import 'home_by_screen.dart';
 import 'kabar_inbox_screen.dart';
 import 'kabar_models.dart';
+import 'kabar_read_store.dart';
 import 'live_map_screen.dart';
-import 'parent_home_screen.dart';
 import 'reminders_screen.dart';
 import 'zones_screen.dart';
+import '../../l10n/app_localizations.dart';
 
-/// Find My Kids–inspired child hub: map + actions + daily timeline.
+/// Find My Kids–inspired child hub: map + inline summaries + daily timeline.
 class ChildDetailScreen extends ConsumerStatefulWidget {
   const ChildDetailScreen({
     super.key,
@@ -35,8 +39,32 @@ class ChildDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<ChildDetailScreen> createState() => _ChildDetailScreenState();
 }
 
+class _ZoneSummary {
+  const _ZoneSummary({
+    required this.id,
+    required this.type,
+    required this.name,
+    this.lat,
+    this.lng,
+  });
+
+  final String id;
+  final String type;
+  final String name;
+  final double? lat;
+  final double? lng;
+
+  String get displayName {
+    if (name.trim().isNotEmpty) return name.trim();
+    if (type == 'home') return 'Rumah';
+    if (type == 'school') return 'Sekolah';
+    return 'Tempat aman';
+  }
+}
+
 class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   final _ws = WsClient();
+  final _kabarRead = KabarReadStore();
   GoogleMapController? _mapController;
   LatLng? _position;
   DateTime? _updatedAt;
@@ -58,10 +86,24 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   bool _activityLoading = true;
   String? _activityError;
 
+  List<_ZoneSummary> _zones = [];
+  List<ChildKabarMessage> _kabar = [];
+  int _kabarUnread = 0;
+  int _screenUsedSeconds = 0;
+  int _screenLimitMinutes = 180;
+  bool _screenEnabled = true;
+  List<ChildReminder> _reminders = [];
+  String _homeByMode = 'off';
+  String? _homeByStatus;
+  String? _homeByTargetLabel;
+
   @override
   void initState() {
     super.initState();
     _gender = widget.gender;
+    _kabar = widget.initialKabar
+        .where((m) => m.childId == widget.child.id)
+        .toList();
     Future.microtask(_bootstrap);
   }
 
@@ -73,8 +115,13 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
       }
       if (mounted) setState(() => _gender = g);
     }
-    await _loadHomeZone();
-    await Future.wait([_fetchLocation(), _fetchActivity(), _fetchHistory()]);
+    await Future.wait([
+      _loadHomeZone(),
+      _fetchLocation(),
+      _fetchActivity(),
+      _fetchHistory(),
+      _fetchSummaries(),
+    ]);
     final token = ref.read(authControllerProvider).token;
     if (token != null) {
       try {
@@ -86,6 +133,191 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     _poll = Timer.periodic(const Duration(seconds: 12), (_) {
       _fetchLocation();
     });
+  }
+
+  Future<void> _fetchSummaries() async {
+    await Future.wait([
+      _loadZonesSummary(),
+      _loadKabarSummary(),
+      _loadScreenTimeSummary(),
+      _loadRemindersSummary(),
+      _loadHomeBySummary(),
+    ]);
+  }
+
+  Future<void> _loadZonesSummary() async {
+    try {
+      final data = await ref.read(apiClientProvider).get(
+        '/api/v1/zones',
+        query: {'childId': widget.child.id},
+      );
+      final zones = (data['zones'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((z) {
+            return _ZoneSummary(
+              id: z['id'] as String? ?? '',
+              type: z['type'] as String? ?? 'custom',
+              name: z['name'] as String? ?? '',
+              lat: (z['lat'] as num?)?.toDouble(),
+              lng: (z['lng'] as num?)?.toDouble(),
+            );
+          })
+          .where((z) => z.id.isNotEmpty)
+          .toList();
+      if (!mounted) return;
+      setState(() => _zones = zones);
+    } catch (_) {}
+  }
+
+  Future<void> _loadKabarSummary() async {
+    try {
+      await _kabarRead.load();
+      final data = await ref.read(apiClientProvider).get('/api/v1/messages');
+      final all = (data['messages'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ChildKabarMessage.fromJson)
+          .where((m) => m.childId == widget.child.id)
+          .toList()
+        ..sort((a, b) => b.sentAt.compareTo(a.sentAt));
+      if (!mounted) return;
+      setState(() {
+        _kabar = all;
+        _kabarUnread = _kabarRead.unreadOf(all).length;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      await _kabarRead.load();
+      setState(() {
+        _kabarUnread = _kabarRead.unreadOf(_kabar).length;
+      });
+    }
+  }
+
+  Future<void> _loadScreenTimeSummary() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final policyRes = await api.get('/api/v1/policies/${widget.child.id}');
+      final policy = policyRes['policy'] as Map<String, dynamic>?;
+      final summary =
+          await api.get('/api/v1/telemetry/${widget.child.id}/summary');
+      final used = (summary['apps'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .fold<int>(
+            0,
+            (sum, a) => sum + ((a['duration_seconds'] as num?)?.toInt() ?? 0),
+          );
+      final parsed = _parseScreenPolicy(policy);
+      if (!mounted) return;
+      setState(() {
+        _screenUsedSeconds = used;
+        _screenLimitMinutes = parsed.limitMinutes;
+        _screenEnabled = parsed.enabled;
+      });
+    } catch (_) {}
+  }
+
+  ({bool enabled, int limitMinutes}) _parseScreenPolicy(
+    Map<String, dynamic>? current,
+  ) {
+    if (current == null) {
+      return (enabled: true, limitMinutes: 180);
+    }
+    final enabled = current['enabled'] == true;
+    final limit = (current['daily_limit_minutes'] as num?)?.toInt() ?? 180;
+    final schedules = (current['schedules'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    var schoolOn = false;
+    var weekendOn = false;
+    int? schoolLimit;
+    int? weekendLimit;
+    for (final s in schedules) {
+      final days = (s['days'] as List<dynamic>? ?? [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final lim = (s['limitMinutes'] as num?)?.toInt() ??
+          (s['limit_minutes'] as num?)?.toInt();
+      final isSchool = days.any((d) => d >= 1 && d <= 5);
+      final isWeekend = days.any((d) => d == 6 || d == 7);
+      if (isSchool) {
+        schoolOn = true;
+        if (lim != null) schoolLimit = lim;
+      }
+      if (isWeekend) {
+        weekendOn = true;
+        if (lim != null) weekendLimit = lim;
+      }
+    }
+    if (schedules.isEmpty) {
+      schoolOn = true;
+      weekendOn = true;
+      schoolLimit = limit <= 180 ? limit : 180;
+      weekendLimit = limit > 180 ? limit : 300;
+    }
+    final now = DateTime.now();
+    final isWeekend =
+        now.weekday == DateTime.saturday || now.weekday == DateTime.sunday;
+    final active = isWeekend
+        ? (weekendOn ? (weekendLimit ?? 300) : (schoolLimit ?? 180))
+        : (schoolOn ? (schoolLimit ?? 180) : (weekendLimit ?? 300));
+    return (enabled: enabled, limitMinutes: active);
+  }
+
+  Future<void> _loadRemindersSummary() async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/reminders/${widget.child.id}');
+      final list = (data['reminders'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ChildReminder.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() => _reminders = list);
+    } catch (_) {}
+  }
+
+  Future<void> _loadHomeBySummary() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final id = widget.child.id;
+      final settingsRes = await api.get('/api/v1/home-by/$id');
+      final todayRes = await api.get('/api/v1/home-by/$id/today');
+      final s = settingsRes['settings'] as Map<String, dynamic>? ?? {};
+      final today = todayRes['today'] as Map<String, dynamic>?;
+      String? targetLabel;
+      final raw = today?['targetTime'] as String?;
+      if (raw != null) {
+        final at = DateTime.tryParse(raw)?.toLocal();
+        if (at != null) {
+          targetLabel =
+              '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _homeByMode = s['mode'] as String? ?? 'off';
+        _homeByStatus = today?['status'] as String?;
+        _homeByTargetLabel = targetLabel;
+        if (_homeByMode == 'custom') {
+          final h = (s['customHour'] as num?)?.toInt();
+          final m = (s['customMinute'] as num?)?.toInt();
+          if (h != null && m != null) {
+            _homeByTargetLabel ??=
+                '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+          }
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _openHomeBy() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HomeByScreen(child: widget.child),
+      ),
+    );
+    await _loadHomeBySummary();
   }
 
   Future<void> _loadHomeZone() async {
@@ -329,15 +561,191 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   }
 
   void _openKabar() {
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       MaterialPageRoute(
         builder: (_) => KabarInboxScreen(
-          messages: List<ChildKabarMessage>.from(widget.initialKabar),
+          messages: List<ChildKabarMessage>.from(_kabar),
           initialChildId: widget.child.id,
           childNames: {widget.child.id: widget.child.name},
+          unreadIds: {
+            for (final m in _kabar)
+              if (_kabarRead.isUnread(m)) m.id,
+          },
+          onMarkAllRead: () async {
+            await _kabarRead.markAllRead();
+            if (mounted) {
+              setState(() {
+                _kabarUnread = _kabarRead.unreadOf(_kabar).length;
+              });
+            }
+          },
+        ),
+      ),
+    )
+        .then((_) {
+      if (mounted) unawaited(_loadKabarSummary());
+    });
+  }
+
+  Future<void> _openZones() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlacesScreen(child: widget.child),
+      ),
+    );
+    await Future.wait([_loadHomeZone(), _loadZonesSummary()]);
+  }
+
+  Future<void> _openScreenTime() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ScreenTimeScreen(
+          lockedChild: widget.child,
+          showBack: true,
         ),
       ),
     );
+    await _loadScreenTimeSummary();
+  }
+
+  Future<void> _openReminders() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RemindersScreen(
+          initialChildId: widget.child.id,
+          lockChild: true,
+        ),
+      ),
+    );
+    await _loadRemindersSummary();
+  }
+
+  String get _zoneBody {
+    if (_zones.isEmpty) return 'Belum ada zona';
+    _ZoneSummary? home;
+    _ZoneSummary? school;
+    for (final z in _zones) {
+      if (z.type == 'home') home ??= z;
+      if (z.type == 'school') school ??= z;
+    }
+    if (_atHome && home != null) {
+      return '${home.displayName} · aktif';
+    }
+    if (home != null) return '${home.displayName} · ${_zones.length} zona';
+    return '${_zones.length} zona aman';
+  }
+
+  String? get _zoneDetail {
+    if (_zones.isEmpty) return 'Tambah rumah atau sekolah';
+    final chips = <String>[];
+    for (final z in _zones.take(3)) {
+      final active = z.type == 'home' && _atHome;
+      chips.add(active ? '${z.displayName} · aktif' : z.displayName);
+    }
+    if (_zones.length > 3) chips.add('+${_zones.length - 3}');
+    return chips.join(' · ');
+  }
+
+  String get _kabarBody {
+    if (_kabar.isEmpty) return 'Belum ada kabar';
+    final latest = _kabar.first;
+    final clock =
+        '${latest.sentAt.toLocal().hour.toString().padLeft(2, '0')}:'
+        '${latest.sentAt.toLocal().minute.toString().padLeft(2, '0')}';
+    return '${latest.text} · $clock';
+  }
+
+  String? get _kabarDetail {
+    if (_kabarUnread <= 0) return null;
+    return '$_kabarUnread belum dibaca';
+  }
+
+  String get _screenBody {
+    if (!_screenEnabled) return 'Batasan dimatikan';
+    final used = formatDurationCompact(_screenUsedSeconds);
+    final limit = _fmtLimitCompact(_screenLimitMinutes);
+    return '$used / $limit hari ini';
+  }
+
+  double get _screenProgress {
+    final limitSec = _screenLimitMinutes * 60;
+    if (limitSec <= 0) return 0;
+    return (_screenUsedSeconds / limitSec).clamp(0.0, 1.0);
+  }
+
+  String get _reminderBody {
+    final active = _reminders.where((r) => r.enabled).toList();
+    if (active.isEmpty) {
+      return _reminders.isEmpty
+          ? 'Belum ada pengingat'
+          : 'Tidak ada yang aktif';
+    }
+    final next = _nextReminder(active);
+    if (next == null) return '${active.length} aktif';
+    return '${active.length} aktif · berikutnya ${next.title} ${next.timeLabel}';
+  }
+
+  String _homeBySummaryBody(AppLocalizations l10n) {
+    if (_homeByMode == 'off') return l10n.homeBySummaryOff;
+    final status = _homeByStatusLabel(l10n, _homeByStatus);
+    if (_homeByMode == 'maghrib') {
+      return l10n.homeBySummaryMaghrib(status);
+    }
+    final time = _homeByTargetLabel ?? '--:--';
+    return l10n.homeBySummaryCustom(time, status);
+  }
+
+  String _homeByStatusLabel(AppLocalizations l10n, String? status) {
+    switch (status) {
+      case 'pre_notified':
+        return l10n.homeByStatusPreNotified;
+      case 'target_notified':
+        return l10n.homeByStatusTargetNotified;
+      case 'grace_notified':
+        return l10n.homeByStatusGraceNotified;
+      case 'resolved':
+        return l10n.homeByStatusResolved;
+      case 'skipped':
+        return l10n.homeByStatusSkipped;
+      case 'pending':
+        return l10n.homeByStatusPending;
+      default:
+        return l10n.homeBySummaryOff;
+    }
+  }
+
+  ChildReminder? _nextReminder(List<ChildReminder> active) {
+    final now = DateTime.now();
+    ChildReminder? best;
+    Duration? bestDelta;
+    for (final r in active) {
+      final days = r.daysOfWeek.isEmpty
+          ? const [1, 2, 3, 4, 5, 6, 7]
+          : r.daysOfWeek;
+      for (var offset = 0; offset < 8; offset++) {
+        final day = now.add(Duration(days: offset));
+        final weekday = day.weekday; // 1=Mon .. 7=Sun
+        if (!days.contains(weekday)) continue;
+        final at = DateTime(day.year, day.month, day.day, r.hour, r.minute);
+        if (!at.isAfter(now)) continue;
+        final delta = at.difference(now);
+        if (bestDelta == null || delta < bestDelta) {
+          bestDelta = delta;
+          best = r;
+        }
+        break;
+      }
+    }
+    return best;
+  }
+
+  String _fmtLimitCompact(int minutes) {
+    if (minutes % 60 == 0) return '${minutes ~/ 60}j';
+    final h = minutes ~/ 60;
+    final m = minutes % 60;
+    if (h == 0) return '${m}m';
+    return '${h}j ${m}m';
   }
 
   @override
@@ -500,6 +908,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                     _fetchLocation(),
                     _fetchActivity(),
                     _loadHomeZone(),
+                    _fetchSummaries(),
                   ]);
                 },
                 child: ListView(
@@ -516,60 +925,57 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                       onRefresh: _fetchLocation,
                     ),
                     const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ActionTile(
-                            icon: Icons.home_work_rounded,
-                            label: 'Zona aman',
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      PlacesScreen(child: widget.child),
+                    _FeatureSummaryCard(
+                      title: 'Zona aman',
+                      body: _zoneBody,
+                      detail: _zoneDetail,
+                      onOpen: _openZones,
+                      chips: _zones.isEmpty
+                          ? const []
+                          : [
+                              for (final z in _zones.take(3))
+                                _MiniZoneChip(
+                                  label: z.type == 'home' && _atHome
+                                      ? '${z.displayName} · aktif'
+                                      : z.displayName,
+                                  active: z.type == 'home' && _atHome,
                                 ),
-                              );
-                              await _loadHomeZone();
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _ActionTile(
-                            icon: Icons.chat_bubble_rounded,
-                            label: 'Kabar',
-                            onTap: _openKabar,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _ActionTile(
-                            icon: Icons.phone_android_rounded,
-                            label: 'Waktu Layar',
-                            onTap: () {
-                              ref
-                                  .read(parentShellTabProvider.notifier)
-                                  .state = 1;
-                              Navigator.of(context)
-                                  .popUntil((route) => route.isFirst);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _ActionTile(
-                            icon: Icons.alarm_rounded,
-                            label: 'Pengingat',
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const RemindersScreen(),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                            ],
+                    ),
+                    const SizedBox(height: 10),
+                    _FeatureSummaryCard(
+                      title: 'Kabar',
+                      body: _kabarBody,
+                      detail: _kabarDetail,
+                      onOpen: _openKabar,
+                    ),
+                    const SizedBox(height: 10),
+                    _FeatureSummaryCard(
+                      title: 'Waktu layar',
+                      body: _screenBody,
+                      onOpen: _openScreenTime,
+                      progress: _screenEnabled ? _screenProgress : null,
+                      progressCaption: _screenEnabled
+                          ? 'batas ${_fmtLimitCompact(_screenLimitMinutes)}'
+                          : null,
+                    ),
+                    const SizedBox(height: 10),
+                    _FeatureSummaryCard(
+                      title: 'Pengingat',
+                      body: _reminderBody,
+                      onOpen: _openReminders,
+                    ),
+                    const SizedBox(height: 10),
+                    Builder(
+                      builder: (context) {
+                        final l10n = AppLocalizations.of(context);
+                        return _FeatureSummaryCard(
+                          title: l10n.homeByTitle,
+                          body: _homeBySummaryBody(l10n),
+                          onOpen: _openHomeBy,
+                          linkLabel: l10n.homeBySeeAll,
+                        );
+                      },
                     ),
                     const SizedBox(height: 22),
                     const Text(
@@ -876,16 +1282,26 @@ class _AlertPill extends StatelessWidget {
   }
 }
 
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
+class _FeatureSummaryCard extends StatelessWidget {
+  const _FeatureSummaryCard({
+    required this.title,
+    required this.body,
+    required this.onOpen,
+    this.detail,
+    this.progress,
+    this.progressCaption,
+    this.chips = const [],
+    this.linkLabel,
   });
 
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+  final String title;
+  final String body;
+  final String? detail;
+  final VoidCallback onOpen;
+  final double? progress;
+  final String? progressCaption;
+  final List<Widget> chips;
+  final String? linkLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -897,29 +1313,135 @@ class _ActionTile extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          onTap: onTap,
+          onTap: onOpen,
           borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 14, 6, 12),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: AppColors.tealDeep, size: 26),
-                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13.5,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      linkLabel ?? 'Lihat semua',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                        color: AppColors.tealDeep.withValues(alpha: 0.95),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: AppColors.tealDeep.withValues(alpha: 0.95),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
                 Text(
-                  label,
+                  body,
                   maxLines: 2,
-                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 11.5,
-                    height: 1.15,
+                    fontSize: 15.5,
+                    height: 1.25,
+                    color: AppColors.ink,
                   ),
                 ),
+                if (detail != null && detail!.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    detail!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                      color: AppColors.inkSoft,
+                    ),
+                  ),
+                ],
+                if (progress != null) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      backgroundColor: const Color(0xFFE8ECF0),
+                      color: progress! >= 1.0
+                          ? AppColors.coral
+                          : AppColors.teal,
+                    ),
+                  ),
+                  if (progressCaption != null) ...[
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        progressCaption!,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.inkSoft,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+                if (chips.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: chips,
+                  ),
+                ],
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniZoneChip extends StatelessWidget {
+  const _MiniZoneChip({required this.label, this.active = false});
+
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: active
+            ? AppColors.teal.withValues(alpha: 0.12)
+            : const Color(0xFFF3F5F7),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: active ? AppColors.teal : const Color(0xFFE2E6EA),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+          color: active ? AppColors.tealDeep : AppColors.inkSoft,
         ),
       ),
     );

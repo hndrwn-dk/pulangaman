@@ -1,0 +1,64 @@
+{
+  "@@locale": "id",
+  "appTitle": "PulangAman",
+  "homeByTitle": "Jam Pulang Aman",
+  "homeBySubtitle": "Pantau apakah anak sudah di rumah pada jam yang ditentukan",
+  "homeByModeOff": "Nonaktif",
+  "homeByModeMaghrib": "Ikuti waktu Maghrib",
+  "homeByModeMaghribHint": "Waktu berbeda tiap hari, dihitung dari lokasi rumah",
+  "homeByModeCustom": "Jam tetap",
+  "homeByGraceLabel": "Masa tenggang",
+  "homeByGraceHint": "{minutes} menit setelah jam pulang",
+  "@homeByGraceHint": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "homeByWeekendTitle": "Akhir pekan",
+  "homeByWeekendOff": "Nonaktifkan",
+  "homeByWeekendSame": "Sama seperti hari biasa",
+  "homeByWeekendCustom": "Jam berbeda",
+  "homeBySkipDatesTitle": "Hari libur",
+  "homeBySkipDatesAdd": "Tandai tanggal",
+  "homeBySkipDatesEmpty": "Belum ada tanggal libur",
+  "homeByTodayStatus": "Status hari ini",
+  "homeByStatusPending": "Menunggu jam pulang",
+  "homeByStatusPreNotified": "Pengingat pulang dikirim ke anak",
+  "homeByStatusTargetNotified": "Belum di rumah — orang tua sudah diberitahu",
+  "homeByStatusGraceNotified": "Masih belum di rumah setelah masa tenggang",
+  "homeByStatusResolved": "Sudah di rumah",
+  "homeByStatusSkipped": "Libur / tidak dipantau hari ini",
+  "homeByTargetTime": "Jam pulang {time}",
+  "@homeByTargetTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "homeByOnceHomeNote": "Setelah anak tiba di rumah, pantauan hari ini selesai meski anak keluar lagi.",
+  "homeBySave": "Simpan",
+  "homeBySaved": "Pengaturan jam pulang disimpan",
+  "homeBySeeAll": "Lihat semua",
+  "homeBySummaryOff": "Belum diaktifkan",
+  "homeBySummaryMaghrib": "Ikuti Maghrib · {status}",
+  "@homeBySummaryMaghrib": {
+    "placeholders": {
+      "status": { "type": "String" }
+    }
+  },
+  "homeBySummaryCustom": "Jam {time} · {status}",
+  "@homeBySummaryCustom": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "status": { "type": "String" }
+    }
+  },
+  "homeByChildAckButton": "Aku otw pulang",
+  "homeByChildAckSent": "Sudah dikirim ke orang tua",
+  "homeByChildAckReasonInTransit": "Di jalan",
+  "homeByChildAckReasonStoppedBy": "Mampir dulu",
+  "homeByChildAckReasonSchool": "Ada kegiatan sekolah",
+  "homeByChildAckReasonOther": "Lainnya",
+  "homeByChildAckNoteHint": "Catatan singkat (opsional)",
+  "homeByChildAckSubmit": "Kirim ke orang tua",
+  "homeByChildAckTitle": "Beri kabar ke orang tua"
+}

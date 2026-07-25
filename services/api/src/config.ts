@@ -38,6 +38,10 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  HOME_BY_CHECK_INTERVAL_MS: z.coerce.number().default(300_000),
+  MAGHRIB_FALLBACK_HOUR: z.coerce.number().int().min(0).max(23).default(18),
+  MAGHRIB_FALLBACK_MINUTE: z.coerce.number().int().min(0).max(59).default(0),
+  CHILD_ACK_EXTENSION_MINUTES: z.coerce.number().int().min(5).max(120).default(30),
 });
 
 const parsed = envSchema.safeParse(process.env);

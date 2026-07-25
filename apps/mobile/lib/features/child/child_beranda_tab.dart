@@ -25,6 +25,9 @@ class ChildBerandaTab extends StatelessWidget {
     required this.onOpenUsageSettings,
     required this.onOpenAccessibilitySettings,
     required this.onOpenReminderPermissions,
+    this.homeByAckVisible = false,
+    this.homeByAckSent = false,
+    this.onHomeByAck,
   });
 
   final String childName;
@@ -44,6 +47,9 @@ class ChildBerandaTab extends StatelessWidget {
   final VoidCallback onOpenUsageSettings;
   final VoidCallback onOpenAccessibilitySettings;
   final VoidCallback onOpenReminderPermissions;
+  final bool homeByAckVisible;
+  final bool homeByAckSent;
+  final VoidCallback? onHomeByAck;
 
   String _timeGreeting() {
     final h = DateTime.now().hour;
@@ -103,6 +109,31 @@ class ChildBerandaTab extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         _QuickStatsRow(todayUsageSeconds: todayUsageSeconds, points: points),
+        if (homeByAckVisible || homeByAckSent) ...[
+          const SizedBox(height: AppSpacing.md),
+          PaSectionCard(
+            color: AppColors.teal.withValues(alpha: 0.12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  homeByAckSent
+                      ? 'Sudah dikirim ke orang tua'
+                      : 'Aku otw pulang',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  textAlign: TextAlign.center,
+                ),
+                if (!homeByAckSent) ...[
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    onPressed: onHomeByAck,
+                    child: const Text('Beri kabar ke orang tua'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         PaSectionCard(
           color: AppColors.coral.withValues(alpha: 0.12),

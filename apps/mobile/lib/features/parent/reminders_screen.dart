@@ -56,7 +56,17 @@ class ChildReminder {
 }
 
 class RemindersScreen extends ConsumerStatefulWidget {
-  const RemindersScreen({super.key});
+  const RemindersScreen({
+    super.key,
+    this.initialChildId,
+    this.lockChild = false,
+  });
+
+  /// Prefill / lock the selected child (e.g. from child detail).
+  final String? initialChildId;
+
+  /// When true with [initialChildId], hide the child picker.
+  final bool lockChild;
 
   @override
   ConsumerState<RemindersScreen> createState() => _RemindersScreenState();
@@ -72,10 +82,21 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   final Map<String, ChildGender> _genders = {};
   static const _timeout = Duration(seconds: 20);
 
+  bool get _childLocked =>
+      widget.lockChild && (widget.initialChildId?.isNotEmpty ?? false);
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(_hydrateGenders);
+    final initial = widget.initialChildId;
+    if (initial != null && initial.isNotEmpty) {
+      _childId = initial;
+    }
+    Future.microtask(() async {
+      await _hydrateGenders();
+      final id = _childId;
+      if (id != null) await _load(id);
+    });
   }
 
   Future<void> _hydrateGenders() async {
@@ -486,7 +507,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   @override
   Widget build(BuildContext context) {
     final children = ref.watch(childrenControllerProvider);
-    if (_childId == null && children.items.isNotEmpty) {
+    if (_childId == null && children.items.isNotEmpty && !_childLocked) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _childId == null) {
           unawaited(_hydrateGenders());
@@ -505,6 +526,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
             PaScreenHeader(
               title: 'Pengingat Jadwal',
               subtitle: '$activeCount pengingat aktif',
+              showBack: Navigator.of(context).canPop(),
             ),
             Expanded(
               child: RefreshIndicator(
@@ -554,6 +576,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                             'Hubungkan anak dulu sebelum membuat pengingat.',
                       ),
                     ] else ...[
+                      if (!_childLocked) ...[
                       const SizedBox(height: 18),
                       const Text(
                         'UNTUK ANAK',
@@ -631,6 +654,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                           },
                         ),
                       ),
+                      ],
                       const SizedBox(height: 18),
                       const Text(
                         'TAMBAH CEPAT',

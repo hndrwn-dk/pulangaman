@@ -38,8 +38,16 @@ const _limitPresets = <({int minutes, String label})>[
 ];
 
 /// Hub Waktu Layar (tab parent) — redesign premium sesuai mockup.
+/// Push with [lockedChild] + [showBack] from child detail so back returns there.
 class ScreenTimeScreen extends ConsumerStatefulWidget {
-  const ScreenTimeScreen({super.key});
+  const ScreenTimeScreen({
+    super.key,
+    this.lockedChild,
+    this.showBack = false,
+  });
+
+  final ChildSummary? lockedChild;
+  final bool showBack;
 
   @override
   ConsumerState<ScreenTimeScreen> createState() => _ScreenTimeScreenState();
@@ -57,9 +65,15 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   List<_DayUsage> _week = [];
   bool _showAllApps = false;
 
+  bool get _childLocked => widget.lockedChild != null;
+
   @override
   void initState() {
     super.initState();
+    final locked = widget.lockedChild;
+    if (locked != null) {
+      _selectedChildId = locked.id;
+    }
     Future.microtask(() async {
       await ref.read(childrenControllerProvider.notifier).bootstrap();
       await _ensureSelectionAndLoad();
@@ -72,7 +86,8 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final id = _selectedChildId ?? items.first.id;
+    final locked = widget.lockedChild;
+    final id = locked?.id ?? _selectedChildId ?? items.first.id;
     if (_selectedChildId != id) {
       setState(() => _selectedChildId = id);
     }
@@ -80,7 +95,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   }
 
   void _selectChild(String id) {
-    if (_selectedChildId == id) return;
+    if (_childLocked || _selectedChildId == id) return;
     setState(() {
       _selectedChildId = id;
       _showAllApps = false;
@@ -249,12 +264,13 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
       }
     }
 
-    final selected = items.isEmpty
-        ? null
-        : items.firstWhere(
-            (c) => c.id == _selectedChildId,
-            orElse: () => items.first,
-          );
+    final selected = widget.lockedChild ??
+        (items.isEmpty
+            ? null
+            : items.firstWhere(
+                (c) => c.id == _selectedChildId,
+                orElse: () => items.first,
+              ));
 
     final limitSec = _activeLimitMinutes * 60;
     final used = _usedSeconds;
@@ -274,50 +290,77 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Waktu Layar',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
-                          ),
+              if (widget.showBack)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: PaScreenHeader(
+                    title: 'Waktu Layar',
+                    subtitle: selected == null
+                        ? 'Pantau penggunaan harian'
+                        : selected.name,
+                    padding: EdgeInsets.zero,
+                    trailing: Material(
+                      color: const Color(0xFFE8ECF0),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: selected == null
+                            ? null
+                            : () => _openSettings(selected),
+                        child: const SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Icon(Icons.settings_rounded, size: 20),
                         ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Pantau penggunaan harian',
-                          style: TextStyle(
-                            color: AppColors.inkSoft,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Material(
-                    color: const Color(0xFFE8ECF0),
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: selected == null
-                          ? null
-                          : () => _openSettings(selected),
-                      child: const SizedBox(
-                        width: 42,
-                        height: 42,
-                        child: Icon(Icons.settings_rounded, size: 20),
                       ),
                     ),
                   ),
-                ],
-              ),
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Waktu Layar',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Pantau penggunaan harian',
+                            style: TextStyle(
+                              color: AppColors.inkSoft,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Material(
+                      color: const Color(0xFFE8ECF0),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: selected == null
+                            ? null
+                            : () => _openSettings(selected),
+                        child: const SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Icon(Icons.settings_rounded, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               if (items.isEmpty) ...[
                 const SizedBox(height: 40),
                 const PaEmptyState(
@@ -326,24 +369,26 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                   message: 'Tambah anak dulu di tab Anak.',
                 ),
               ] else ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 42,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) {
-                      final c = items[i];
-                      final on = c.id == selected?.id;
-                      return _ChildChip(
-                        name: c.name,
-                        selected: on,
-                        onTap: () => _selectChild(c.id),
-                      );
-                    },
+                if (!_childLocked) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 42,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: items.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final c = items[i];
+                        final on = c.id == selected?.id;
+                        return _ChildChip(
+                          name: c.name,
+                          selected: on,
+                          onTap: () => _selectChild(c.id),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 16),
                 if (_loading)
                   const Padding(
