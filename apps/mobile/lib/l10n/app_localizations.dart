@@ -674,6 +674,66 @@ abstract class AppLocalizations {
   /// **'Jarakmu: {distance}'**
   String empMyDistance(String distance);
 
+  /// No description provided for @empActiveTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik kumpul sedang aktif'**
+  String get empActiveTitle;
+
+  /// No description provided for @empActiveSince.
+  ///
+  /// In id, this message translates to:
+  /// **'Diaktifkan {time}'**
+  String empActiveSince(String time);
+
+  /// No description provided for @empArrived.
+  ///
+  /// In id, this message translates to:
+  /// **'Sudah sampai'**
+  String get empArrived;
+
+  /// No description provided for @empOnTheWay.
+  ///
+  /// In id, this message translates to:
+  /// **'Masih di jalan'**
+  String get empOnTheWay;
+
+  /// No description provided for @empChildLocationUnknown.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi belum diketahui'**
+  String get empChildLocationUnknown;
+
+  /// No description provided for @empActiveNoPoint.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum punya titik kumpul'**
+  String get empActiveNoPoint;
+
+  /// No description provided for @empRefresh.
+  ///
+  /// In id, this message translates to:
+  /// **'Perbarui'**
+  String get empRefresh;
+
+  /// No description provided for @empDeactivate.
+  ///
+  /// In id, this message translates to:
+  /// **'Matikan titik kumpul'**
+  String get empDeactivate;
+
+  /// No description provided for @empDeactivateConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Matikan titik kumpul darurat? Anak dan wali akan diberi tahu kalau kondisi darurat sudah selesai.'**
+  String get empDeactivateConfirm;
+
+  /// No description provided for @empDeactivated.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik kumpul dinonaktifkan'**
+  String get empDeactivated;
+
   /// No description provided for @empMenuHint.
   ///
   /// In id, this message translates to:

@@ -69,6 +69,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Map<String, dynamic>? _trip;
   Map<String, dynamic>? _empActive;
   String? _empAlertOpenedId;
+  bool _empScreenOpen = false;
 
   @override
   void initState() {
@@ -184,6 +185,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       unawaited(_onEmergencyMeetingAlert(payload));
       return;
     }
+    if (event == 'parent:emergency_meeting_resolved') {
+      _onEmergencyMeetingResolved();
+      return;
+    }
     if (event == 'parent:home_by_status' || event == 'parent:home_by_ack') {
       unawaited(_pollHomeByStatus());
       return;
@@ -252,6 +257,21 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     );
   }
 
+  void _onEmergencyMeetingResolved() {
+    if (!mounted) return;
+    setState(() {
+      _empActive = null;
+      _empAlertOpenedId = null;
+    });
+    if (_empScreenOpen) {
+      _empScreenOpen = false;
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Titik kumpul darurat sudah dinonaktifkan')),
+    );
+  }
+
   Future<void> _pollEmergencyMeeting({bool openAlert = false}) async {
     try {
       final data = await ref
@@ -299,6 +319,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (activationId == _empAlertOpenedId) return;
       _empAlertOpenedId = activationId;
     }
+    _empScreenOpen = true;
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => EmergencyMeetingAlertScreen(
@@ -310,6 +331,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         ),
       ),
     );
+    _empScreenOpen = false;
   }
 
   Future<void> _pollHomeByStatus() async {

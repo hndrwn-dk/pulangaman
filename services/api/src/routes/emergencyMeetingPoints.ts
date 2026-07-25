@@ -9,11 +9,13 @@ import {
   createPoint,
   deleteAllPointsForParent,
   deletePoint,
+  getActiveActivationForParent,
   getActiveAlertForChild,
   getChildPointStatus,
   getPointById,
   listPointsForChild,
   mapPoint,
+  resolveActivations,
   updatePoint,
 } from '../services/emergencyMeetingService.js';
 
@@ -176,6 +178,43 @@ emergencyMeetingRouter.post('/activate', async (req: AuthedRequest, res, next) =
       }
       throw e;
     }
+  } catch (error) {
+    next(error);
+  }
+});
+
+emergencyMeetingRouter.get('/activation', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const activation = await getActiveActivationForParent(parentId);
+    res.json({ activation });
+  } catch (error) {
+    next(error);
+  }
+});
+
+emergencyMeetingRouter.post('/deactivate', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const body = z
+      .object({ activationId: z.string().uuid().nullable().optional() })
+      .parse(req.body ?? {});
+
+    const result = await resolveActivations({
+      parentId,
+      activationId: body.activationId,
+    });
+    res.json({ ok: true, ...result });
   } catch (error) {
     next(error);
   }

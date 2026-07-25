@@ -69,6 +69,17 @@ export function haversineMeters(
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+/** A child within this radius of their meeting point counts as arrived. */
+export const ARRIVAL_RADIUS_METERS = 150;
+
+export function isArrivedAt(
+  distanceMeters: number | null,
+  radiusM: number = ARRIVAL_RADIUS_METERS,
+): boolean {
+  if (distanceMeters == null || !Number.isFinite(distanceMeters)) return false;
+  return distanceMeters <= radiusM;
+}
+
 export function formatDistanceLabel(meters: number | null): string {
   if (meters == null || !Number.isFinite(meters)) return '';
   if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;

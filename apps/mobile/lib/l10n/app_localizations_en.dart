@@ -330,6 +330,39 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get empActiveTitle => 'Meeting point is active';
+
+  @override
+  String empActiveSince(String time) {
+    return 'Activated $time';
+  }
+
+  @override
+  String get empArrived => 'Arrived';
+
+  @override
+  String get empOnTheWay => 'On the way';
+
+  @override
+  String get empChildLocationUnknown => 'Location unknown';
+
+  @override
+  String get empActiveNoPoint => 'No meeting point yet';
+
+  @override
+  String get empRefresh => 'Refresh';
+
+  @override
+  String get empDeactivate => 'Turn off meeting point';
+
+  @override
+  String get empDeactivateConfirm =>
+      'Turn off the emergency meeting point? Children and guardians will be told the emergency is over.';
+
+  @override
+  String get empDeactivated => 'Meeting point turned off';
+
+  @override
   String get empMenuHint => 'Meet here in an emergency';
 
   @override

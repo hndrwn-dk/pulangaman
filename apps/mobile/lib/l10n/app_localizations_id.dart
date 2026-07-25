@@ -332,6 +332,39 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get empActiveTitle => 'Titik kumpul sedang aktif';
+
+  @override
+  String empActiveSince(String time) {
+    return 'Diaktifkan $time';
+  }
+
+  @override
+  String get empArrived => 'Sudah sampai';
+
+  @override
+  String get empOnTheWay => 'Masih di jalan';
+
+  @override
+  String get empChildLocationUnknown => 'Lokasi belum diketahui';
+
+  @override
+  String get empActiveNoPoint => 'Belum punya titik kumpul';
+
+  @override
+  String get empRefresh => 'Perbarui';
+
+  @override
+  String get empDeactivate => 'Matikan titik kumpul';
+
+  @override
+  String get empDeactivateConfirm =>
+      'Matikan titik kumpul darurat? Anak dan wali akan diberi tahu kalau kondisi darurat sudah selesai.';
+
+  @override
+  String get empDeactivated => 'Titik kumpul dinonaktifkan';
+
+  @override
   String get empMenuHint => 'Titik bertemu saat darurat';
 
   @override

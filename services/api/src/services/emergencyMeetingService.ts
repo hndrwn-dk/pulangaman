@@ -3,9 +3,11 @@ import { childLocationKey, getRedis } from '../redis/client.js';
 import { sendFcmToUser } from './fcm.js';
 import { broadcastToRoom, childRoom, guardianAlertRoom, parentRoom } from '../ws/server.js';
 import {
+  ARRIVAL_RADIUS_METERS,
   buildActivationTargets,
   formatDistanceLabel,
   haversineMeters,
+  isArrivedAt,
   type ActivateTargetResult,
 } from './emergencyMeetingLogic.js';
 
@@ -451,6 +453,150 @@ export async function activateMeetingPoints(params: {
   return { activationId, targets, activatedAt };
 }
 
+export { ARRIVAL_RADIUS_METERS };
+
+export type ActivationChildStatus = {
+  childId: string;
+  childName: string;
+  meetingPointId: string | null;
+  meetingPointName: string | null;
+  notified: boolean;
+  lat: number | null;
+  lng: number | null;
+  childLat: number | null;
+  childLng: number | null;
+  distanceMeters: number | null;
+  distanceLabel: string;
+  arrived: boolean;
+  lastSeenAt: string | null;
+};
+
+export type ActiveActivation = {
+  activationId: string;
+  activatedAt: string;
+  note: string | null;
+  children: ActivationChildStatus[];
+};
+
+/** Open activation for a parent, with each child's live distance to their point. */
+export async function getActiveActivationForParent(
+  parentId: string,
+): Promise<ActiveActivation | null> {
+  const result = await pool.query<{
+    id: string;
+    note: string | null;
+    activated_at: Date;
+    targets: ActivateTargetResult[];
+  }>(
+    `SELECT id, note, activated_at, targets
+     FROM emergency_meeting_activations
+     WHERE parent_id = $1
+       AND resolved_at IS NULL
+       AND activated_at > now() - interval '12 hours'
+     ORDER BY activated_at DESC
+     LIMIT 1`,
+    [parentId],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  const targets = Array.isArray(row.targets) ? row.targets : [];
+  const children: ActivationChildStatus[] = [];
+  for (const t of targets) {
+    const point = t.meetingPointId ? await getPointById(t.meetingPointId) : null;
+    const loc = point ? await latestChildLocation(t.childId) : null;
+    const distance =
+      point == null || loc == null
+        ? null
+        : haversineMeters(
+            { lat: loc.lat, lng: loc.lng },
+            { lat: Number(point.lat), lng: Number(point.lng) },
+          );
+    children.push({
+      childId: t.childId,
+      childName: t.childName,
+      meetingPointId: point?.id ?? null,
+      meetingPointName: point?.name ?? t.meetingPointName ?? null,
+      notified: t.notified,
+      lat: point ? Number(point.lat) : null,
+      lng: point ? Number(point.lng) : null,
+      childLat: loc?.lat ?? null,
+      childLng: loc?.lng ?? null,
+      distanceMeters: distance,
+      distanceLabel: formatDistanceLabel(distance),
+      arrived: isArrivedAt(distance),
+      lastSeenAt: loc?.recordedAt ?? null,
+    });
+  }
+
+  return {
+    activationId: row.id,
+    activatedAt: row.activated_at.toISOString(),
+    note: row.note,
+    children,
+  };
+}
+
+/** Turn off open activations; children and guardians get a stand-down signal. */
+export async function resolveActivations(params: {
+  parentId: string;
+  activationId?: string | null;
+}): Promise<{ resolved: number }> {
+  const result = await pool.query<{
+    id: string;
+    targets: ActivateTargetResult[];
+    resolved_at: Date;
+  }>(
+    `UPDATE emergency_meeting_activations
+     SET resolved_at = now()
+     WHERE parent_id = $1
+       AND resolved_at IS NULL
+       AND ($2::uuid IS NULL OR id = $2::uuid)
+     RETURNING id, targets, resolved_at`,
+    [params.parentId, params.activationId ?? null],
+  );
+
+  for (const row of result.rows) {
+    const resolvedAt = row.resolved_at.toISOString();
+    const targets = Array.isArray(row.targets) ? row.targets : [];
+    for (const t of targets) {
+      if (!t.notified) continue;
+      await sendFcmToUser(
+        t.childId,
+        {
+          title: 'Titik Kumpul Dinonaktifkan',
+          body: 'Kondisi darurat selesai. Ikuti arahan orang tua.',
+        },
+        {
+          type: 'emergency_meeting_resolved',
+          activationId: String(row.id),
+          childId: String(t.childId),
+        },
+      ).catch((err) => {
+        console.error('emp_resolve_fcm_child_failed', { childId: t.childId, err });
+      });
+      broadcastToRoom(childRoom(t.childId), 'parent:emergency_meeting_resolved', {
+        activationId: String(row.id),
+        childId: String(t.childId),
+        at: resolvedAt,
+      });
+      for (const gid of t.guardianIds) {
+        broadcastToRoom(guardianAlertRoom(gid), 'guardian:emergency_meeting_resolved', {
+          activationId: String(row.id),
+          at: resolvedAt,
+        });
+      }
+    }
+    broadcastToRoom(parentRoom(params.parentId), 'parent:emergency_meeting_resolved', {
+      activationId: String(row.id),
+      at: resolvedAt,
+    });
+  }
+
+  return { resolved: result.rowCount ?? 0 };
+}
+
 /** Latest still-relevant activation for a child (last 6 hours, notified target). */
 export async function getActiveAlertForChild(childId: string): Promise<{
   activationId: string;
@@ -471,7 +617,8 @@ export async function getActiveAlertForChild(childId: string): Promise<{
      FROM emergency_meeting_activations a
      JOIN parent_children pc
        ON pc.parent_id = a.parent_id AND pc.child_id = $1
-     WHERE a.activated_at > now() - interval '6 hours'
+     WHERE a.resolved_at IS NULL
+       AND a.activated_at > now() - interval '6 hours'
      ORDER BY a.activated_at DESC
      LIMIT 8`,
     [childId],

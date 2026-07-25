@@ -38,10 +38,14 @@ class _EmergencyMeetingScreenState
   bool _householdHasPoint = false;
   String? _lastSummary;
   String? _loadError;
+  Map<String, dynamic>? _activation;
+  bool _deactivating = false;
+  Timer? _activationPoll;
   final Map<String, _ChildEmpCache> _cache = {};
   final Set<String> _fetching = {};
 
   static const _empTimeout = Duration(seconds: 12);
+  static const _activationPollInterval = Duration(seconds: 20);
 
   bool get _locked => widget.lockedChild != null;
 
@@ -56,6 +60,84 @@ class _EmergencyMeetingScreenState
     super.initState();
     _childId = widget.lockedChild?.id;
     Future.microtask(_bootstrap);
+    unawaited(_pollActivation());
+    _activationPoll = Timer.periodic(
+      _activationPollInterval,
+      (_) => unawaited(_pollActivation()),
+    );
+  }
+
+  @override
+  void dispose() {
+    _activationPoll?.cancel();
+    super.dispose();
+  }
+
+  /// Live arrival tracking for the currently open activation (parent-scoped).
+  Future<void> _pollActivation() async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get(
+            '/api/v1/emergency-meeting-points/activation',
+            timeout: _empTimeout,
+          );
+      if (!mounted) return;
+      final activation = data['activation'];
+      setState(() {
+        _activation =
+            activation is Map<String, dynamic> ? activation : null;
+      });
+    } catch (_) {
+      // Keep the last known activation; the next tick retries.
+    }
+  }
+
+  Future<void> _deactivate() async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l10n.empDeactivate),
+        content: Text(l10n.empDeactivateConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.empActivateCancel),
+          ),
+          FilledButton(
+            key: const Key('emp_deactivate_confirm'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(l10n.empDeactivate),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deactivating = true);
+    try {
+      await ref.read(apiClientProvider).post(
+        '/api/v1/emergency-meeting-points/deactivate',
+        body: {
+          if (_activation?['activationId'] is String)
+            'activationId': _activation!['activationId'],
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _activation = null;
+        _lastSummary = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.empDeactivated)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _deactivating = false);
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -372,6 +454,7 @@ class _EmergencyMeetingScreenState
         msg.write(' ${l10n.empSummarySkipped(name)}');
       }
       setState(() => _lastSummary = msg.toString());
+      unawaited(_pollActivation());
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException && e.statusCode == 429
@@ -539,7 +622,16 @@ class _EmergencyMeetingScreenState
                                     unawaited(_pickAndSavePrimary()),
                                 onDelete: () => unawaited(_deletePrimary()),
                               ),
-                            if (showActivate) ...[
+                            if (_activation != null) ...[
+                              const SizedBox(height: 16),
+                              _ActiveActivationCard(
+                                activation: _activation!,
+                                busy: _deactivating,
+                                onRefresh: () => unawaited(_pollActivation()),
+                                onDeactivate: () => unawaited(_deactivate()),
+                              ),
+                            ],
+                            if (showActivate && _activation == null) ...[
                               const SizedBox(height: 20),
                               const Divider(height: 1),
                               const SizedBox(height: 16),
@@ -605,6 +697,189 @@ class _EmergencyMeetingScreenState
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ActiveActivationCard extends StatelessWidget {
+  const _ActiveActivationCard({
+    required this.activation,
+    required this.busy,
+    required this.onRefresh,
+    required this.onDeactivate,
+  });
+
+  final Map<String, dynamic> activation;
+  final bool busy;
+  final VoidCallback onRefresh;
+  final VoidCallback onDeactivate;
+
+  static String _clock(String? iso) {
+    final at = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
+    if (at == null) return '';
+    final h = at.hour.toString().padLeft(2, '0');
+    final m = at.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final children = (activation['children'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final note = (activation['note'] as String?)?.trim() ?? '';
+    final since = _clock(activation['activatedAt'] as String?);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.notifications_active_rounded,
+                size: 20,
+                color: AppColors.danger,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  l10n.empActiveTitle,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                    color: AppColors.danger,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: busy ? null : onRefresh,
+                tooltip: l10n.empRefresh,
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          if (since.isNotEmpty)
+            Text(
+              l10n.empActiveSince(since),
+              style: const TextStyle(
+                color: AppColors.inkSoft,
+                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+              ),
+            ),
+          if (note.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              note,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 12),
+          for (final c in children) _ChildProgressRow(child: c),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            key: const Key('emp_deactivate_button'),
+            onPressed: busy ? null : onDeactivate,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.tealDeep,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.check_circle_outline, size: 18),
+            label: Text(
+              busy ? '...' : l10n.empDeactivate,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChildProgressRow extends StatelessWidget {
+  const _ChildProgressRow({required this.child});
+
+  final Map<String, dynamic> child;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final name = child['childName'] as String? ?? '';
+    final notified = child['notified'] == true;
+    final arrived = child['arrived'] == true;
+    final distanceLabel = (child['distanceLabel'] as String?)?.trim() ?? '';
+    final pointName = child['meetingPointName'] as String?;
+
+    final String subtitle;
+    if (!notified) {
+      subtitle = l10n.empActiveNoPoint;
+    } else if (arrived) {
+      subtitle = pointName == null || pointName.isEmpty
+          ? l10n.empArrived
+          : '${l10n.empArrived} - $pointName';
+    } else if (distanceLabel.isEmpty) {
+      subtitle = l10n.empChildLocationUnknown;
+    } else {
+      subtitle = '${l10n.empOnTheWay} - $distanceLabel';
+    }
+
+    final Color accent = !notified
+        ? AppColors.inkSoft
+        : arrived
+            ? AppColors.tealDeep
+            : AppColors.danger;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(
+            !notified
+                ? Icons.remove_circle_outline
+                : arrived
+                    ? Icons.check_circle_rounded
+                    : Icons.directions_walk_rounded,
+            size: 20,
+            color: accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

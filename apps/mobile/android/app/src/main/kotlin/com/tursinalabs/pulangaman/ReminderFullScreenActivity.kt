@@ -3,6 +3,7 @@ package com.tursinalabs.pulangaman
 import android.app.KeyguardManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
@@ -21,7 +22,7 @@ class ReminderFullScreenActivity : ComponentActivity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFF07584E.toInt())
-            setPadding(48)
+            setPadding(dp(24))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -30,22 +31,21 @@ class ReminderFullScreenActivity : ComponentActivity() {
 
         val eyebrow = TextView(this).apply {
             text = "PULANGAMAN"
-            textSize = 14f
+            textSize = 13f
             setTextColor(0xCCFFFFFF.toInt())
-            setPadding(0, 48, 0, 16)
+            setPadding(0, 0, 0, dp(8))
         }
         val titleView = TextView(this).apply {
             text = title
-            textSize = 34f
+            textSize = 32f
             setTextColor(0xFFFFFFFF.toInt())
             setTypeface(typeface, android.graphics.Typeface.BOLD)
-            setPadding(0, 8, 0, 24)
+            setPadding(0, 0, 0, dp(12))
         }
         val bodyView = TextView(this).apply {
             text = body
-            textSize = 20f
+            textSize = 19f
             setTextColor(0xF2FFFFFF.toInt())
-            setPadding(0, 0, 0, 48)
         }
         val button = Button(this).apply {
             text = "Mengerti"
@@ -55,17 +55,31 @@ class ReminderFullScreenActivity : ComponentActivity() {
             setOnClickListener { finish() }
         }
 
+        // Text block sits optically centered; the action stays within thumb reach.
+        root.addView(spacer(weight = 1f))
         root.addView(eyebrow)
         root.addView(titleView)
         root.addView(bodyView)
+        root.addView(spacer(weight = 1.2f))
         root.addView(
             button,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(56),
             ),
         )
         setContentView(root)
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
+    private fun spacer(weight: Float): View = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            weight,
+        )
     }
 
     private fun turnScreenOnAndUnlock() {

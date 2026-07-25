@@ -169,6 +169,21 @@
       "distance": { "type": "String" }
     }
   },
+  "empActiveTitle": "Titik kumpul sedang aktif",
+  "empActiveSince": "Diaktifkan {time}",
+  "@empActiveSince": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "empArrived": "Sudah sampai",
+  "empOnTheWay": "Masih di jalan",
+  "empChildLocationUnknown": "Lokasi belum diketahui",
+  "empActiveNoPoint": "Belum punya titik kumpul",
+  "empRefresh": "Perbarui",
+  "empDeactivate": "Matikan titik kumpul",
+  "empDeactivateConfirm": "Matikan titik kumpul darurat? Anak dan wali akan diberi tahu kalau kondisi darurat sudah selesai.",
+  "empDeactivated": "Titik kumpul dinonaktifkan",
   "empMenuHint": "Titik bertemu saat darurat",
   "empPickPlace": "Cari lokasi titik kumpul",
   "empNoChildren": "Belum ada anak terhubung"

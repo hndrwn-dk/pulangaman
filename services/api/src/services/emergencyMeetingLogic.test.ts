@@ -1,11 +1,26 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  ARRIVAL_RADIUS_METERS,
   buildActivationTargets,
   formatDistanceLabel,
   haversineMeters,
+  isArrivedAt,
   uniqueGuardianIds,
 } from './emergencyMeetingLogic.js';
+
+describe('isArrivedAt', () => {
+  it('counts a child inside the radius as arrived', () => {
+    assert.equal(isArrivedAt(0), true);
+    assert.equal(isArrivedAt(ARRIVAL_RADIUS_METERS), true);
+  });
+
+  it('does not count unknown or far distances', () => {
+    assert.equal(isArrivedAt(null), false);
+    assert.equal(isArrivedAt(Number.NaN), false);
+    assert.equal(isArrivedAt(ARRIVAL_RADIUS_METERS + 1), false);
+  });
+});
 
 describe('buildActivationTargets', () => {
   it('marks children without a point as not notified', () => {

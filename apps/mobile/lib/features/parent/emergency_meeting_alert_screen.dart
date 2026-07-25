@@ -46,7 +46,9 @@ class _EmergencyMeetingAlertScreenState
       if (permission == LocationPermission.denied) {
         await Geolocator.requestPermission();
       }
-      final pos = await Geolocator.getCurrentPosition();
+      // A hanging GPS fix must not leave the distance line stuck on "...".
+      final pos = await Geolocator.getCurrentPosition()
+          .timeout(const Duration(seconds: 8));
       final m = Geolocator.distanceBetween(
         pos.latitude,
         pos.longitude,

@@ -14,6 +14,7 @@ import 'child_avatar.dart';
 import 'child_detail_screen.dart';
 import 'child_home_map_card.dart';
 import 'children_controller.dart';
+import 'emergency_meeting_screen.dart';
 import 'kabar_inbox_screen.dart';
 import 'kabar_models.dart';
 import 'kabar_read_store.dart';
@@ -43,6 +44,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   final Map<String, DateTime?> _updatedAt = {};
   String? _selectedChildId;
   Map<String, dynamic>? _activitySummary;
+  Map<String, dynamic>? _empActivation;
   Timer? _locationPoll;
 
   @override
@@ -55,11 +57,15 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       await _loadGenders();
       await _loadMessages();
       await _loadLocations();
+      await _loadEmpActivation();
       await _connectWs();
       _locationPoll?.cancel();
       _locationPoll = Timer.periodic(
         const Duration(seconds: 20),
-        (_) => _loadLocations(),
+        (_) {
+          unawaited(_loadLocations());
+          unawaited(_loadEmpActivation());
+        },
       );
     });
   }
@@ -99,6 +105,20 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       unawaited(_loadLocations());
       unawaited(_connectWs());
     }
+  }
+
+  Future<void> _loadEmpActivation() async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/emergency-meeting-points/activation');
+      if (!mounted) return;
+      final activation = data['activation'];
+      setState(() {
+        _empActivation =
+            activation is Map<String, dynamic> ? activation : null;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadLocations() async {
@@ -440,6 +460,20 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   ),
                 ),
               ),
+              if (_empActivation != null) ...[
+                const SizedBox(height: 14),
+                _EmpActiveBanner(
+                  activation: _empActivation!,
+                  onOpen: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const EmergencyMeetingScreen(),
+                      ),
+                    );
+                    await _loadEmpActivation();
+                  },
+                ),
+              ],
               if (urgent.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 ...urgent.take(2).map(
@@ -1196,6 +1230,79 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.radius != radius;
+}
+
+class _EmpActiveBanner extends StatelessWidget {
+  const _EmpActiveBanner({required this.activation, required this.onOpen});
+
+  final Map<String, dynamic> activation;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final children = (activation['children'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .where((c) => c['notified'] == true)
+        .toList();
+    final arrived = children.where((c) => c['arrived'] == true).length;
+    final pending = children
+        .where((c) => c['arrived'] != true)
+        .map((c) => c['childName'] as String? ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+    final subtitle = children.isEmpty
+        ? 'Ketuk untuk lihat status'
+        : pending.isEmpty
+            ? 'Semua anak sudah sampai'
+            : '$arrived/${children.length} sudah sampai - '
+                'menunggu ${pending.join(', ')}';
+
+    return Material(
+      color: const Color(0xFFFFE8E6),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.notifications_active_rounded,
+                color: AppColors.danger,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Titik kumpul darurat aktif',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.danger,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.inkSoft),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _UrgentBanner extends StatelessWidget {
