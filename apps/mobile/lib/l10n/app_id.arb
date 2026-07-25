@@ -100,6 +100,7 @@
       "childName": { "type": "String" }
     }
   },
+  "empEmptyGeneric": "Belum ada titik kumpul",
   "empAdd": "+ Tambah titik kumpul",
   "empAddBackup": "Titik cadangan",
   "empPrimaryLabel": "Titik kumpul utama",

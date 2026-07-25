@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme.dart';
@@ -28,6 +30,7 @@ class _EmergencyMeetingScreenState
   Map<String, dynamic>? _status;
   bool _loading = true;
   bool _activating = false;
+  bool _householdHasPoint = false;
   String? _lastSummary;
 
   bool get _locked => widget.lockedChild != null;
@@ -46,12 +49,32 @@ class _EmergencyMeetingScreenState
     });
   }
 
+  Future<bool> _probeHouseholdHasPoint() async {
+    final children = ref.read(childrenControllerProvider).items;
+    if (children.isEmpty) return false;
+    final api = ref.read(apiClientProvider);
+    for (final c in children) {
+      try {
+        final list = await api.get(
+          '/api/v1/emergency-meeting-points',
+          query: {'childId': c.id},
+        );
+        final points = list['points'] as List<dynamic>? ?? [];
+        if (points.isNotEmpty) return true;
+      } catch (_) {
+        // Keep probing other children.
+      }
+    }
+    return false;
+  }
+
   Future<void> _reload() async {
     final id = _childId;
     if (id == null) {
       setState(() {
         _primary = null;
         _status = null;
+        _householdHasPoint = false;
         _loading = false;
       });
       return;
@@ -76,10 +99,13 @@ class _EmergencyMeetingScreenState
         }
       }
       primary ??= points.isEmpty ? null : points.first;
+      final householdHasPoint =
+          primary != null || await _probeHouseholdHasPoint();
       if (!mounted) return;
       setState(() {
         _primary = primary;
         _status = status;
+        _householdHasPoint = householdHasPoint;
         _loading = false;
       });
     } catch (_) {
@@ -101,6 +127,9 @@ class _EmergencyMeetingScreenState
     final childId = _childId;
     if (childId == null) return;
     final l10n = AppLocalizations.of(context);
+    final children = ref.read(childrenControllerProvider).items;
+    final siblings = children.where((c) => c.id != childId).toList();
+
     final hit = await showModalBottomSheet<PlaceHit>(
       context: context,
       isScrollControlled: true,
@@ -113,34 +142,84 @@ class _EmergencyMeetingScreenState
 
     final nameCtrl = TextEditingController(text: hit.name);
     final noteCtrl = TextEditingController();
+    final applyToOthers = ValueNotifier<bool>(siblings.isNotEmpty);
+    final selectedTargets = <String>{for (final c in siblings) c.id};
+
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
           _primary == null ? l10n.empAdd : l10n.empEdit,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: InputDecoration(labelText: l10n.empNameHint),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(labelText: l10n.empNameHint),
+              ),
+              const SizedBox(height: 8),
+              Text(
                 hit.address,
                 style: const TextStyle(color: AppColors.inkSoft),
               ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: noteCtrl,
-              maxLines: 2,
-              decoration: InputDecoration(hintText: l10n.empInstructionsHint),
-            ),
-          ],
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(hintText: l10n.empInstructionsHint),
+              ),
+              if (siblings.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ValueListenableBuilder<bool>(
+                  valueListenable: applyToOthers,
+                  builder: (context, apply, _) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: apply,
+                          title: Text(l10n.empApplyToOthers),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          onChanged: (v) => applyToOthers.value = v == true,
+                        ),
+                        if (apply)
+                          StatefulBuilder(
+                            builder: (context, setLocal) {
+                              return Column(
+                                children: [
+                                  for (final c in siblings)
+                                    CheckboxListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      dense: true,
+                                      value: selectedTargets.contains(c.id),
+                                      title: Text(c.name),
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
+                                      onChanged: (v) {
+                                        setLocal(() {
+                                          if (v == true) {
+                                            selectedTargets.add(c.id);
+                                          } else {
+                                            selectedTargets.remove(c.id);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -156,8 +235,11 @@ class _EmergencyMeetingScreenState
     );
     final name = nameCtrl.text.trim();
     final note = noteCtrl.text.trim();
+    final shouldApply = applyToOthers.value;
+    final targets = selectedTargets.toList();
     nameCtrl.dispose();
     noteCtrl.dispose();
+    applyToOthers.dispose();
     if (saved != true || name.isEmpty) return;
 
     final instructions = note.isNotEmpty ? note : hit.address;
@@ -174,74 +256,16 @@ class _EmergencyMeetingScreenState
           'isPrimary': true,
         },
       );
-      await _reload();
-      if (!mounted) return;
-      await _offerApplyToOthers();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-    }
-  }
-
-  Future<void> _offerApplyToOthers() async {
-    final children = ref.read(childrenControllerProvider).items;
-    final sourceId = _childId;
-    if (sourceId == null || children.length < 2) return;
-    final l10n = AppLocalizations.of(context);
-    final selected = <String>{};
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setLocal) {
-            return AlertDialog(
-              title: Text(l10n.empApplyToOthers),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final c in children)
-                    if (c.id != sourceId)
-                      CheckboxListTile(
-                        value: selected.contains(c.id),
-                        title: Text(c.name),
-                        onChanged: (v) {
-                          setLocal(() {
-                            if (v == true) {
-                              selected.add(c.id);
-                            } else {
-                              selected.remove(c.id);
-                            }
-                          });
-                        },
-                      ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(l10n.empActivateCancel),
-                ),
-                FilledButton(
-                  onPressed: selected.isEmpty
-                      ? null
-                      : () => Navigator.pop(ctx, true),
-                  child: Text(l10n.empApply),
-                ),
-              ],
-            );
+      if (shouldApply && targets.isNotEmpty) {
+        await ref.read(apiClientProvider).post(
+          '/api/v1/emergency-meeting-points/apply-to-all',
+          body: {
+            'sourceChildId': childId,
+            'targetChildIds': targets,
           },
         );
-      },
-    );
-    if (ok != true || selected.isEmpty) return;
-    try {
-      await ref.read(apiClientProvider).post(
-        '/api/v1/emergency-meeting-points/apply-to-all',
-        body: {
-          'sourceChildId': sourceId,
-          'targetChildIds': selected.toList(),
-        },
-      );
+      }
+      await _reload();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -333,6 +357,25 @@ class _EmergencyMeetingScreenState
     return '$head, dan ${children.last.name}';
   }
 
+  LatLng? _pointLatLng() {
+    final p = _primary;
+    if (p == null) return null;
+    final lat = p['lat'];
+    final lng = p['lng'];
+    if (lat is num && lng is num) {
+      return LatLng(lat.toDouble(), lng.toDouble());
+    }
+    final statusPoint = _status?['point'];
+    if (statusPoint is Map<String, dynamic>) {
+      final slat = statusPoint['lat'];
+      final slng = statusPoint['lng'];
+      if (slat is num && slng is num) {
+        return LatLng(slat.toDouble(), slng.toDouble());
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -350,8 +393,13 @@ class _EmergencyMeetingScreenState
     final captionNames = _namesCaption(
       children.isNotEmpty
           ? children
-          : (widget.lockedChild != null ? [widget.lockedChild!] : <ChildSummary>[]),
+          : (widget.lockedChild != null
+              ? [widget.lockedChild!]
+              : <ChildSummary>[]),
     );
+    final showChips =
+        !_locked && _householdHasPoint && children.length > 1;
+    final showActivate = _householdHasPoint;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -359,7 +407,7 @@ class _EmergencyMeetingScreenState
         child: Column(
           children: [
             PaScreenHeader(title: l10n.empTitle),
-            if (!_locked && children.length > 1)
+            if (showChips)
               SizedBox(
                 height: 48,
                 child: ListView.separated(
@@ -370,8 +418,9 @@ class _EmergencyMeetingScreenState
                   itemBuilder: (context, i) {
                     final c = children[i];
                     final selected = c.id == _childId;
-                    final initial =
-                        c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase();
+                    final initial = c.name.trim().isEmpty
+                        ? '?'
+                        : c.name.trim()[0].toUpperCase();
                     return ChoiceChip(
                       avatar: CircleAvatar(
                         backgroundColor: selected
@@ -408,75 +457,78 @@ class _EmergencyMeetingScreenState
                           children: [
                             if (_primary == null)
                               _EmptyCard(
-                                childName: selectedName ?? '',
+                                childName: showChips ? (selectedName ?? '') : null,
                                 onAdd: () => unawaited(_pickAndSavePrimary()),
                               )
                             else
                               _PrimaryCard(
                                 point: _primary!,
+                                mapPosition: _pointLatLng(),
                                 childName: selectedName ?? '',
                                 distanceLabel: distanceLabel,
                                 onEdit: () =>
                                     unawaited(_pickAndSavePrimary()),
                               ),
-                            const SizedBox(height: 20),
-                            const Divider(height: 1),
-                            const SizedBox(height: 16),
-                            if (captionNames.isNotEmpty)
-                              Text(
-                                l10n.empActivateCaption(captionNames),
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.inkSoft,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            const SizedBox(height: 12),
-                            FilledButton.icon(
-                              key: const Key('emp_activate_button'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.danger,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                              onPressed: _activating
-                                  ? null
-                                  : () => unawaited(_activate()),
-                              icon: const Icon(Icons.warning_amber_rounded),
-                              label: Text(
-                                _activating ? '...' : l10n.empActivate,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                            if (_lastSummary != null) ...[
-                              const SizedBox(height: 14),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E6EA),
-                                  ),
-                                ),
-                                child: Text(
-                                  _lastSummary!,
+                            if (showActivate) ...[
+                              const SizedBox(height: 20),
+                              const Divider(height: 1),
+                              const SizedBox(height: 16),
+                              if (captionNames.isNotEmpty)
+                                Text(
+                                  l10n.empActivateCaption(captionNames),
+                                  textAlign: TextAlign.center,
                                   style: const TextStyle(
+                                    color: AppColors.inkSoft,
                                     fontWeight: FontWeight.w600,
-                                    height: 1.35,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              const SizedBox(height: 12),
+                              FilledButton.icon(
+                                key: const Key('emp_activate_button'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: AppColors.danger,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: _activating
+                                    ? null
+                                    : () => unawaited(_activate()),
+                                icon: const Icon(Icons.warning_amber_rounded),
+                                label: Text(
+                                  _activating ? '...' : l10n.empActivate,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
                                   ),
                                 ),
                               ),
+                              if (_lastSummary != null) ...[
+                                const SizedBox(height: 14),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E6EA),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _lastSummary!,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ],
                         ),
@@ -489,14 +541,18 @@ class _EmergencyMeetingScreenState
 }
 
 class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.childName, required this.onAdd});
+  const _EmptyCard({required this.onAdd, this.childName});
 
-  final String childName;
+  /// When null, shows the generic empty copy (first-time setup, no chips yet).
+  final String? childName;
   final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final emptyText = (childName == null || childName!.isEmpty)
+        ? l10n.empEmptyGeneric
+        : l10n.empEmpty(childName!);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       decoration: BoxDecoration(
@@ -519,7 +575,7 @@ class _EmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            l10n.empEmpty(childName),
+            emptyText,
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
@@ -539,19 +595,25 @@ class _PrimaryCard extends StatelessWidget {
     required this.point,
     required this.childName,
     required this.onEdit,
+    this.mapPosition,
     this.distanceLabel,
   });
 
   final Map<String, dynamic> point;
   final String childName;
+  final LatLng? mapPosition;
   final String? distanceLabel;
   final VoidCallback onEdit;
+
+  static bool get _inWidgetTest =>
+      Platform.environment.containsKey('FLUTTER_TEST');
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final name = point['name'] as String? ?? '';
     final subtitle = (point['instructions'] as String?)?.trim() ?? '';
+    final pos = mapPosition;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -578,30 +640,45 @@ class _PrimaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          Container(
-            height: 120,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF1F4),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.location_on_rounded,
-                  color: AppColors.tealDeep.withValues(alpha: 0.85),
-                  size: 28,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.empMapPreview,
-                  style: const TextStyle(
-                    color: AppColors.inkSoft,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 140,
+              child: pos == null || _inWidgetTest
+                  ? Container(
+                      color: const Color(0xFFEEF1F4),
+                      alignment: Alignment.center,
+                      child: Icon(
+                        Icons.location_on_rounded,
+                        color: AppColors.tealDeep.withValues(alpha: 0.85),
+                        size: 32,
+                      ),
+                    )
+                  : GoogleMap(
+                      key: ValueKey(
+                        '${pos.latitude.toStringAsFixed(5)}-'
+                        '${pos.longitude.toStringAsFixed(5)}',
+                      ),
+                      initialCameraPosition: CameraPosition(
+                        target: pos,
+                        zoom: 15,
+                      ),
+                      liteModeEnabled: true,
+                      markers: {
+                        Marker(
+                          markerId: const MarkerId('emp_primary'),
+                          position: pos,
+                        ),
+                      },
+                      zoomControlsEnabled: false,
+                      myLocationButtonEnabled: false,
+                      mapToolbarEnabled: false,
+                      compassEnabled: false,
+                      rotateGesturesEnabled: false,
+                      scrollGesturesEnabled: false,
+                      tiltGesturesEnabled: false,
+                      zoomGesturesEnabled: false,
+                    ),
             ),
           ),
           const SizedBox(height: 14),

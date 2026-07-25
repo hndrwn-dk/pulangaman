@@ -476,6 +476,12 @@ abstract class AppLocalizations {
   /// **'Belum ada titik kumpul untuk {childName}'**
   String empEmpty(String childName);
 
+  /// No description provided for @empEmptyGeneric.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada titik kumpul'**
+  String get empEmptyGeneric;
+
   /// No description provided for @empAdd.
   ///
   /// In id, this message translates to:

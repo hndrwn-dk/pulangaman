@@ -215,6 +215,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get empEmptyGeneric => 'No meeting point yet';
+
+  @override
   String get empAdd => '+ Add meeting point';
 
   @override

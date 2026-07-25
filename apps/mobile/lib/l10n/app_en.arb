@@ -63,6 +63,7 @@
   "empTitle": "Emergency Meeting Point",
   "empSubtitle": "Where to meet in an emergency",
   "empEmpty": "No meeting point for {childName} yet",
+  "empEmptyGeneric": "No meeting point yet",
   "empAdd": "+ Add meeting point",
   "empAddBackup": "Backup point",
   "empPrimaryLabel": "Primary meeting point",

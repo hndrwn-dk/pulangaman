@@ -217,6 +217,9 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get empEmptyGeneric => 'Belum ada titik kumpul';
+
+  @override
   String get empAdd => '+ Tambah titik kumpul';
 
   @override

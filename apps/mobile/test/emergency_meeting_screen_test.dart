@@ -13,6 +13,49 @@ import 'package:pulangaman/features/parent/emergency_meeting_screen.dart';
 import 'package:pulangaman/l10n/app_localizations.dart';
 
 void main() {
+  testWidgets('activate button hidden when no meeting point configured',
+      (tester) async {
+    final mock = MockClient((request) async {
+      if (request.url.path.endsWith('/status')) {
+        return http.Response(
+          jsonEncode({
+            'point': null,
+            'distanceLabel': null,
+          }),
+          200,
+        );
+      }
+      return http.Response(jsonEncode({'points': []}), 200);
+    });
+    final api = ApiClient(client: mock, baseUrl: 'http://test.local');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          apiClientProvider.overrideWithValue(api),
+          childrenControllerProvider.overrideWith(
+            (ref) => _FakeChildren(ref, [
+              ChildSummary(id: 'c1', name: 'Andi'),
+              ChildSummary(id: 'c2', name: 'Zahira'),
+            ]),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('id'),
+          home: const EmergencyMeetingScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('emp_activate_button')), findsNothing);
+    expect(find.text('Andi'), findsNothing);
+    expect(find.text('Zahira'), findsNothing);
+    expect(find.text('Belum ada titik kumpul'), findsOneWidget);
+  });
+
   testWidgets('activate requires confirmation dialog before POST',
       (tester) async {
     var activateCalls = 0;
@@ -51,6 +94,8 @@ void main() {
               'name': 'Lapangan',
               'isPrimary': true,
               'instructions': null,
+              'lat': -6.2,
+              'lng': 106.8,
             }
           ],
         }),
