@@ -275,6 +275,17 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     return 'Tempat aman tambahan';
   }
 
+  String _tripPlaceLabel(Map<String, dynamic> zone) {
+    final title = _displayTitle(zone);
+    final subtitle = _displaySubtitle(zone);
+    if (subtitle.isEmpty ||
+        subtitle == 'Belum ada alamat' ||
+        subtitle == 'Tempat aman tambahan') {
+      return title;
+    }
+    return '$title — $subtitle';
+  }
+
   Future<void> _addBySearch(
     String type, {
     String? customLabel,
@@ -637,7 +648,11 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       for (final z in _zones)
                         DropdownMenuItem(
                           value: z['id'] as String,
-                          child: Text(_displayTitle(z)),
+                          child: Text(
+                            _tripPlaceLabel(z),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                     onChanged: (v) => setSheet(() => fromId = v),
@@ -651,7 +666,11 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       for (final z in _zones)
                         DropdownMenuItem(
                           value: z['id'] as String,
-                          child: Text(_displayTitle(z)),
+                          child: Text(
+                            _tripPlaceLabel(z),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                     ],
                     onChanged: (v) => setSheet(() => toId = v),
