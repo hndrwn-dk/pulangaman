@@ -535,43 +535,46 @@ class _EmergencyMeetingScreenState
           children: [
             PaScreenHeader(title: l10n.empTitle),
             if (showChips)
-              SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: children.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, i) {
-                    final c = children[i];
-                    final selected = c.id == _childId;
-                    final initial = c.name.trim().isEmpty
-                        ? '?'
-                        : c.name.trim()[0].toUpperCase();
-                    return ChoiceChip(
-                      avatar: CircleAvatar(
-                        backgroundColor: selected
-                            ? Colors.white.withValues(alpha: 0.25)
-                            : AppColors.teal.withValues(alpha: 0.15),
-                        child: Text(
-                          initial,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                            color: selected ? Colors.white : AppColors.tealDeep,
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: children.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final c = children[i];
+                      final selected = c.id == _childId;
+                      final initial = c.name.trim().isEmpty
+                          ? '?'
+                          : c.name.trim()[0].toUpperCase();
+                      return ChoiceChip(
+                        avatar: CircleAvatar(
+                          backgroundColor: selected
+                              ? Colors.white.withValues(alpha: 0.25)
+                              : AppColors.teal.withValues(alpha: 0.15),
+                          child: Text(
+                            initial,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                              color: selected ? Colors.white : AppColors.tealDeep,
+                            ),
                           ),
                         ),
-                      ),
-                      label: Text(c.name),
-                      selected: selected,
-                      onSelected: (_) => _selectChild(c.id),
-                      selectedColor: AppColors.tealDeep,
-                      labelStyle: TextStyle(
-                        color: selected ? Colors.white : AppColors.ink,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    );
-                  },
+                        label: Text(c.name),
+                        selected: selected,
+                        onSelected: (_) => _selectChild(c.id),
+                        selectedColor: AppColors.tealDeep,
+                        labelStyle: TextStyle(
+                          color: selected ? Colors.white : AppColors.ink,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             Expanded(
