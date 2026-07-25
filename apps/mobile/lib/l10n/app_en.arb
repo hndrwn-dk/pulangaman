@@ -39,5 +39,6 @@
   "homeByChildAckReasonOther": "Other",
   "homeByChildAckNoteHint": "Short note (optional)",
   "homeByChildAckSubmit": "Send to parent",
-  "homeByChildAckTitle": "Update your parent"
+  "homeByChildAckTitle": "Update your parent",
+  "homeByNoChildren": "No child linked yet"
 }

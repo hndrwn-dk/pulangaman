@@ -60,5 +60,6 @@
   "homeByChildAckReasonOther": "Lainnya",
   "homeByChildAckNoteHint": "Catatan singkat (opsional)",
   "homeByChildAckSubmit": "Kirim ke orang tua",
-  "homeByChildAckTitle": "Beri kabar ke orang tua"
+  "homeByChildAckTitle": "Beri kabar ke orang tua",
+  "homeByNoChildren": "Belum ada anak terhubung"
 }

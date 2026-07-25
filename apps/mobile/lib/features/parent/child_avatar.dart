@@ -220,7 +220,7 @@ Future<ChildGender?> showChildGenderPicker({
               ),
               const SizedBox(height: 6),
               const Text(
-                'Pilih yang mirip anakmu supaya mudah dikenali.',
+                'Pilih laki-laki atau perempuan. Foto anak tidak dipakai demi privasi.',
                 style: TextStyle(color: AppColors.inkSoft),
               ),
               const SizedBox(height: 16),

@@ -337,6 +337,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Beri kabar ke orang tua'**
   String get homeByChildAckTitle;
+
+  /// No description provided for @homeByNoChildren.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada anak terhubung'**
+  String get homeByNoChildren;
 }
 
 class _AppLocalizationsDelegate

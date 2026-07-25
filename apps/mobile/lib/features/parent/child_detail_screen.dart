@@ -314,10 +314,22 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   Future<void> _openHomeBy() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => HomeByScreen(child: widget.child),
+        builder: (_) => HomeByScreen(lockedChild: widget.child),
       ),
     );
     await _loadHomeBySummary();
+  }
+
+  Future<void> _editGender() async {
+    final picked = await showChildGenderPicker(
+      context: context,
+      childName: widget.child.name,
+      current: _gender,
+    );
+    if (picked == null || !mounted) return;
+    await ChildGenderStore.instance.set(widget.child.id, picked);
+    if (!mounted) return;
+    setState(() => _gender = picked);
   }
 
   Future<void> _loadHomeZone() async {
@@ -515,6 +527,10 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
         }
       });
       _mapController?.animateCamera(CameraUpdate.newLatLng(pos));
+    }
+    if ((event == 'parent:home_by_status' || event == 'parent:home_by_ack') &&
+        payload['childId'] == widget.child.id) {
+      unawaited(_loadHomeBySummary());
     }
   }
 
@@ -923,6 +939,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                       batteryLevel: _batteryLevel,
                       batteryCharging: _batteryCharging,
                       onRefresh: _fetchLocation,
+                      onEditGender: _editGender,
                     ),
                     const SizedBox(height: 14),
                     _FeatureSummaryCard(
@@ -1071,6 +1088,7 @@ class _ProfileStatusCard extends StatelessWidget {
     required this.batteryLevel,
     required this.batteryCharging,
     required this.onRefresh,
+    required this.onEditGender,
   });
 
   final String name;
@@ -1081,6 +1099,7 @@ class _ProfileStatusCard extends StatelessWidget {
   final int? batteryLevel;
   final bool batteryCharging;
   final Future<void> Function() onRefresh;
+  final VoidCallback onEditGender;
 
   @override
   Widget build(BuildContext context) {
@@ -1092,7 +1111,19 @@ class _ProfileStatusCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              ChildAvatar(name: name, gender: gender, size: 52),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onEditGender,
+                  child: ChildAvatar(
+                    name: name,
+                    gender: gender,
+                    size: 52,
+                    showEditBadge: true,
+                  ),
+                ),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -1134,6 +1165,18 @@ class _ProfileStatusCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 4),
+                    GestureDetector(
+                      onTap: onEditGender,
+                      child: const Text(
+                        'Ubah wajah avatar',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.tealDeep,
+                        ),
+                      ),
                     ),
                   ],
                 ),

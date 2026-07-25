@@ -140,4 +140,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get homeByChildAckTitle => 'Beri kabar ke orang tua';
+
+  @override
+  String get homeByNoChildren => 'Belum ada anak terhubung';
 }

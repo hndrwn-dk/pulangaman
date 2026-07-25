@@ -8,6 +8,7 @@ import '../rewards/rewards_screen.dart';
 import 'account_settings_screen.dart';
 import 'children_controller.dart';
 import 'guardians_screen.dart';
+import 'home_by_screen.dart';
 import 'reminders_screen.dart';
 
 class MoreScreen extends ConsumerStatefulWidget {
@@ -20,6 +21,7 @@ class MoreScreen extends ConsumerStatefulWidget {
 class _MoreScreenState extends ConsumerState<MoreScreen> {
   int _reminderCount = 0;
   String _reminderHint = 'Belum ada pengingat';
+  String _homeByHint = 'Belum diaktifkan';
   int _points = 0;
   int _streak = 0;
   String _guardianHint = 'Belum ada wali';
@@ -40,6 +42,7 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
     final api = ref.read(apiClientProvider);
     var reminders = 0;
     final reminderTitles = <String>[];
+    final homeByParts = <String>[];
     var points = 0;
     var streak = 0;
     var guardians = 0;
@@ -59,6 +62,22 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           for (final r in list.take(2)) {
             final t = (r['title'] as String?)?.trim();
             if (t != null && t.isNotEmpty) reminderTitles.add(t);
+          }
+        } catch (_) {}
+
+        try {
+          final hb = await api.get('/api/v1/home-by/${child.id}');
+          final s = hb['settings'] as Map<String, dynamic>? ?? {};
+          final mode = s['mode'] as String? ?? 'off';
+          if (mode == 'maghrib') {
+            homeByParts.add('${child.name}: Maghrib');
+          } else if (mode == 'custom') {
+            final h = (s['customHour'] as num?)?.toInt() ?? 18;
+            final m = (s['customMinute'] as num?)?.toInt() ?? 0;
+            homeByParts.add(
+              '${child.name}: '
+              '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}',
+            );
           }
         } catch (_) {}
 
@@ -105,6 +124,9 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
           ? 'Belum ada pengingat'
           : '$reminders pengingat aktif'
               '${reminderTitles.isEmpty ? '' : ' · ${reminderTitles.take(2).join(' & ')}'}';
+      _homeByHint = homeByParts.isEmpty
+          ? 'Belum diaktifkan'
+          : homeByParts.take(2).join(' · ');
       _points = points;
       _streak = streak;
       _guardianHint = guardians == 0
@@ -185,6 +207,14 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                     title: 'Pengingat Jadwal',
                     subtitle: _reminderHint,
                     onTap: () => _open(const RemindersScreen()),
+                  ),
+                  _MenuRow(
+                    icon: Icons.nights_stay_rounded,
+                    iconBg: const Color(0xFFEAE6FA),
+                    iconColor: const Color(0xFF7C3AED),
+                    title: 'Jam Pulang Aman',
+                    subtitle: _homeByHint,
+                    onTap: () => _open(const HomeByScreen()),
                   ),
                   _MenuRow(
                     icon: Icons.card_giftcard_rounded,

@@ -138,4 +138,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeByChildAckTitle => 'Update your parent';
+
+  @override
+  String get homeByNoChildren => 'No child linked yet';
 }

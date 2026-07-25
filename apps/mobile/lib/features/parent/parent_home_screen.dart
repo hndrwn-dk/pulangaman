@@ -333,7 +333,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   void _openChildDetail(ChildSummary child) {
     final gender =
         _genders[child.id] ?? ChildGenderStore.guessFromName(child.name);
-    Navigator.of(context).push(
+    Navigator.of(context)
+        .push(
       MaterialPageRoute(
         builder: (_) => ChildDetailScreen(
           child: child,
@@ -341,7 +342,24 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
           initialKabar: List<ChildKabarMessage>.from(_messages),
         ),
       ),
+    )
+        .then((_) {
+      if (mounted) unawaited(_loadGenders());
+    });
+  }
+
+  Future<void> _editChildGender(ChildSummary child) async {
+    final current =
+        _genders[child.id] ?? ChildGenderStore.guessFromName(child.name);
+    final picked = await showChildGenderPicker(
+      context: context,
+      childName: child.name,
+      current: current,
     );
+    if (picked == null || !mounted) return;
+    await ChildGenderStore.instance.set(child.id, picked);
+    if (!mounted) return;
+    setState(() => _genders[child.id] = picked);
   }
 
   void _openLiveMap(ChildSummary child) {
@@ -524,6 +542,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                         gender: _genders[c.id] ??
                             ChildGenderStore.guessFromName(c.name),
                         onTap: () => _selectChild(c.id),
+                        onLongPress: () => unawaited(_editChildGender(c)),
                       );
                     },
                   ),
@@ -985,6 +1004,7 @@ class _ChildChip extends StatelessWidget {
     required this.online,
     required this.gender,
     required this.onTap,
+    this.onLongPress,
   });
 
   final String name;
@@ -992,6 +1012,7 @@ class _ChildChip extends StatelessWidget {
   final bool online;
   final ChildGender gender;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -1000,6 +1021,7 @@ class _ChildChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         borderRadius: BorderRadius.circular(999),
         child: Container(
           padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),

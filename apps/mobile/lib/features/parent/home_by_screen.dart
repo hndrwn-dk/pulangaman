@@ -10,9 +10,10 @@ import '../auth/auth_controller.dart';
 import 'children_controller.dart';
 
 class HomeByScreen extends ConsumerStatefulWidget {
-  const HomeByScreen({super.key, required this.child});
+  const HomeByScreen({super.key, this.lockedChild});
 
-  final ChildSummary child;
+  /// When set (from child detail), the child picker is hidden.
+  final ChildSummary? lockedChild;
 
   @override
   ConsumerState<HomeByScreen> createState() => _HomeByScreenState();
@@ -21,6 +22,7 @@ class HomeByScreen extends ConsumerStatefulWidget {
 class _HomeByScreenState extends ConsumerState<HomeByScreen> {
   bool _loading = true;
   bool _saving = false;
+  String? _childId;
   String _mode = 'off';
   int _customHour = 18;
   int _customMinute = 0;
@@ -31,17 +33,38 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
   Map<String, dynamic>? _today;
   List<Map<String, dynamic>> _skipDates = [];
 
+  bool get _childLocked => widget.lockedChild != null;
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(_load);
+    _childId = widget.lockedChild?.id;
+    Future.microtask(() async {
+      if (_childId == null) {
+        await ref.read(childrenControllerProvider.notifier).bootstrap();
+        final items = ref.read(childrenControllerProvider).items;
+        if (items.isEmpty) {
+          if (mounted) setState(() => _loading = false);
+          return;
+        }
+        _childId = items.first.id;
+      }
+      await _load();
+    });
+  }
+
+  void _selectChild(String id) {
+    if (_childId == id) return;
+    setState(() => _childId = id);
+    unawaited(_load());
   }
 
   Future<void> _load() async {
+    final id = _childId;
+    if (id == null) return;
     setState(() => _loading = true);
     try {
       final api = ref.read(apiClientProvider);
-      final id = widget.child.id;
       final settingsRes = await api.get('/api/v1/home-by/$id');
       final todayRes = await api.get('/api/v1/home-by/$id/today');
       final skipRes = await api.get('/api/v1/home-by/$id/skip-dates');
@@ -68,11 +91,13 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
   }
 
   Future<void> _save() async {
+    final id = _childId;
+    if (id == null) return;
     final l10n = AppLocalizations.of(context);
     setState(() => _saving = true);
     try {
       await ref.read(apiClientProvider).put(
-        '/api/v1/home-by/${widget.child.id}',
+        '/api/v1/home-by/$id',
         body: {
           'mode': _mode,
           'customHour': _mode == 'custom' ? _customHour : null,
@@ -118,6 +143,8 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
   }
 
   Future<void> _addSkipDate() async {
+    final childId = _childId;
+    if (childId == null) return;
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -132,7 +159,7 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
         '${picked.day.toString().padLeft(2, '0')}';
     try {
       await ref.read(apiClientProvider).post(
-        '/api/v1/home-by/${widget.child.id}/skip-dates',
+        '/api/v1/home-by/$childId/skip-dates',
         body: {'skipDate': date},
       );
       await _load();
@@ -183,6 +210,16 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final children = ref.watch(childrenControllerProvider).items;
+    String? selectedName = widget.lockedChild?.name;
+    if (selectedName == null) {
+      for (final c in children) {
+        if (c.id == _childId) {
+          selectedName = c.name;
+          break;
+        }
+      }
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       body: SafeArea(
@@ -190,11 +227,45 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
           children: [
             PaScreenHeader(
               title: l10n.homeByTitle,
-              subtitle: widget.child.name,
+              subtitle: selectedName,
             ),
+            if (!_childLocked && children.length > 1)
+              SizedBox(
+                height: 44,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: children.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) {
+                    final c = children[i];
+                    final selected = c.id == _childId;
+                    return ChoiceChip(
+                      label: Text(c.name),
+                      selected: selected,
+                      onSelected: (_) => _selectChild(c.id),
+                      selectedColor: AppColors.tealDeep,
+                      labelStyle: TextStyle(
+                        color: selected ? Colors.white : AppColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    );
+                  },
+                ),
+              ),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
+                  : _childId == null
+                  ? Center(
+                      child: Text(
+                        l10n.homeByNoChildren,
+                        style: const TextStyle(
+                          color: AppColors.inkSoft,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
                       children: [
