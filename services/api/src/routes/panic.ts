@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { cancelPanicCascade, startPanicCascade } from '../services/panicCascade.js';
+import { broadcastToRoom, childRoom, parentRoom } from '../ws/server.js';
 
 export const panicRouter = Router();
 
@@ -151,11 +152,11 @@ panicRouter.post('/:id/ack', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    const result = await pool.query(
+    const result = await pool.query<{ id: string; child_id: string; parent_id: string }>(
       `UPDATE panic_alerts
        SET status = 'parent_responded'
        WHERE id = $1 AND parent_id = $2 AND status IN ('active', 'guardian_notified')
-       RETURNING id`,
+       RETURNING id, child_id, parent_id`,
       [alertId, userId],
     );
     if (result.rowCount === 0) {
@@ -178,6 +179,11 @@ panicRouter.post('/:id/ack', async (req: AuthedRequest, res, next) => {
       [userId, JSON.stringify({ alertId })],
     );
 
+    const row = result.rows[0];
+    const payload = { alertId, childId: row.child_id, status: 'parent_responded' };
+    broadcastToRoom(childRoom(row.child_id), 'child:panic_acked', payload);
+    broadcastToRoom(parentRoom(row.parent_id), 'child:panic_acked', payload);
+
     res.json({ alertId, status: 'parent_responded' });
   } catch (error) {
     next(error);
@@ -197,7 +203,7 @@ panicRouter.post('/:id/resolve', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    const result = await pool.query(
+    const result = await pool.query<{ id: string; child_id: string; parent_id: string }>(
       `UPDATE panic_alerts
        SET status = 'resolved',
            resolved_at = now(),
@@ -205,7 +211,7 @@ panicRouter.post('/:id/resolve', async (req: AuthedRequest, res, next) => {
        WHERE id = $1
          AND (parent_id = $2 OR child_id = $2)
          AND status IN ('active', 'parent_responded', 'guardian_notified')
-       RETURNING id`,
+       RETURNING id, child_id, parent_id`,
       [alertId, userId, notes ?? null],
     );
     if (result.rowCount === 0) {
@@ -220,6 +226,11 @@ panicRouter.post('/:id/resolve', async (req: AuthedRequest, res, next) => {
        VALUES ($1, 'panic.resolved', $2::jsonb)`,
       [userId, JSON.stringify({ alertId })],
     );
+
+    const row = result.rows[0];
+    const payload = { alertId, childId: row.child_id, status: 'resolved' };
+    broadcastToRoom(childRoom(row.child_id), 'child:panic_resolved', payload);
+    broadcastToRoom(parentRoom(row.parent_id), 'child:panic_resolved', payload);
 
     res.json({ alertId, status: 'resolved' });
   } catch (error) {

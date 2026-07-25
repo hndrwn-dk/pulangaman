@@ -56,6 +56,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   final ScreenTimeChannel _screenTimeChannel = ScreenTimeChannel();
   final LocationTrackingChannel _locationChannel = LocationTrackingChannel();
   final ReminderChannel _reminderChannel = ReminderChannel();
+  Timer? _panicCooldownTimer;
 
   @override
   void initState() {
@@ -142,7 +143,49 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   void _onReminderWs(String event, Map<String, dynamic> payload) {
     if (event == 'child:reminders_updated') {
       unawaited(_syncReminders());
+      return;
     }
+    if (event == 'child:panic_acked' || event == 'child:panic_resolved') {
+      unawaited(_clearPanicState(
+        message: event == 'child:panic_acked'
+            ? 'Orang tua sudah merespons panik'
+            : 'Panik ditandai selesai / aman',
+      ));
+    }
+  }
+
+  Future<void> _clearPanicState({String? message}) async {
+    _panicCooldownTimer?.cancel();
+    _panicTapCounter.reset();
+    _panicInFlight = false;
+    if (_panicMode) {
+      await _setPanicMode(false);
+    }
+    if (!mounted) return;
+    setState(() {
+      _panicMode = false;
+      _status = _tracking ? AppStrings.trackingOn : _status;
+    });
+    if (message != null) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+
+  void _schedulePanicCooldownRefresh() {
+    _panicCooldownTimer?.cancel();
+    final until = _panicTapCounter.cooldownUntil;
+    if (until == null) return;
+    final wait = until.difference(DateTime.now()) + const Duration(milliseconds: 200);
+    if (wait.isNegative) {
+      if (mounted) setState(() {});
+      return;
+    }
+    _panicCooldownTimer = Timer(wait, () {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _syncReminders() async {
@@ -474,6 +517,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
 
     _panicInFlight = true;
     _panicTapCounter.markTriggered();
+    _schedulePanicCooldownRefresh();
     if (mounted) {
       setState(() => _panicMode = true);
     }
@@ -570,6 +614,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySub?.cancel();
+    _panicCooldownTimer?.cancel();
     _ws.removeHandler(_onReminderWs);
     unawaited(_ws.disconnect());
     // Keep native FGS running after Flutter dispose so background tracking continues.
@@ -653,6 +698,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             status: _status,
             panicInFlight: _panicInFlight,
             panicOnCooldown: _panicTapCounter.isOnCooldown,
+            panicActive: _panicMode,
             reminderCount: _reminderCount,
             exactAlarmOk: _exactAlarmOk,
             onPanicTap: _onPanicTap,

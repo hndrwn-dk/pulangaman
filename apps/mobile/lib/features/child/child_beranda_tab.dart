@@ -18,6 +18,7 @@ class ChildBerandaTab extends StatelessWidget {
     required this.status,
     required this.panicInFlight,
     required this.panicOnCooldown,
+    this.panicActive = false,
     required this.reminderCount,
     required this.exactAlarmOk,
     required this.onPanicTap,
@@ -36,6 +37,7 @@ class ChildBerandaTab extends StatelessWidget {
   final String? status;
   final bool panicInFlight;
   final bool panicOnCooldown;
+  final bool panicActive;
   final int reminderCount;
   final bool exactAlarmOk;
   final VoidCallback onPanicTap;
@@ -126,7 +128,22 @@ class ChildBerandaTab extends StatelessWidget {
               ),
               const Text(AppStrings.panicConfirm, textAlign: TextAlign.center),
               const SizedBox(height: 4),
-              Text(status ?? '', textAlign: TextAlign.center),
+              Text(
+                panicInFlight
+                    ? 'Mengirim peringatan...'
+                    : panicOnCooldown
+                        ? 'Panik terkirim. Tunggu sebentar sebelum bisa dikirim lagi.'
+                        : panicActive
+                            ? 'Mode panik aktif — menunggu respons orang tua'
+                            : (status ?? ''),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: panicActive || panicOnCooldown
+                      ? AppColors.danger
+                      : AppColors.inkSoft,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),

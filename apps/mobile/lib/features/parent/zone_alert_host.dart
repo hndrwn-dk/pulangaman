@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/ws_client.dart';
+import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../auth/auth_controller.dart';
 import 'children_controller.dart';
+import 'live_map_screen.dart';
 
 class ZoneArrivalNotice {
   ZoneArrivalNotice({
@@ -84,8 +86,11 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
   Timer? _pollTimer;
   bool _dialogOpen = false;
   String? _panicBanner;
+  String? _panicAlertId;
+  String? _panicChildId;
   String? _seenPanicAlertId;
   bool _connecting = false;
+  bool _panicBusy = false;
 
   @override
   void initState() {
@@ -157,6 +162,13 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
       _handlePanic(payload);
       return;
     }
+    if (event == 'child:panic_acked' || event == 'child:panic_resolved') {
+      final alertId = payload['alertId'] as String?;
+      if (alertId != null && alertId == _panicAlertId) {
+        _clearPanicUi();
+      }
+      return;
+    }
     if (event != 'parent:zone_event') return;
     final notice = ZoneArrivalNotice.fromPayload(payload);
     if (notice.childId.isEmpty) return;
@@ -200,18 +212,33 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
       final api = ref.read(apiClientProvider);
       final data = await api.get('/api/v1/panic/active');
       final alerts = (data['alerts'] as List?) ?? const [];
-      if (alerts.isEmpty) return;
+      if (alerts.isEmpty) {
+        if (_panicBanner != null && !_dialogOpen) {
+          _clearPanicUi();
+        }
+        return;
+      }
       final first = alerts.first;
       if (first is! Map) return;
       final map = Map<String, dynamic>.from(first);
       final alertId = map['alertId'] as String?;
-      if (alertId == null || alertId == _seenPanicAlertId) return;
+      if (alertId == null) return;
+      if (alertId == _seenPanicAlertId && _panicBanner != null) return;
       _handlePanic({
         'alertId': alertId,
         'childId': map['childId'],
         'location': map['location'],
       });
     } catch (_) {}
+  }
+
+  void _clearPanicUi() {
+    if (!mounted) return;
+    setState(() {
+      _panicBanner = null;
+      _panicAlertId = null;
+      _panicChildId = null;
+    });
   }
 
   void _handlePanic(Map<String, dynamic> payload) {
@@ -237,6 +264,8 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
 
     setState(() {
       _panicBanner = message;
+      _panicAlertId = alertId;
+      _panicChildId = childId.isEmpty ? null : childId;
       _banner = null;
     });
 
@@ -249,6 +278,67 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
       ),
     );
     unawaited(_showPanicDialog(name, message));
+  }
+
+  Future<void> _ackPanic() async {
+    final alertId = _panicAlertId;
+    if (alertId == null || _panicBusy) return;
+    _panicBusy = true;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/panic/$alertId/ack');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Peringatan direspons. Cascade dihentikan.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mengirim respons. Coba lagi.')),
+      );
+    } finally {
+      _panicBusy = false;
+    }
+  }
+
+  Future<void> _resolvePanic() async {
+    final alertId = _panicAlertId;
+    if (alertId == null || _panicBusy) return;
+    _panicBusy = true;
+    try {
+      await ref.read(apiClientProvider).post(
+        '/api/v1/panic/$alertId/resolve',
+        body: {'notes': 'Diselesaikan orang tua'},
+      );
+      if (!mounted) return;
+      _clearPanicUi();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Panik ditandai selesai / aman.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal menyelesaikan panik. Coba lagi.')),
+      );
+    } finally {
+      _panicBusy = false;
+    }
+  }
+
+  void _openPanicMap() {
+    final childId = _panicChildId;
+    if (childId == null) return;
+    final children = ref.read(childrenControllerProvider).items;
+    ChildSummary? child;
+    for (final c in children) {
+      if (c.id == childId) {
+        child = c;
+        break;
+      }
+    }
+    if (child == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LiveMapScreen(child: child!)),
+    );
   }
 
   Future<void> _showPanicDialog(String childName, String message) async {
@@ -285,11 +375,29 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
               message,
               style: const TextStyle(height: 1.35, fontSize: 16),
             ),
+            actionsAlignment: MainAxisAlignment.spaceBetween,
             actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openPanicMap();
+                },
+                child: const Text('Buka lokasi'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await _ackPanic();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                child: const Text(AppStrings.ackAlert),
+              ),
               FilledButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () async {
+                  await _resolvePanic();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
                 style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-                child: const Text('Saya mengerti'),
+                child: const Text(AppStrings.resolveAlert),
               ),
             ],
           );
@@ -369,22 +477,49 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                 child: Material(
                   elevation: 3,
                   color: const Color(0xFFFFE8E6),
-                  child: ListTile(
-                    leading: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppColors.danger,
-                    ),
-                    title: const Text(
-                      'PANIK',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.danger,
-                      ),
-                    ),
-                    subtitle: Text(_panicBanner!),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => setState(() => _panicBanner = null),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                          leading: const Icon(
+                            Icons.warning_amber_rounded,
+                            color: AppColors.danger,
+                          ),
+                          title: const Text(
+                            'PANIK',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.danger,
+                            ),
+                          ),
+                          subtitle: Text(_panicBanner!),
+                        ),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 8,
+                          children: [
+                            TextButton(
+                              onPressed: _openPanicMap,
+                              child: const Text('Buka lokasi'),
+                            ),
+                            TextButton(
+                              onPressed: () => unawaited(_ackPanic()),
+                              child: const Text(AppStrings.ackAlert),
+                            ),
+                            FilledButton(
+                              onPressed: () => unawaited(_resolvePanic()),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.danger,
+                              ),
+                              child: const Text(AppStrings.resolveAlert),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
