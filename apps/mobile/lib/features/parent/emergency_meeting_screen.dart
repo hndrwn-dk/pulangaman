@@ -23,17 +23,30 @@ class EmergencyMeetingScreen extends ConsumerStatefulWidget {
       _EmergencyMeetingScreenState();
 }
 
+class _ChildEmpCache {
+  const _ChildEmpCache({this.primary, this.status});
+
+  final Map<String, dynamic>? primary;
+  final Map<String, dynamic>? status;
+}
+
 class _EmergencyMeetingScreenState
     extends ConsumerState<EmergencyMeetingScreen> {
   String? _childId;
-  Map<String, dynamic>? _primary;
-  Map<String, dynamic>? _status;
   bool _loading = true;
   bool _activating = false;
   bool _householdHasPoint = false;
   String? _lastSummary;
+  final Map<String, _ChildEmpCache> _cache = {};
+  final Set<String> _fetching = {};
 
   bool get _locked => widget.lockedChild != null;
+
+  Map<String, dynamic>? get _primary =>
+      _childId == null ? null : _cache[_childId!]?.primary;
+
+  Map<String, dynamic>? get _status =>
+      _childId == null ? null : _cache[_childId!]?.status;
 
   @override
   void initState() {
@@ -45,67 +58,69 @@ class _EmergencyMeetingScreenState
         final items = ref.read(childrenControllerProvider).items;
         if (items.isNotEmpty) _childId = items.first.id;
       }
-      await _reload();
+      await _prefetchAll(showSpinner: true);
     });
   }
 
-  Future<bool> _probeHouseholdHasPoint() async {
-    final children = ref.read(childrenControllerProvider).items;
-    if (children.isEmpty) return false;
-    final api = ref.read(apiClientProvider);
-    for (final c in children) {
-      try {
-        final list = await api.get(
-          '/api/v1/emergency-meeting-points',
-          query: {'childId': c.id},
-        );
-        final points = list['points'] as List<dynamic>? ?? [];
-        if (points.isNotEmpty) return true;
-      } catch (_) {
-        // Keep probing other children.
-      }
+  bool _computeHouseholdHasPoint() {
+    for (final entry in _cache.values) {
+      if (entry.primary != null) return true;
     }
     return false;
   }
 
-  Future<void> _reload() async {
-    final id = _childId;
-    if (id == null) {
+  Future<_ChildEmpCache> _fetchChild(String childId) async {
+    final api = ref.read(apiClientProvider);
+    final list = await api.get(
+      '/api/v1/emergency-meeting-points',
+      query: {'childId': childId},
+    );
+    final status =
+        await api.get('/api/v1/emergency-meeting-points/$childId/status');
+    final points = (list['points'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    Map<String, dynamic>? primary;
+    for (final p in points) {
+      if (p['isPrimary'] == true) {
+        primary = p;
+        break;
+      }
+    }
+    primary ??= points.isEmpty ? null : points.first;
+    return _ChildEmpCache(primary: primary, status: status);
+  }
+
+  Future<void> _prefetchAll({required bool showSpinner}) async {
+    final children = ref.read(childrenControllerProvider).items;
+    if (children.isEmpty) {
+      if (!mounted) return;
       setState(() {
-        _primary = null;
-        _status = null;
+        _cache.clear();
         _householdHasPoint = false;
         _loading = false;
       });
       return;
     }
-    setState(() => _loading = true);
+
+    final ids = _locked && widget.lockedChild != null
+        ? [widget.lockedChild!.id]
+        : children.map((c) => c.id).toList();
+
+    if (showSpinner && mounted) {
+      setState(() => _loading = true);
+    }
+
     try {
-      final api = ref.read(apiClientProvider);
-      final list = await api.get(
-        '/api/v1/emergency-meeting-points',
-        query: {'childId': id},
-      );
-      final status =
-          await api.get('/api/v1/emergency-meeting-points/$id/status');
-      final points = (list['points'] as List<dynamic>? ?? [])
-          .whereType<Map<String, dynamic>>()
-          .toList();
-      Map<String, dynamic>? primary;
-      for (final p in points) {
-        if (p['isPrimary'] == true) {
-          primary = p;
-          break;
-        }
-      }
-      primary ??= points.isEmpty ? null : points.first;
-      final householdHasPoint =
-          primary != null || await _probeHouseholdHasPoint();
+      final results = await Future.wait([
+        for (final id in ids) _fetchChild(id),
+      ]);
       if (!mounted) return;
       setState(() {
-        _primary = primary;
-        _status = status;
-        _householdHasPoint = householdHasPoint;
+        for (var i = 0; i < ids.length; i++) {
+          _cache[ids[i]] = results[i];
+        }
+        _householdHasPoint = _computeHouseholdHasPoint();
         _loading = false;
       });
     } catch (_) {
@@ -114,13 +129,46 @@ class _EmergencyMeetingScreenState
     }
   }
 
+  /// Soft refresh one child without blanking the UI (uses cache until done).
+  Future<void> _refreshChild(String childId, {bool forceSpinner = false}) async {
+    if (_fetching.contains(childId)) return;
+    _fetching.add(childId);
+    final hadCache = _cache.containsKey(childId);
+    if (forceSpinner || !hadCache) {
+      if (mounted) setState(() => _loading = true);
+    }
+    try {
+      final data = await _fetchChild(childId);
+      if (!mounted) return;
+      setState(() {
+        _cache[childId] = data;
+        _householdHasPoint = _computeHouseholdHasPoint();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    } finally {
+      _fetching.remove(childId);
+    }
+  }
+
   void _selectChild(String id) {
     if (_locked || _childId == id) return;
     setState(() {
       _childId = id;
       _lastSummary = null;
+      // Instant switch from cache — no full-screen spinner.
+      if (_cache.containsKey(id)) {
+        _loading = false;
+      }
     });
-    unawaited(_reload());
+    if (!_cache.containsKey(id)) {
+      unawaited(_refreshChild(id, forceSpinner: true));
+    } else {
+      // Background refresh for fresher distance without blocking UI.
+      unawaited(_refreshChild(id));
+    }
   }
 
   Future<void> _pickAndSavePrimary() async {
@@ -265,7 +313,7 @@ class _EmergencyMeetingScreenState
           },
         );
       }
-      await _reload();
+      await _prefetchAll(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -302,11 +350,10 @@ class _EmergencyMeetingScreenState
       if (!mounted) return;
       setState(() {
         _lastSummary = null;
-        _primary = null;
-        _status = null;
+        _cache.clear();
         _householdHasPoint = false;
       });
-      await _reload();
+      await _prefetchAll(showSpinner: true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
