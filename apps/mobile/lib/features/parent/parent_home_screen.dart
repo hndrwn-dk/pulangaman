@@ -227,6 +227,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       }
       return;
     }
+    if (event == 'child:panic_triggered' ||
+        event == 'child:panic_acked' ||
+        event == 'child:panic_resolved') {
+      unawaited(_loadMessages());
+      return;
+    }
     if (event != 'child:message') return;
     final msg = ChildKabarMessage.fromJson({
       'id': payload['id'] ??
@@ -255,17 +261,20 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   }
 
   void _openInbox({String? childId}) {
-    final children = ref.read(childrenControllerProvider).items;
-    final names = {for (final c in children) c.id: c.name};
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => KabarInboxScreen(
-          messages: List<ChildKabarMessage>.from(_messages),
-          initialChildId: childId,
-          childNames: names,
+    unawaited(_loadMessages().then((_) {
+      if (!mounted) return;
+      final children = ref.read(childrenControllerProvider).items;
+      final names = {for (final c in children) c.id: c.name};
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => KabarInboxScreen(
+            messages: List<ChildKabarMessage>.from(_messages),
+            initialChildId: childId,
+            childNames: names,
+          ),
         ),
-      ),
-    );
+      );
+    }));
   }
 
   String _greeting() {

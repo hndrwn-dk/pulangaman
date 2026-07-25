@@ -32,7 +32,8 @@ class ChildKabarMessage {
     );
   }
 
-  bool get isUrgent => preset == 'need_help';
+  bool get isUrgent =>
+      preset == 'need_help' || preset == 'panic';
 }
 
 IconData kabarPresetIcon(String? preset) {
@@ -43,6 +44,12 @@ IconData kabarPresetIcon(String? preset) {
       return Icons.home_rounded;
     case 'need_help':
       return Icons.support_agent_rounded;
+    case 'panic':
+      return Icons.warning_amber_rounded;
+    case 'panic_acked':
+      return Icons.mark_chat_read_rounded;
+    case 'panic_resolved':
+      return Icons.check_circle_rounded;
     default:
       return Icons.chat_bubble_rounded;
   }
@@ -56,6 +63,12 @@ Color kabarPresetColor(String? preset) {
       return AppColors.success;
     case 'need_help':
       return AppColors.coral;
+    case 'panic':
+      return AppColors.danger;
+    case 'panic_acked':
+      return AppColors.amber;
+    case 'panic_resolved':
+      return AppColors.success;
     default:
       return AppColors.sky;
   }

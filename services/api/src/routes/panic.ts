@@ -15,6 +15,39 @@ const triggerSchema = z.object({
   lng: z.number().min(-180).max(180),
 });
 
+/** Child: whether this device still has an active panic alert. */
+panicRouter.get('/me/active', async (req: AuthedRequest, res, next) => {
+  try {
+    const childId = req.auth?.userId;
+    if (!childId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const result = await pool.query<{ id: string; status: string; created_at: Date }>(
+      `SELECT id, status, created_at
+       FROM panic_alerts
+       WHERE child_id = $1
+         AND status IN ('active', 'guardian_notified', 'parent_responded')
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [childId],
+    );
+
+    const row = result.rows[0];
+    res.json({
+      active: row != null && (row.status === 'active' || row.status === 'guardian_notified'),
+      waitingParent: row?.status === 'parent_responded',
+      resolved: row == null,
+      alertId: row?.id ?? null,
+      status: row?.status ?? null,
+      createdAt: row?.created_at ?? null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 /** Active panic alerts for the signed-in parent (HTTP fallback when WS misses). */
 panicRouter.get('/active', async (req: AuthedRequest, res, next) => {
   try {
@@ -173,13 +206,13 @@ panicRouter.post('/:id/ack', async (req: AuthedRequest, res, next) => {
       [alertId, userId],
     );
 
+    const row = result.rows[0];
     await pool.query(
-      `INSERT INTO audit_events (actor_id, action, payload)
-       VALUES ($1, 'panic.parent_ack', $2::jsonb)`,
-      [userId, JSON.stringify({ alertId })],
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, 'panic.parent_ack', $3::jsonb)`,
+      [userId, row.child_id, JSON.stringify({ alertId })],
     );
 
-    const row = result.rows[0];
     const payload = { alertId, childId: row.child_id, status: 'parent_responded' };
     broadcastToRoom(childRoom(row.child_id), 'child:panic_acked', payload);
     broadcastToRoom(parentRoom(row.parent_id), 'child:panic_acked', payload);
@@ -221,13 +254,13 @@ panicRouter.post('/:id/resolve', async (req: AuthedRequest, res, next) => {
 
     cancelPanicCascade(alertId);
 
+    const row = result.rows[0];
     await pool.query(
-      `INSERT INTO audit_events (actor_id, action, payload)
-       VALUES ($1, 'panic.resolved', $2::jsonb)`,
-      [userId, JSON.stringify({ alertId })],
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, 'panic.resolved', $3::jsonb)`,
+      [userId, row.child_id, JSON.stringify({ alertId })],
     );
 
-    const row = result.rows[0];
     const payload = { alertId, childId: row.child_id, status: 'resolved' };
     broadcastToRoom(childRoom(row.child_id), 'child:panic_resolved', payload);
     broadcastToRoom(parentRoom(row.parent_id), 'child:panic_resolved', payload);

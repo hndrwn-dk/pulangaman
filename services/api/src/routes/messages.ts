@@ -44,14 +44,31 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
          ae.id,
          ae.subject_child_id AS child_id,
          u.name AS child_name,
-         ae.payload->>'text' AS text,
-         ae.payload->>'preset' AS preset,
+         CASE
+           WHEN ae.action = 'child.message' THEN ae.payload->>'text'
+           WHEN ae.action = 'panic.triggered' THEN 'TOMBOL PANIK ditekan'
+           WHEN ae.action = 'panic.parent_ack' THEN 'Orang tua sudah merespons panik'
+           WHEN ae.action = 'panic.resolved' THEN 'Panik selesai / aman'
+           ELSE ae.payload->>'text'
+         END AS text,
+         CASE
+           WHEN ae.action = 'child.message' THEN ae.payload->>'preset'
+           WHEN ae.action = 'panic.triggered' THEN 'panic'
+           WHEN ae.action = 'panic.parent_ack' THEN 'panic_acked'
+           WHEN ae.action = 'panic.resolved' THEN 'panic_resolved'
+           ELSE ae.payload->>'preset'
+         END AS preset,
          ae.created_at AS sent_at
        FROM audit_events ae
        JOIN parent_children pc ON pc.child_id = ae.subject_child_id
        JOIN users u ON u.id = ae.subject_child_id
        WHERE pc.parent_id = $1
-         AND ae.action = 'child.message'
+         AND ae.action IN (
+           'child.message',
+           'panic.triggered',
+           'panic.parent_ack',
+           'panic.resolved'
+         )
          AND ae.created_at > now() - interval '24 hours'
        ORDER BY ae.created_at DESC
        LIMIT 50`,

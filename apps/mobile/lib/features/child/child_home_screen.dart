@@ -57,6 +57,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   final LocationTrackingChannel _locationChannel = LocationTrackingChannel();
   final ReminderChannel _reminderChannel = ReminderChannel();
   Timer? _panicCooldownTimer;
+  Timer? _panicStatusPoll;
 
   @override
   void initState() {
@@ -66,6 +67,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     Future.microtask(_setupScreenTimeAndRewards);
     Future.microtask(_syncReminders);
     Future.microtask(_connectReminderWs);
+    Future.microtask(_pollPanicStatus);
+    _panicStatusPoll = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => unawaited(_pollPanicStatus()),
+    );
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
   }
@@ -76,6 +82,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       unawaited(_refreshScreenTimeAndRewards());
       unawaited(_ensureNativeTracking());
       unawaited(_syncReminders());
+      unawaited(_connectReminderWs(force: true));
+      unawaited(_pollPanicStatus());
     }
   }
 
@@ -126,15 +134,15 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     }
   }
 
-  Future<void> _connectReminderWs() async {
+  Future<void> _connectReminderWs({bool force = false}) async {
     final auth = ref.read(authControllerProvider);
     final token = auth.token;
     final userId = auth.userId;
     if (token == null || userId == null) return;
     try {
-      if (!_ws.isConnected) {
-        await _ws.connect(token);
+      if (force || !_ws.isConnected) {
         _ws.addHandler(_onReminderWs);
+        await _ws.connect(token);
       }
       _ws.subscribe('child:$userId');
     } catch (_) {}
@@ -152,6 +160,26 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             : 'Panik ditandai selesai / aman',
       ));
     }
+  }
+
+  Future<void> _pollPanicStatus() async {
+    if (!mounted) return;
+    // Always poll while panic UI is on; also once after resume to recover.
+    if (!_panicMode && !_panicTapCounter.isOnCooldown) return;
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/panic/me/active');
+      final active = data['active'] == true;
+      final waitingParent = data['waitingParent'] == true;
+      final resolved = data['resolved'] == true;
+      if (active) return;
+      if (waitingParent) {
+        await _clearPanicState(message: 'Orang tua sudah merespons panik');
+        return;
+      }
+      if (resolved || data['status'] == null) {
+        await _clearPanicState(message: 'Panik ditandai selesai / aman');
+      }
+    } catch (_) {}
   }
 
   Future<void> _clearPanicState({String? message}) async {
@@ -615,6 +643,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySub?.cancel();
     _panicCooldownTimer?.cancel();
+    _panicStatusPoll?.cancel();
     _ws.removeHandler(_onReminderWs);
     unawaited(_ws.disconnect());
     // Keep native FGS running after Flutter dispose so background tracking continues.
