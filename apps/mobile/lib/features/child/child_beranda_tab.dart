@@ -236,8 +236,7 @@ class ChildBerandaTab extends StatelessWidget {
             ),
           ),
         ],
-        // Hide idle trip CTA while EMP is active — reduces stack noise.
-        if (tripActive || (onStartTrip != null && !empActive)) ...[
+        if (tripActive || onStartTrip != null) ...[
           const SizedBox(height: AppSpacing.md),
           PaSectionCard(
             color: AppColors.sky.withValues(alpha: 0.14),
@@ -287,11 +286,11 @@ class ChildBerandaTab extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.lg),
         PaSectionCard(
-          color: AppColors.coral.withValues(alpha: empActive ? 0.06 : 0.12),
+          color: AppColors.coral.withValues(alpha: 0.12),
           child: Column(
             children: [
               SizedBox(
-                height: empActive ? 112 : 180,
+                height: 180,
                 child: FilledButton(
                   onPressed: (panicInFlight || panicOnCooldown) ? null : onPanicTap,
                   style: FilledButton.styleFrom(
@@ -301,22 +300,14 @@ class ChildBerandaTab extends StatelessWidget {
                   child: Text(
                     AppStrings.panicButton,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w900,
-                          fontSize: empActive ? 13 : null,
                         ),
                   ),
                 ),
               ),
-              Text(
-                AppStrings.panicConfirm,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: empActive ? 12.5 : 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              const Text(AppStrings.panicConfirm, textAlign: TextAlign.center),
               const SizedBox(height: 4),
               Text(
                 panicInFlight
@@ -332,7 +323,6 @@ class ChildBerandaTab extends StatelessWidget {
                       ? AppColors.danger
                       : AppColors.inkSoft,
                   fontWeight: FontWeight.w600,
-                  fontSize: empActive ? 12 : 14,
                 ),
               ),
             ],
