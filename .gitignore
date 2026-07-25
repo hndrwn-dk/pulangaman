@@ -7,6 +7,10 @@ Thumbs.db
 .history
 .buildlog/
 
+# Local-only (not published)
+docs/
+.cursor/rules/
+
 # Env / secrets
 .env
 .env.*
