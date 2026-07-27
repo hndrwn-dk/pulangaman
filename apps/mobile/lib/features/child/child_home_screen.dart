@@ -12,10 +12,11 @@ import '../../core/config.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/parse_coord.dart';
 import '../../core/storage/offline_queue.dart';
-import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../parent/emergency_meeting_alert_screen.dart';
+import '../parent/visual_refresh_flag.dart';
 import '../screentime/screen_time_channel.dart';
 import 'child_beranda_tab.dart';
 import 'child_kabar_tab.dart';
@@ -220,10 +221,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       return;
     }
     if (event == 'child:panic_acked' || event == 'child:panic_resolved') {
+      final l10n = AppLocalizations.of(context);
       unawaited(_clearPanicState(
         message: event == 'child:panic_acked'
-            ? 'Orang tua sudah merespons panik'
-            : 'Panik ditandai selesai / aman',
+            ? l10n.panicAckedByParent
+            : l10n.panicResolvedSafe,
       ));
     }
   }
@@ -249,7 +251,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       // Fall through and show from the push payload if the poll failed.
     }
 
-    final name = payload['meetingPointName'] as String? ?? 'Titik kumpul';
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final name = payload['meetingPointName'] as String? ?? l10n.empDefaultPlaceName;
     final lat = parseCoord(payload['lat']);
     final lng = parseCoord(payload['lng']);
     if (lat == null || lng == null || !mounted) return;
@@ -267,11 +271,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     });
     try {
       await _reminderChannel.previewNow(
-        title: 'Titik Kumpul Darurat',
+        title: l10n.empAlertTitle,
         body: note != null && note.isNotEmpty
-            ? '$note — menuju $name'
-            : 'Segera menuju titik kumpul: $name',
+            ? l10n.empAlertBodyWithNote(note, name)
+            : l10n.empAlertBodyPlain(name),
         style: 'fullscreen',
+        visualRefresh: ref.read(visualRefreshEnabledProvider),
       );
     } catch (_) {}
     if (!mounted) return;
@@ -302,7 +307,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Titik kumpul darurat sudah dinonaktifkan')),
+      SnackBar(content: Text(AppLocalizations.of(context).empDeactivated)),
     );
   }
 
@@ -371,7 +376,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           (activationId != null && activationId != _empAlertOpenedId)) {
         final lat = parseCoord(alert['lat']);
         final lng = parseCoord(alert['lng']);
-        final name = alert['meetingPointName'] as String? ?? 'Titik kumpul';
+        final name = alert['meetingPointName'] as String? ??
+            AppLocalizations.of(context).empDefaultPlaceName;
         if (lat != null && lng != null) {
           await _openEmergencyMeetingScreen(
             placeName: name,
@@ -434,12 +440,15 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
 
       if (shouldPreview) {
         _homeByPreviewShown = true;
-        final name = ref.read(authControllerProvider).name ?? 'Anak';
+        if (!mounted) return;
+        final l10n = AppLocalizations.of(context);
+        final name = ref.read(authControllerProvider).name ?? l10n.homeByDefaultChildName;
         try {
           await _reminderChannel.previewNow(
-            title: 'Waktunya pulang',
-            body: '$name, sebentar lagi waktu pulang ya',
+            title: l10n.homeByPreviewTitle,
+            body: l10n.homeByPreviewBody(name),
             style: 'fullscreen',
+            visualRefresh: ref.read(visualRefreshEnabledProvider),
           );
         } catch (_) {}
       }
@@ -449,11 +458,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Future<void> _openHomeByAckSheet() async {
     final userId = ref.read(authControllerProvider).userId;
     if (userId == null) return;
+    final l10n = AppLocalizations.of(context);
     final reasons = <({String id, String label})>[
-      (id: 'in_transit', label: 'Di jalan'),
-      (id: 'stopped_by', label: 'Mampir dulu'),
-      (id: 'school_activity', label: 'Ada kegiatan sekolah'),
-      (id: 'other', label: 'Lainnya'),
+      (id: 'in_transit', label: l10n.homeByChildAckReasonInTransit),
+      (id: 'stopped_by', label: l10n.homeByChildAckReasonStoppedBy),
+      (id: 'school_activity', label: l10n.homeByChildAckReasonSchool),
+      (id: 'other', label: l10n.homeByChildAckReasonOther),
     ];
     String selected = 'in_transit';
     final noteCtrl = TextEditingController();
@@ -474,9 +484,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Beri kabar ke orang tua',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  Text(
+                    l10n.homeByChildAckTitle,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -496,15 +506,15 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                     TextField(
                       controller: noteCtrl,
                       maxLength: 140,
-                      decoration: const InputDecoration(
-                        hintText: 'Catatan singkat (opsional)',
+                      decoration: InputDecoration(
+                        hintText: l10n.homeByChildAckNoteHint,
                       ),
                     ),
                   ],
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('Kirim ke orang tua'),
+                    child: Text(l10n.homeByChildAckSubmit),
                   ),
                 ],
               );
@@ -529,12 +539,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (!mounted) return;
       setState(() => _homeByAcked = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sudah dikirim ke orang tua')),
+        SnackBar(content: Text(AppLocalizations.of(context).homeByChildAckSent)),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context).errorWithDetail('$e'))),
       );
     } finally {
       noteCtrl.dispose();
@@ -566,12 +576,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (!mounted) return;
       setState(() => _trip = null);
     });
+    final l10n = AppLocalizations.of(context);
+    final destination =
+        payload['toLabel'] as String? ?? l10n.destinationFallback;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Tiba di ${payload['toLabel'] as String? ?? 'tujuan'} — ortu sudah diberitahu',
-        ),
-      ),
+      SnackBar(content: Text(l10n.tripArrivedNotified(destination))),
     );
   }
 
@@ -589,7 +598,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context).errorWithDetail('$e'))),
       );
     }
   }
@@ -605,7 +614,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context).errorWithDetail('$e'))),
       );
     }
   }
@@ -621,7 +630,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context).errorWithDetail('$e'))),
       );
     }
   }
@@ -635,9 +644,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           .toList();
     } catch (_) {}
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     if (zones.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Belum ada cukup tempat tersimpan')),
+        SnackBar(content: Text(l10n.tripNotEnoughPlaces)),
       );
       return;
     }
@@ -646,9 +656,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       final name = (z['name'] as String?)?.trim();
       if (name != null && name.isNotEmpty) return name;
       final type = z['type'] as String?;
-      if (type == 'home') return 'Rumah';
-      if (type == 'school') return 'Sekolah';
-      return 'Tempat';
+      if (type == 'home') return l10n.homeZone;
+      if (type == 'school') return l10n.schoolZone;
+      return l10n.zoneGenericLabel;
     }
 
     Map<String, dynamic>? fromZone;
@@ -692,12 +702,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Mulai perjalanan',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
+                  Text(
+                    l10n.tripChildStart,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Dari', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text(l10n.tripPickFrom, style: const TextStyle(fontWeight: FontWeight.w700)),
                   DropdownButton<String>(
                     isExpanded: true,
                     value: fromId,
@@ -711,7 +721,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                     onChanged: (v) => setSheet(() => fromId = v),
                   ),
                   const SizedBox(height: 8),
-                  const Text('Ke', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text(l10n.tripPickTo, style: const TextStyle(fontWeight: FontWeight.w700)),
                   DropdownButton<String>(
                     isExpanded: true,
                     value: toId,
@@ -732,7 +742,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                       }
                       Navigator.of(ctx).pop(true);
                     },
-                    child: const Text('Mulai'),
+                    child: Text(l10n.startAction),
                   ),
                 ],
               ),
@@ -757,7 +767,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $e')),
+        SnackBar(content: Text(AppLocalizations.of(context).errorWithDetail('$e'))),
       );
     }
   }
@@ -772,12 +782,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       final waitingParent = data['waitingParent'] == true;
       final resolved = data['resolved'] == true;
       if (active) return;
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       if (waitingParent) {
-        await _clearPanicState(message: 'Orang tua sudah merespons panik');
+        await _clearPanicState(message: l10n.panicAckedByParent);
         return;
       }
       if (resolved || data['status'] == null) {
-        await _clearPanicState(message: 'Panik ditandai selesai / aman');
+        await _clearPanicState(message: l10n.panicResolvedSafe);
       }
     } catch (_) {}
   }
@@ -790,9 +802,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       await _setPanicMode(false);
     }
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _panicMode = false;
-      _status = _tracking ? AppStrings.trackingOn : _status;
+      _status = _tracking ? l10n.trackingOn : _status;
     });
     if (message != null) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -846,13 +859,12 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (!mounted) return;
       setState(() => _reminderCount = list.length);
       if (!_exactAlarmOk && list.isNotEmpty) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(
-              'Izinkan alarm tepat waktu agar pengingat ortu muncul.',
-            ),
+            content: Text(l10n.allowExactAlarmMessage),
             action: SnackBarAction(
-              label: 'Buka',
+              label: l10n.openAction,
               onPressed: _openReminderPermissions,
             ),
           ),
@@ -934,7 +946,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       if (!mounted) return;
-      setState(() => _status = 'Izin lokasi ditolak');
+      setState(() => _status = AppLocalizations.of(context).locationPermissionDenied);
       return;
     }
 
@@ -945,7 +957,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     final token = ref.read(authControllerProvider).token;
     if (token == null || token.isEmpty) {
       if (!mounted) return;
-      setState(() => _status = 'Sesi belum siap');
+      setState(() => _status = AppLocalizations.of(context).sessionNotReady);
       return;
     }
 
@@ -961,14 +973,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       setState(() {
         _tracking = true;
         _status = always.isGranted
-            ? AppStrings.trackingOn
-            : 'Lokasi aktif — izinkan "Selalu" agar tetap jalan di background';
+            ? AppLocalizations.of(context).trackingOn
+            : AppLocalizations.of(context).trackingOnNeedsAlways;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _tracking = true;
-        _status = AppStrings.trackingOn;
+        _status = AppLocalizations.of(context).trackingOn;
       });
       unawaited(_pushLocationOnce());
     }
@@ -1086,15 +1098,21 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       final online = await _isOnline();
       if (!online) {
         await ref.read(offlineQueueProvider).enqueue('location', body);
-        if (mounted) setState(() => _status = AppStrings.offlineQueued);
+        if (mounted) {
+          setState(() => _status = AppLocalizations.of(context).offlineQueued);
+        }
         return;
       }
 
       await ref.read(apiClientProvider).post('/api/v1/location', body: body);
-      if (mounted) setState(() => _status = AppStrings.trackingOn);
+      if (mounted) {
+        setState(() => _status = AppLocalizations.of(context).trackingOn);
+      }
       await _flushQueue();
     } catch (_) {
-      if (mounted) setState(() => _status = 'Gagal kirim lokasi');
+      if (mounted) {
+        setState(() => _status = AppLocalizations.of(context).locationSendFailed);
+      }
     }
   }
 
@@ -1133,16 +1151,29 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     }
     if (tapResult > 0) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${AppStrings.panicConfirm} ($tapResult/3)'),
+          content: Text(l10n.panicConfirmCount(tapResult)),
           duration: const Duration(seconds: 2),
         ),
       );
       return;
     }
 
+    await _firePanicAlert();
+  }
+
+  /// Visual Refresh press-and-hold completion — same cascade as triple-tap.
+  Future<void> _onPanicHoldComplete() async {
+    if (_panicInFlight || _panicTapCounter.isOnCooldown) {
+      return;
+    }
+    await _firePanicAlert();
+  }
+
+  Future<void> _firePanicAlert() async {
     _panicInFlight = true;
     _panicTapCounter.markTriggered();
     _schedulePanicCooldownRefresh();
@@ -1168,7 +1199,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.offlineQueued)),
+          SnackBar(content: Text(AppLocalizations.of(context).offlineQueued)),
         );
       }
       _panicInFlight = false;
@@ -1181,9 +1212,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(AppStrings.panicSent),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).panicSent),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -1193,8 +1224,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal kirim panik. Dicoba lagi otomatis.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).panicSendFailedRetrying),
           ),
         );
       }
@@ -1212,12 +1243,16 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Kabar terkirim: ${preset.label}')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).childMessageSentWithLabel(preset.label),
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mengirim kabar. Coba lagi.')),
+        SnackBar(content: Text(AppLocalizations.of(context).childMessageFailed)),
       );
     } finally {
       if (mounted) setState(() => _sendingPresetId = null);
@@ -1225,9 +1260,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   }
 
   Future<void> _smsFallback() async {
-    final uri = Uri.parse(
-      'sms:?body=${Uri.encodeComponent('PulangAman PANIK — butuh bantuan sekarang.')}',
-    );
+    if (!mounted) return;
+    final body = AppLocalizations.of(context).smsFallbackPanicBody;
+    final uri = Uri.parse('sms:?body=${Uri.encodeComponent(body)}');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
@@ -1257,55 +1292,63 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
-    final childName = auth.name ?? 'Sahabat';
+    final l10n = AppLocalizations.of(context);
+    final childName = auth.name ?? l10n.greetingDefaultName;
+    final refresh = visualRefreshOf(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const SizedBox.shrink(),
         actions: [
           IconButton(
-            tooltip: 'Segarkan (kirim daftar app & aturan)',
+            tooltip: l10n.refreshTooltip,
             onPressed: () async {
               await _refreshScreenTimeAndRewards();
               await _syncReminders();
               if (!context.mounted) return;
               final sent = _usageApps.isNotEmpty;
+              final refreshL10n = AppLocalizations.of(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
                     sent
-                        ? 'Lokasi & daftar app dikirim ke ortu'
-                        : 'Lokasi dikirim. Daftar app kosong — cek izin Usage Access.',
+                        ? refreshL10n.refreshSentWithApps
+                        : refreshL10n.refreshSentNoApps,
                   ),
                 ),
               );
             },
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              refresh ? Icons.refresh_outlined : Icons.refresh,
+            ),
           ),
           IconButton(
-            tooltip: AppStrings.logout,
+            tooltip: l10n.logout,
             onPressed: () async {
               final ok = await showDialog<bool>(
                 context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Keluar dari akun anak?'),
-                  content: const Text(
-                    'Untuk masuk lagi, minta kode masuk ulang dari HP ortu.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Batal'),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.coral,
+                builder: (ctx) {
+                  final dialogRefresh = visualRefreshOf(ctx);
+                  return AlertDialog(
+                    title: Text(l10n.logoutConfirmTitle),
+                    content: Text(l10n.logoutConfirmBody),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(l10n.cancel),
                       ),
-                      child: const Text('Keluar'),
-                    ),
-                  ],
-                ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: dialogRefresh
+                              ? VisualRefreshColors.danger
+                              : AppColors.coral,
+                        ),
+                        child: Text(l10n.logout),
+                      ),
+                    ],
+                  );
+                },
               );
               if (ok != true) return;
               try {
@@ -1313,7 +1356,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
               } catch (_) {}
               await ref.read(authControllerProvider.notifier).logout();
             },
-            icon: const Icon(Icons.logout),
+            icon: Icon(
+              refresh ? Icons.logout_outlined : Icons.logout,
+            ),
           ),
         ],
       ),
@@ -1334,7 +1379,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             panicActive: _panicMode,
             reminderCount: _reminderCount,
             exactAlarmOk: _exactAlarmOk,
-            onPanicTap: _onPanicTap,
+            onPanicTap: () => unawaited(_onPanicTap()),
+            onPanicHoldComplete: () => unawaited(_onPanicHoldComplete()),
             onOpenUsageSettings: _screenTimeChannel.openUsageAccessSettings,
             onOpenAccessibilitySettings:
                 _screenTimeChannel.openAccessibilitySettings,
@@ -1384,7 +1430,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                     );
                     final name = (fromActive?['meetingPointName'] as String?) ??
                         (_empPoint?['name'] as String?) ??
-                        'Titik kumpul';
+                        l10n.empDefaultPlaceName;
                     if (lat == null || lng == null) return;
                     _empAlertOpenedId = null;
                     unawaited(
@@ -1423,21 +1469,21 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             unawaited(_loadUsageStats(_usagePeriod));
           }
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Beranda',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: l10n.childTabHome,
           ),
           NavigationDestination(
-            icon: Icon(Icons.hourglass_empty_outlined),
-            selectedIcon: Icon(Icons.hourglass_bottom),
-            label: 'Layar',
+            icon: const Icon(Icons.hourglass_empty_outlined),
+            selectedIcon: const Icon(Icons.hourglass_bottom),
+            label: l10n.childTabScreen,
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Kabar',
+            icon: const Icon(Icons.chat_bubble_outline),
+            selectedIcon: const Icon(Icons.chat_bubble),
+            label: l10n.childTabMessages,
           ),
         ],
       ),

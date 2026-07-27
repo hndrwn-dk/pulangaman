@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../community/reports_screen.dart';
 import '../rewards/rewards_screen.dart';
@@ -21,12 +23,12 @@ class MoreScreen extends ConsumerStatefulWidget {
 
 class _MoreScreenState extends ConsumerState<MoreScreen> {
   int _reminderCount = 0;
-  String _reminderHint = 'Belum ada pengingat';
-  String _homeByHint = 'Belum diaktifkan';
+  String? _reminderHint;
+  String? _homeByHint;
   int _points = 0;
   int _streak = 0;
-  String _guardianHint = 'Belum ada wali';
-  String _reportHint = 'Belum ada laporan';
+  String? _guardianHint;
+  String? _reportHint;
   bool _loadingStats = true;
 
   @override
@@ -119,24 +121,23 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
       // Keep defaults if aggregate fetch fails.
     }
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _reminderCount = reminders;
       _reminderHint = reminders == 0
-          ? 'Belum ada pengingat'
-          : '$reminders pengingat aktif'
+          ? null
+          : '${l10n.reminderActiveCount(reminders)}'
               '${reminderTitles.isEmpty ? '' : ' · ${reminderTitles.take(2).join(' & ')}'}';
-      _homeByHint = homeByParts.isEmpty
-          ? 'Belum diaktifkan'
-          : homeByParts.take(2).join(' · ');
+      _homeByHint = homeByParts.isEmpty ? null : homeByParts.take(2).join(' · ');
       _points = points;
       _streak = streak;
       _guardianHint = guardians == 0
-          ? 'Belum ada wali'
-          : '$guardians wali'
+          ? null
+          : '${l10n.guardiansCountLabel(guardians)}'
               '${guardianChild == null ? '' : ' · $guardianChild'}';
       _reportHint = reports == 0
-          ? 'Belum ada laporan'
-          : '$reports laporan'
+          ? null
+          : '${l10n.reportsCountLabel(reports)}'
               '${reportNote == null ? '' : ' · $reportNote'}';
       _loadingStats = false;
     });
@@ -150,30 +151,45 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
+      backgroundColor:
+          refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.teal,
+          color: refresh ? VisualRefreshColors.accent : AppColors.teal,
           onRefresh: _loadStats,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
-              const Text(
-                'Fitur Lainnya',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                ),
+              Text(
+                l10n.moreScreenTitle,
+                style: refresh
+                    ? GoogleFonts.fraunces(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.4,
+                        color: VisualRefreshColors.textPrimary,
+                      )
+                    : const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                      ),
               ),
               const SizedBox(height: 2),
-              const Text(
-                'Kelola pengaturan & tambahan',
+              Text(
+                l10n.moreScreenSubtitle,
                 style: TextStyle(
-                  color: AppColors.inkSoft,
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
               ),
               const SizedBox(height: 16),
@@ -182,98 +198,125 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
                   Expanded(
                     child: _StatCard(
                       value: _loadingStats ? '—' : '$_reminderCount',
-                      label: 'Pengingat Aktif',
+                      label: l10n.activeRemindersStatLabel,
                       color: AppColors.tealDeep,
+                      refresh: refresh,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _StatCard(
                       value: _loadingStats ? '—' : '$_points',
-                      label: 'Total Poin',
+                      label: l10n.totalPointsStatLabel,
                       color: const Color(0xFFE8913A),
+                      refresh: refresh,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 22),
-              _SectionLabel('JADWAL & AKTIVITAS'),
+              _SectionLabel(l10n.sectionScheduleActivity, refresh: refresh),
               const SizedBox(height: 8),
               _MenuGroup(
+                refresh: refresh,
                 children: [
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.alarm_rounded,
                     iconBg: const Color(0xFFE8F6F1),
                     iconColor: const Color(0xFFE85A7A),
-                    title: 'Pengingat Jadwal',
-                    subtitle: _reminderHint,
+                    vrIconBg: const Color(0xFFF8E8EC),
+                    vrIconColor: const Color(0xFFC45B6E),
+                    title: l10n.remindersTitle,
+                    subtitle: _reminderHint ?? l10n.noRemindersYet,
                     onTap: () => _open(const RemindersScreen()),
                   ),
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.nights_stay_rounded,
                     iconBg: const Color(0xFFEAE6FA),
                     iconColor: const Color(0xFF7C3AED),
-                    title: 'Jam Pulang Aman',
-                    subtitle: _homeByHint,
+                    vrIconBg: const Color(0xFFEEE8F8),
+                    vrIconColor: const Color(0xFF6B5B95),
+                    title: l10n.homeByTitle,
+                    subtitle: _homeByHint ?? l10n.homeBySummaryOff,
                     onTap: () => _open(const HomeByScreen()),
                   ),
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.card_giftcard_rounded,
                     iconBg: const Color(0xFFFFF0DC),
                     iconColor: const Color(0xFFE8913A),
-                    title: 'Hadiah & Poin',
+                    vrIconBg: const Color(0xFFF8EFE0),
+                    vrIconColor: const Color(0xFFC47E3A),
+                    title: l10n.rewardsTitle,
                     subtitle: _points == 0 && _streak == 0
-                        ? '0 poin · Belum ada streak'
-                        : '$_points poin'
-                            '${_streak > 0 ? ' · Streak $_streak hari' : ''}',
+                        ? l10n.noPointsNoStreak
+                        : _streak > 0
+                            ? l10n.pointsStreakLabel(_points, _streak)
+                            : l10n.pointsCountLabel(_points),
                     onTap: () => _open(const RewardsScreen()),
                     showDivider: false,
                   ),
                 ],
               ),
               const SizedBox(height: 18),
-              _SectionLabel('KEAMANAN'),
+              _SectionLabel(l10n.sectionSafety, refresh: refresh),
               const SizedBox(height: 8),
               _MenuGroup(
+                refresh: refresh,
                 children: [
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.shield_rounded,
                     iconBg: const Color(0xFFFFE8F0),
                     iconColor: const Color(0xFF3B82F6),
-                    title: 'Wali Terpercaya',
-                    subtitle: _guardianHint,
+                    vrIconBg: const Color(0xFFF8E8EC),
+                    vrIconColor: const Color(0xFF5B7DB8),
+                    title: l10n.guardiansTitle,
+                    subtitle: _guardianHint ?? l10n.noGuardiansYet,
                     onTap: () => _open(const GuardiansEntryScreen()),
                   ),
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.groups_rounded,
                     iconBg: const Color(0xFFFFE8E6),
                     iconColor: const Color(0xFFDC2626),
-                    title: 'Titik Kumpul Darurat',
-                    subtitle: 'Tempat bertemu saat darurat',
+                    vrIconBg: const Color(0xFFF8E8E6),
+                    vrIconColor: VisualRefreshColors.danger,
+                    title: l10n.empTitle,
+                    subtitle: l10n.emergencyMeetingMenuSubtitle,
                     onTap: () => _open(const EmergencyMeetingScreen()),
                   ),
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.warning_amber_rounded,
                     iconBg: const Color(0xFFFFE8E6),
                     iconColor: const Color(0xFFE8913A),
-                    title: 'Laporan Komunitas',
-                    subtitle: _reportHint,
+                    vrIconBg: const Color(0xFFF8EFE0),
+                    vrIconColor: const Color(0xFFC47E3A),
+                    title: l10n.communityReportsTitle,
+                    subtitle: _reportHint ?? l10n.noReportsYet,
                     onTap: () => _open(const ReportsScreen()),
                     showDivider: false,
                   ),
                 ],
               ),
               const SizedBox(height: 18),
-              _SectionLabel('PENGATURAN'),
+              _SectionLabel(l10n.sectionSettings, refresh: refresh),
               const SizedBox(height: 8),
               _MenuGroup(
+                refresh: refresh,
                 children: [
                   _MenuRow(
+                    refresh: refresh,
                     icon: Icons.settings_rounded,
                     iconBg: const Color(0xFFE8ECF0),
                     iconColor: const Color(0xFF7C3AED),
-                    title: 'Pengaturan Akun',
-                    subtitle: 'Notifikasi, privasi, keluar',
+                    vrIconBg: VisualRefreshColors.tagMuted,
+                    vrIconColor: VisualRefreshColors.textSecondary,
+                    title: l10n.settingsAccountTitle,
+                    subtitle: l10n.accountSettingsMenuSubtitle,
                     onTap: () => _open(const AccountSettingsScreen()),
                     showDivider: false,
                   ),
@@ -288,19 +331,22 @@ class _MoreScreenState extends ConsumerState<MoreScreen> {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
+  const _SectionLabel(this.text, {this.refresh = false});
 
   final String text;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w800,
-        letterSpacing: 0.8,
-        color: AppColors.inkSoft,
+        letterSpacing: refresh ? 1.1 : 0.8,
+        color: refresh ? VisualRefreshColors.textSecondary : AppColors.inkSoft,
+        fontFamily:
+            refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
       ),
     );
   }
@@ -311,14 +357,55 @@ class _StatCard extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
+    this.refresh = false,
   });
 
   final String value;
   final String label;
   final Color color;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    if (refresh) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+        decoration: BoxDecoration(
+          color: VisualRefreshColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.vrCard),
+          border: Border.all(
+            color: VisualRefreshColors.border,
+            width: 0.5,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              value,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.fraunces(
+                color: VisualRefreshColors.textPrimary,
+                fontSize: 32,
+                fontWeight: FontWeight.w600,
+                height: 1.05,
+                letterSpacing: -0.8,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                color: VisualRefreshColors.textSecondary,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
       decoration: BoxDecoration(
@@ -361,23 +448,31 @@ class _StatCard extends StatelessWidget {
 }
 
 class _MenuGroup extends StatelessWidget {
-  const _MenuGroup({required this.children});
+  const _MenuGroup({required this.children, this.refresh = false});
 
   final List<Widget> children;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: refresh ? VisualRefreshColors.surface : Colors.white,
+        borderRadius: BorderRadius.circular(
+          refresh ? AppRadius.vrCard : 20,
+        ),
+        border: refresh
+            ? Border.all(color: VisualRefreshColors.border, width: 0.5)
+            : null,
+        boxShadow: refresh
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
       ),
       child: Column(children: children),
     );
@@ -392,26 +487,34 @@ class _MenuRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.vrIconBg,
+    this.vrIconColor,
     this.showDivider = true,
+    this.refresh = false,
   });
 
   final IconData icon;
   final Color iconBg;
   final Color iconColor;
+  final Color? vrIconBg;
+  final Color? vrIconColor;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
   final bool showDivider;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final tileBg = refresh ? (vrIconBg ?? iconBg) : iconBg;
+    final tileFg = refresh ? (vrIconColor ?? iconColor) : iconColor;
     return Column(
       children: [
         Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(refresh ? AppRadius.vrCard : 20),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
               child: Row(
@@ -420,10 +523,12 @@ class _MenuRow extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: iconBg,
-                      borderRadius: BorderRadius.circular(12),
+                      color: tileBg,
+                      borderRadius: BorderRadius.circular(
+                        refresh ? AppRadius.vrChip : 12,
+                      ),
                     ),
-                    child: Icon(icon, color: iconColor, size: 22),
+                    child: Icon(icon, color: tileFg, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -432,28 +537,41 @@ class _MenuRow extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15.5,
-                          ),
+                          style: refresh
+                              ? GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15.5,
+                                  color: VisualRefreshColors.textPrimary,
+                                )
+                              : const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15.5,
+                                ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.inkSoft,
+                          style: TextStyle(
+                            color: refresh
+                                ? VisualRefreshColors.textSecondary
+                                : AppColors.inkSoft,
                             fontWeight: FontWeight.w600,
                             fontSize: 12.5,
+                            fontFamily: refresh
+                                ? GoogleFonts.plusJakartaSans().fontFamily
+                                : null,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.inkSoft,
+                    color: refresh
+                        ? VisualRefreshColors.textTertiary
+                        : AppColors.inkSoft,
                   ),
                 ],
               ),
@@ -461,7 +579,12 @@ class _MenuRow extends StatelessWidget {
           ),
         ),
         if (showDivider)
-          const Divider(height: 1, indent: 70, endIndent: 14),
+          Divider(
+            height: 1,
+            indent: 70,
+            endIndent: 14,
+            color: refresh ? VisualRefreshColors.border : null,
+          ),
       ],
     );
   }

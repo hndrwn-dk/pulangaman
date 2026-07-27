@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/network/api_client.dart';
@@ -95,23 +96,36 @@ class _EmergencyMeetingScreenState
 
   Future<void> _deactivate() async {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.empDeactivate),
-        content: Text(l10n.empDeactivateConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.empActivateCancel),
-          ),
-          FilledButton(
-            key: const Key('emp_deactivate_confirm'),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.empDeactivate),
-          ),
-        ],
-      ),
+      barrierColor: refresh
+          ? VisualRefreshColors.anchor.withValues(alpha: 0.45)
+          : null,
+      builder: (ctx) => refresh
+          ? _EmpConfirmDialog(
+              title: l10n.empDeactivate,
+              body: l10n.empDeactivateConfirm,
+              confirmLabel: l10n.empDeactivate,
+              confirmKey: const Key('emp_deactivate_confirm'),
+              confirmColor: VisualRefreshColors.anchor,
+              cancelLabel: l10n.empActivateCancel,
+            )
+          : AlertDialog(
+              title: Text(l10n.empDeactivate),
+              content: Text(l10n.empDeactivateConfirm),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(l10n.empActivateCancel),
+                ),
+                FilledButton(
+                  key: const Key('emp_deactivate_confirm'),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(l10n.empDeactivate),
+                ),
+              ],
+            ),
     );
     if (confirmed != true || !mounted) return;
 
@@ -332,7 +346,7 @@ class _EmergencyMeetingScreenState
       isScrollControlled: true,
       builder: (ctx) => PlaceSearchSheet(
         title: l10n.empPickPlace,
-        hint: 'Cari tempat...',
+        hint: l10n.searchPlaceHint,
       ),
     );
     if (hit == null || !mounted) return;
@@ -379,23 +393,37 @@ class _EmergencyMeetingScreenState
   Future<void> _deletePrimary() async {
     if (_primary == null) return;
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.empDelete),
-        content: Text(l10n.empDeleteConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(l10n.empActivateCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l10n.empDelete),
-          ),
-        ],
-      ),
+      barrierColor: refresh
+          ? VisualRefreshColors.anchor.withValues(alpha: 0.45)
+          : null,
+      builder: (ctx) => refresh
+          ? _EmpConfirmDialog(
+              title: l10n.empDelete,
+              body: l10n.empDeleteConfirm,
+              confirmLabel: l10n.empDelete,
+              confirmColor: VisualRefreshColors.danger,
+              cancelLabel: l10n.empActivateCancel,
+            )
+          : AlertDialog(
+              title: Text(l10n.empDelete),
+              content: Text(l10n.empDeleteConfirm),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(l10n.empActivateCancel),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.danger,
+                  ),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(l10n.empDelete),
+                ),
+              ],
+            ),
     );
     if (confirmed != true) return;
     try {
@@ -424,8 +452,12 @@ class _EmergencyMeetingScreenState
   /// Always parent-scoped — chip selection must not affect this call.
   Future<void> _activate() async {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final note = await showDialog<String>(
       context: context,
+      barrierColor: refresh
+          ? VisualRefreshColors.anchor.withValues(alpha: 0.45)
+          : null,
       builder: (ctx) => const _EmpActivateDialog(),
     );
     if (note == null || !mounted) return;
@@ -466,17 +498,18 @@ class _EmergencyMeetingScreenState
     }
   }
 
-  String _namesCaption(List<ChildSummary> children) {
+  String _namesCaption(List<ChildSummary> children, AppLocalizations l10n) {
     if (children.isEmpty) return '';
     if (children.length == 1) return children.first.name;
+    final and = l10n.listAnd;
     if (children.length == 2) {
-      return '${children[0].name} dan ${children[1].name}';
+      return '${children[0].name} $and ${children[1].name}';
     }
     final head = children
         .take(children.length - 1)
         .map((c) => c.name)
         .join(', ');
-    return '$head, dan ${children.last.name}';
+    return '$head, $and ${children.last.name}';
   }
 
   LatLng? _pointLatLng() {
@@ -501,6 +534,7 @@ class _EmergencyMeetingScreenState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final children = ref.watch(childrenControllerProvider).items;
     String? selectedName = widget.lockedChild?.name;
     if (selectedName == null) {
@@ -518,6 +552,7 @@ class _EmergencyMeetingScreenState
           : (widget.lockedChild != null
               ? [widget.lockedChild!]
               : <ChildSummary>[]),
+      l10n,
     );
     final showChips =
         !_locked && _householdHasPoint && children.length > 1;
@@ -529,16 +564,27 @@ class _EmergencyMeetingScreenState
     final showFullSpinner = _loading && !hasCachedSelected;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
+      backgroundColor:
+          refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
       body: SafeArea(
         child: Column(
           children: [
-            PaScreenHeader(title: l10n.empTitle),
+            PaScreenHeader(
+              title: l10n.empTitle,
+              titleStyle: refresh
+                  ? GoogleFonts.fraunces(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.4,
+                      color: VisualRefreshColors.textPrimary,
+                    )
+                  : null,
+            ),
             if (showChips)
               Padding(
-                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: SizedBox(
-                  height: 48,
+                  height: refresh ? 40 : 48,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -547,6 +593,13 @@ class _EmergencyMeetingScreenState
                     itemBuilder: (context, i) {
                       final c = children[i];
                       final selected = c.id == _childId;
+                      if (refresh) {
+                        return _EmpChildPill(
+                          name: c.name,
+                          selected: selected,
+                          onTap: () => _selectChild(c.id),
+                        );
+                      }
                       final initial = c.name.trim().isEmpty
                           ? '?'
                           : c.name.trim()[0].toUpperCase();
@@ -581,16 +634,29 @@ class _EmergencyMeetingScreenState
               child: showFullSpinner
                   ? const Center(child: CircularProgressIndicator())
                   : selectedId == null
-                      ? Center(child: Text(l10n.empNoChildren))
+                      ? (refresh
+                          ? PaVrEmptyState(
+                              icon: Icons.child_care_rounded,
+                              message: l10n.empNoChildren,
+                            )
+                          : Center(child: Text(l10n.empNoChildren)))
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
                           children: [
+                            if (_activation != null && refresh) ...[
+                              _EmpInScreenActiveBanner(
+                                activation: _activation!,
+                              ),
+                              const SizedBox(height: 14),
+                            ],
                             if (_loadError != null) ...[
                               Text(
                                 l10n.empLoadError,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppColors.inkSoft,
+                                style: TextStyle(
+                                  color: refresh
+                                      ? VisualRefreshColors.textSecondary
+                                      : AppColors.inkSoft,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -610,7 +676,8 @@ class _EmergencyMeetingScreenState
                             ],
                             if (_primary == null)
                               _EmptyCard(
-                                childName: showChips ? (selectedName ?? '') : null,
+                                childName:
+                                    showChips ? (selectedName ?? '') : null,
                                 onAdd: () => unawaited(_pickAndSavePrimary()),
                               )
                             else
@@ -634,30 +701,47 @@ class _EmergencyMeetingScreenState
                             ],
                             if (showActivate && _activation == null) ...[
                               const SizedBox(height: 20),
-                              const Divider(height: 1),
+                              Divider(
+                                height: 1,
+                                color: refresh
+                                    ? VisualRefreshColors.border
+                                    : null,
+                              ),
                               const SizedBox(height: 16),
                               if (captionNames.isNotEmpty)
                                 Text(
                                   l10n.empActivateCaption(captionNames),
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: AppColors.inkSoft,
+                                  style: TextStyle(
+                                    color: refresh
+                                        ? VisualRefreshColors.textSecondary
+                                        : AppColors.inkSoft,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
+                                    fontFamily: refresh
+                                        ? GoogleFonts.plusJakartaSans()
+                                            .fontFamily
+                                        : null,
                                   ),
                                 ),
                               const SizedBox(height: 12),
                               FilledButton.icon(
                                 key: const Key('emp_activate_button'),
                                 style: FilledButton.styleFrom(
-                                  backgroundColor: AppColors.danger,
+                                  backgroundColor: refresh
+                                      ? VisualRefreshColors.danger
+                                      : AppColors.danger,
                                   foregroundColor: Colors.white,
+                                  elevation: 0,
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
+                                  shape: refresh
+                                      ? const StadiumBorder()
+                                      : RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
                                 ),
                                 onPressed: _activating
                                     ? null
@@ -665,9 +749,13 @@ class _EmergencyMeetingScreenState
                                 icon: const Icon(Icons.warning_amber_rounded),
                                 label: Text(
                                   _activating ? '...' : l10n.empActivate,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 15,
+                                    fontFamily: refresh
+                                        ? GoogleFonts.plusJakartaSans()
+                                            .fontFamily
+                                        : null,
                                   ),
                                 ),
                               ),
@@ -677,17 +765,31 @@ class _EmergencyMeetingScreenState
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: refresh
+                                        ? VisualRefreshColors.surface
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(
+                                      refresh ? AppRadius.vrCard : 12,
+                                    ),
                                     border: Border.all(
-                                      color: const Color(0xFFE2E6EA),
+                                      color: refresh
+                                          ? VisualRefreshColors.border
+                                          : const Color(0xFFE2E6EA),
+                                      width: refresh ? 0.5 : 1,
                                     ),
                                   ),
                                   child: Text(
                                     _lastSummary!,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                       height: 1.35,
+                                      color: refresh
+                                          ? VisualRefreshColors.textPrimary
+                                          : null,
+                                      fontFamily: refresh
+                                          ? GoogleFonts.plusJakartaSans()
+                                              .fontFamily
+                                          : null,
                                     ),
                                   ),
                                 ),
@@ -695,6 +797,236 @@ class _EmergencyMeetingScreenState
                             ],
                           ],
                         ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmpChildPill extends StatelessWidget {
+  const _EmpChildPill({
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? VisualRefreshColors.anchor
+          : VisualRefreshColors.surface,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: selected
+                ? null
+                : Border.all(
+                    color: VisualRefreshColors.border,
+                    width: 0.5,
+                  ),
+          ),
+          child: Text(
+            name,
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: selected
+                  ? VisualRefreshColors.background
+                  : VisualRefreshColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmpInScreenActiveBanner extends StatelessWidget {
+  const _EmpInScreenActiveBanner({required this.activation});
+
+  final Map<String, dynamic> activation;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final children = (activation['children'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .where((c) => c['notified'] == true)
+        .toList();
+    final arrived = children.where((c) => c['arrived'] == true).length;
+    final pending = children
+        .where((c) => c['arrived'] != true)
+        .map((c) => c['childName'] as String? ?? '')
+        .where((n) => n.isNotEmpty)
+        .toList();
+    final subtitle = children.isEmpty
+        ? l10n.tapToViewStatus
+        : pending.isEmpty
+            ? l10n.allChildrenArrived
+            : l10n.arrivedWaitingSummary(
+                arrived,
+                children.length,
+                pending.join(', '),
+              );
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.dangerTint,
+        borderRadius: BorderRadius.circular(AppRadius.vrCard),
+        border: Border.all(
+          color: VisualRefreshColors.dangerTintBorder,
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.notifications_outlined,
+            color: VisualRefreshColors.danger,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.empBannerActiveTitle,
+                  style: GoogleFonts.fraunces(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: VisualRefreshColors.danger,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                    color: VisualRefreshColors.dangerTintText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: VisualRefreshColors.textTertiary,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmpConfirmDialog extends StatelessWidget {
+  const _EmpConfirmDialog({
+    required this.title,
+    required this.body,
+    required this.confirmLabel,
+    required this.cancelLabel,
+    required this.confirmColor,
+    this.confirmKey,
+  });
+
+  final String title;
+  final String body;
+  final String confirmLabel;
+  final String cancelLabel;
+  final Color confirmColor;
+  final Key? confirmKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: VisualRefreshColors.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.fraunces(
+                fontWeight: FontWeight.w600,
+                fontSize: 24,
+                height: 1.25,
+                color: VisualRefreshColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              body,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 15,
+                height: 1.45,
+                fontWeight: FontWeight.w500,
+                color: VisualRefreshColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: TextButton.styleFrom(
+                    foregroundColor: VisualRefreshColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: Text(
+                    cancelLabel,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  key: confirmKey,
+                  onPressed: () => Navigator.pop(context, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: confirmColor,
+                    foregroundColor: VisualRefreshColors.background,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(
+                    confirmLabel,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -727,6 +1059,7 @@ class _ActiveActivationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final children = (activation['children'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
         .toList();
@@ -736,35 +1069,56 @@ class _ActiveActivationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.35)),
+        color: refresh ? VisualRefreshColors.dangerTint : Colors.white,
+        borderRadius: BorderRadius.circular(
+          refresh ? AppRadius.vrHero : 18,
+        ),
+        border: Border.all(
+          color: refresh
+              ? VisualRefreshColors.dangerTintBorder
+              : AppColors.danger.withValues(alpha: 0.35),
+          width: refresh ? 0.5 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.notifications_active_rounded,
+              Icon(
+                Icons.notifications_outlined,
                 size: 20,
-                color: AppColors.danger,
+                color: refresh
+                    ? VisualRefreshColors.danger
+                    : AppColors.danger,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   l10n.empActiveTitle,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                    color: AppColors.danger,
-                  ),
+                  style: refresh
+                      ? GoogleFonts.fraunces(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                          color: VisualRefreshColors.danger,
+                        )
+                      : const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                          color: AppColors.danger,
+                        ),
                 ),
               ),
               IconButton(
                 onPressed: busy ? null : onRefresh,
                 tooltip: l10n.empRefresh,
-                icon: const Icon(Icons.refresh_rounded, size: 20),
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  size: 20,
+                  color: refresh
+                      ? VisualRefreshColors.dangerTintText
+                      : null,
+                ),
                 visualDensity: VisualDensity.compact,
               ),
             ],
@@ -772,39 +1126,72 @@ class _ActiveActivationCard extends StatelessWidget {
           if (since.isNotEmpty)
             Text(
               l10n.empActiveSince(since),
-              style: const TextStyle(
-                color: AppColors.inkSoft,
+              style: TextStyle(
+                color: refresh
+                    ? VisualRefreshColors.dangerTintText
+                    : AppColors.inkSoft,
                 fontWeight: FontWeight.w600,
                 fontSize: 12.5,
+                fontFamily: refresh
+                    ? GoogleFonts.plusJakartaSans().fontFamily
+                    : null,
               ),
             ),
           if (note.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
               note,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: refresh ? VisualRefreshColors.textPrimary : null,
+                fontFamily: refresh
+                    ? GoogleFonts.plusJakartaSans().fontFamily
+                    : null,
+              ),
             ),
           ],
-          const SizedBox(height: 12),
-          for (final c in children) _ChildProgressRow(child: c),
+          if (refresh) ...[
+            const SizedBox(height: 12),
+            const Divider(
+              height: 1,
+              color: VisualRefreshColors.dangerTintBorder,
+            ),
+          ] else
+            const SizedBox(height: 12),
+          for (var i = 0; i < children.length; i++) ...[
+            if (refresh && i > 0)
+              const Divider(
+                height: 1,
+                color: VisualRefreshColors.dangerTintBorder,
+              ),
+            _ChildProgressRow(child: children[i]),
+          ],
           const SizedBox(height: 12),
           FilledButton.icon(
             key: const Key('emp_deactivate_button'),
             onPressed: busy ? null : onDeactivate,
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.tealDeep,
+              backgroundColor: refresh
+                  ? VisualRefreshColors.anchor
+                  : AppColors.tealDeep,
               foregroundColor: Colors.white,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: refresh
+                  ? const StadiumBorder()
+                  : RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
             ),
             icon: const Icon(Icons.check_circle_outline, size: 18),
             label: Text(
               busy ? '...' : l10n.empDeactivate,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 14.5,
+                fontFamily: refresh
+                    ? GoogleFonts.plusJakartaSans().fontFamily
+                    : null,
               ),
             ),
           ),
@@ -822,6 +1209,7 @@ class _ChildProgressRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final name = child['childName'] as String? ?? '';
     final notified = child['notified'] == true;
     final arrived = child['arrived'] == true;
@@ -838,49 +1226,63 @@ class _ChildProgressRow extends StatelessWidget {
     } else if (distanceLabel.isEmpty) {
       subtitle = l10n.empChildLocationUnknown;
     } else {
-      subtitle = '${l10n.empOnTheWay} - $distanceLabel';
+      subtitle = '${l10n.empOnTheWay} – $distanceLabel';
     }
 
     final Color accent = !notified
-        ? AppColors.inkSoft
+        ? (refresh ? VisualRefreshColors.dangerTintText : AppColors.inkSoft)
         : arrived
-            ? AppColors.tealDeep
-            : AppColors.danger;
+            ? (refresh ? VisualRefreshColors.accent : AppColors.tealDeep)
+            : (refresh ? VisualRefreshColors.danger : AppColors.danger);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(
-            !notified
-                ? Icons.remove_circle_outline
-                : arrived
-                    ? Icons.check_circle_rounded
-                    : Icons.directions_walk_rounded,
-            size: 20,
-            color: accent,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
+      padding: EdgeInsets.symmetric(vertical: refresh ? 12 : 0),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: refresh ? 0 : 8),
+        child: Row(
+          children: [
+            Icon(
+              !notified
+                  ? Icons.remove_circle_outline
+                  : arrived
+                      ? Icons.check_circle_rounded
+                      : Icons.directions_walk_rounded,
+              size: 20,
+              color: accent,
             ),
-          ),
-        ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: refresh
+                          ? VisualRefreshColors.textPrimary
+                          : null,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -911,6 +1313,124 @@ class _EmpActivateDialogState extends State<_EmpActivateDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    if (refresh) {
+      return Dialog(
+        backgroundColor: VisualRefreshColors.surface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.empActivate,
+                style: GoogleFonts.fraunces(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 24,
+                  height: 1.25,
+                  color: VisualRefreshColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.empActivateConfirm,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                  color: VisualRefreshColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _noteCtrl,
+                style: GoogleFonts.plusJakartaSans(
+                  color: VisualRefreshColors.textPrimary,
+                  fontWeight: FontWeight.w500,
+                ),
+                decoration: InputDecoration(
+                  hintText: l10n.empActivateNoteHint,
+                  hintStyle: GoogleFonts.plusJakartaSans(
+                    color: VisualRefreshColors.textTertiary,
+                  ),
+                  filled: true,
+                  fillColor: VisualRefreshColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.border,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.border,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.accent,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: VisualRefreshColors.textPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: Text(
+                      l10n.empActivateCancel,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: VisualRefreshColors.danger,
+                      foregroundColor: VisualRefreshColors.background,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 12,
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () =>
+                        Navigator.pop(context, _noteCtrl.text.trim()),
+                    child: Text(
+                      l10n.empActivateContinue,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return AlertDialog(
       title: Text(l10n.empActivate),
       content: Column(
@@ -1087,9 +1607,21 @@ class _EmptyCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final emptyText = (childName == null || childName!.isEmpty)
         ? l10n.empEmptyGeneric
         : l10n.empEmpty(childName!);
+
+    if (refresh) {
+      return PaVrEmptyState(
+        icon: Icons.place_outlined,
+        message: emptyText,
+        actionLabel: l10n.empAdd,
+        actionIcon: Icons.add_rounded,
+        onAction: onAdd,
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       decoration: BoxDecoration(
@@ -1150,6 +1682,7 @@ class _PrimaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final name = point['name'] as String? ?? '';
     final subtitle = (point['instructions'] as String?)?.trim() ?? '';
     final pos = mapPosition;
@@ -1157,25 +1690,36 @@ class _PrimaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: refresh ? VisualRefreshColors.surface : Colors.white,
+        borderRadius: BorderRadius.circular(
+          refresh ? AppRadius.vrHero : 18,
+        ),
+        border: refresh
+            ? Border.all(color: VisualRefreshColors.border, width: 0.5)
+            : null,
+        boxShadow: refresh
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             l10n.empPrimaryLabel,
-            style: const TextStyle(
-              color: AppColors.inkSoft,
+            style: TextStyle(
+              color: refresh
+                  ? VisualRefreshColors.textTertiary
+                  : AppColors.inkSoft,
               fontWeight: FontWeight.w700,
               fontSize: 12.5,
+              fontFamily:
+                  refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
             ),
           ),
           const SizedBox(height: 10),
@@ -1185,11 +1729,15 @@ class _PrimaryCard extends StatelessWidget {
               height: 140,
               child: pos == null || _inWidgetTest
                   ? Container(
-                      color: const Color(0xFFEEF1F4),
+                      color: refresh
+                          ? VisualRefreshColors.accentTint
+                          : const Color(0xFFEEF1F4),
                       alignment: Alignment.center,
                       child: Icon(
                         Icons.location_on_rounded,
-                        color: AppColors.tealDeep.withValues(alpha: 0.85),
+                        color: refresh
+                            ? VisualRefreshColors.accent
+                            : AppColors.tealDeep.withValues(alpha: 0.85),
                         size: 32,
                       ),
                     )
@@ -1224,28 +1772,37 @@ class _PrimaryCard extends StatelessWidget {
           const SizedBox(height: 14),
           Text(
             name,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w900,
               fontSize: 18,
+              color: refresh ? VisualRefreshColors.textPrimary : null,
+              fontFamily:
+                  refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
             ),
           ),
           if (subtitle.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: const TextStyle(
-                color: AppColors.inkSoft,
+              style: TextStyle(
+                color: refresh
+                    ? VisualRefreshColors.textSecondary
+                    : AppColors.inkSoft,
                 fontWeight: FontWeight.w600,
+                fontFamily:
+                    refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
               ),
             ),
           ],
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
-                Icons.route_rounded,
+              Icon(
+                Icons.location_on_outlined,
                 size: 18,
-                color: AppColors.tealDeep,
+                color: refresh
+                    ? VisualRefreshColors.accent
+                    : AppColors.tealDeep,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -1253,9 +1810,14 @@ class _PrimaryCard extends StatelessWidget {
                   (distanceLabel == null || distanceLabel!.isEmpty)
                       ? l10n.empDistanceUnknown
                       : l10n.empDistanceLive(childName, distanceLabel!),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.tealDeep,
+                    color: refresh
+                        ? VisualRefreshColors.accent
+                        : AppColors.tealDeep,
+                    fontFamily: refresh
+                        ? GoogleFonts.plusJakartaSans().fontFamily
+                        : null,
                   ),
                 ),
               ),
@@ -1270,11 +1832,20 @@ class _PrimaryCard extends StatelessWidget {
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: Text(l10n.empEdit),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.ink,
-                    side: const BorderSide(color: Color(0xFFD5DBE0)),
+                    foregroundColor: refresh
+                        ? VisualRefreshColors.textPrimary
+                        : AppColors.ink,
+                    side: BorderSide(
+                      color: refresh
+                          ? VisualRefreshColors.border
+                          : const Color(0xFFD5DBE0),
+                      width: refresh ? 0.5 : 1,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        refresh ? 999 : 12,
+                      ),
                     ),
                   ),
                 ),
@@ -1286,16 +1857,23 @@ class _PrimaryCard extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline, size: 18),
                 label: Text(l10n.empDelete),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.danger,
+                  foregroundColor: refresh
+                      ? VisualRefreshColors.danger
+                      : AppColors.danger,
                   side: BorderSide(
-                    color: AppColors.danger.withValues(alpha: 0.45),
+                    color: refresh
+                        ? VisualRefreshColors.danger.withValues(alpha: 0.45)
+                        : AppColors.danger.withValues(alpha: 0.45),
+                    width: refresh ? 0.5 : 1,
                   ),
                   padding: const EdgeInsets.symmetric(
                     vertical: 12,
                     horizontal: 14,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(
+                      refresh ? 999 : 12,
+                    ),
                   ),
                 ),
               ),

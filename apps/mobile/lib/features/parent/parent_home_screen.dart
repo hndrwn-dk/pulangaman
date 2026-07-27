@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/day_period.dart';
+import '../../core/locale_controller.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../screentime/screen_time_screen.dart';
 import 'account_settings_screen.dart';
@@ -21,6 +24,8 @@ import 'kabar_models.dart';
 import 'kabar_read_store.dart';
 import 'live_map_screen.dart';
 import 'more_screen.dart';
+import 'remove_child_sheet.dart';
+import 'sign_in_code_sheet.dart';
 import 'zones_screen.dart';
 import 'zone_alert_host.dart';
 
@@ -320,7 +325,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     }));
   }
 
-  String _greeting() => dayPeriodFor().greetingId;
+  String _greeting(AppLocalizations l10n) => dayPeriodFor().greeting(l10n);
 
   IconData _greetingIcon() => dayPeriodFor().icon;
 
@@ -389,6 +394,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final children = ref.watch(childrenControllerProvider);
     final auth = ref.watch(authControllerProvider);
     final unread = _kabarRead.unreadOf(_messages);
@@ -432,7 +438,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         : '${distM.round()} m';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
+      backgroundColor: visualRefreshOf(context)
+          ? VisualRefreshColors.background
+          : const Color(0xFFF0F2F5),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.teal,
@@ -448,10 +456,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
               _HomeHeader(
-                greeting: _greeting(),
+                greeting: _greeting(l10n),
                 greetingIcon: _greetingIcon(),
                 greetingIconColor: _greetingIconColor(),
-                name: auth.name ?? 'Orang tua',
+                name: auth.name ?? l10n.parentFallbackName,
                 initials: _initials(auth.name),
                 notificationCount: unread.length,
                 onNotifications: () => _openInbox(),
@@ -489,7 +497,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     ),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
+                    child: TextButton(
                     onPressed: () => unawaited(_markAllKabarRead()),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.coral,
@@ -497,9 +505,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
-                      'Tandai semua dibaca',
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                    child: Text(
+                      l10n.markAllReadAction,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),
@@ -511,13 +519,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (items.isEmpty) ...[
-                const PaEmptyState(
+                PaEmptyState(
                   icon: Icons.child_care,
-                  title: 'Belum ada anak',
-                  message:
-                      'Ketuk “Tambah anak” di bawah untuk buat kode, '
-                      'lalu masukkan di HP anak. Jika ganti cara masuk, '
-                      'pulihkan dulu dari nomor lama.',
+                  title: l10n.noChildrenTitle,
+                  message: l10n.parentHomeNoChildrenMessage,
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
@@ -527,33 +532,47 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     side: const BorderSide(color: AppColors.teal),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Pulihkan anak dari nomor lama'),
+                  child: Text(l10n.recoverChildrenButton),
                 ),
               ] else ...[
                 Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'Lokasi Anak',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.2,
-                        ),
+                        l10n.childLocationSectionTitle,
+                        style: visualRefreshOf(context)
+                            ? GoogleFonts.fraunces(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.2,
+                                color: VisualRefreshColors.textPrimary,
+                              )
+                            : const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.2,
+                              ),
                       ),
                     ),
                     if (selected != null)
                       TextButton(
                         onPressed: () => _openLiveMap(selected),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.teal,
+                          foregroundColor: visualRefreshOf(context)
+                              ? VisualRefreshColors.accent
+                              : AppColors.teal,
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text(
-                          'Lihat peta ›',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        child: Text(
+                          l10n.viewMapAction,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontFamily: visualRefreshOf(context)
+                                ? GoogleFonts.plusJakartaSans().fontFamily
+                                : null,
+                          ),
                         ),
                       ),
                   ],
@@ -599,13 +618,20 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     onOpenMap: () => _openChildDetail(selected),
                   ),
                 const SizedBox(height: 22),
-                const Text(
-                  'Ringkasan Hari Ini',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.2,
-                  ),
+                Text(
+                  l10n.todaySummaryTitle,
+                  style: visualRefreshOf(context)
+                      ? GoogleFonts.fraunces(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
+                          color: VisualRefreshColors.textPrimary,
+                        )
+                      : const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
+                        ),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -613,14 +639,14 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                     Expanded(
                       child: _SummaryCard(
                         value: '$placeCount',
-                        label: 'Tempat dikunjungi',
+                        label: l10n.placesVisitedLabel,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _SummaryCard(
                         value: distLabel,
-                        label: 'Total perjalanan',
+                        label: l10n.totalTripDistanceLabel,
                       ),
                     ),
                   ],
@@ -628,15 +654,28 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
               ],
               if (children.invites.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text(
-                  'Kode menunggu',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
+                Text(
+                  visualRefreshOf(context)
+                      ? l10n.pendingCodesTitle.toUpperCase()
+                      : l10n.pendingCodesTitle,
+                  style: visualRefreshOf(context)
+                      ? const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: VisualRefreshColors.textTertiary,
+                        )
+                      : const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                 ),
                 const SizedBox(height: 10),
                 ...children.invites.map((invite) {
+                  final refresh = visualRefreshOf(context);
+                  final codeLabel = refresh
+                      ? SignInCodeSheet.formatSpacedCode(invite.code)
+                      : invite.code;
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.symmetric(
@@ -644,37 +683,60 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                       vertical: 14,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      color: refresh
+                          ? VisualRefreshColors.surface
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(
+                        refresh ? AppRadius.vrCard : 16,
+                      ),
+                      border: refresh
+                          ? Border.all(
+                              color: VisualRefreshColors.border,
+                              width: 0.5,
+                            )
+                          : null,
+                      boxShadow: refresh
+                          ? null
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.vpn_key, color: AppColors.teal),
+                        Icon(
+                          Icons.vpn_key,
+                          color: refresh
+                              ? VisualRefreshColors.accent
+                              : AppColors.teal,
+                        ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                invite.code,
-                                style: const TextStyle(
-                                  fontSize: 26,
+                                codeLabel,
+                                style: TextStyle(
+                                  fontSize: refresh ? 22 : 26,
                                   fontWeight: FontWeight.w900,
-                                  letterSpacing: 3,
+                                  letterSpacing: refresh ? 2.5 : 3,
+                                  fontFamily: refresh ? 'monospace' : null,
+                                  color: refresh
+                                      ? VisualRefreshColors.textPrimary
+                                      : null,
                                 ),
                               ),
                               if (invite.childDisplayName != null)
                                 Text(
                                   invite.childDisplayName!,
-                                  style: const TextStyle(
-                                    color: AppColors.inkSoft,
+                                  style: TextStyle(
+                                    color: refresh
+                                        ? VisualRefreshColors.textSecondary
+                                        : AppColors.inkSoft,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -703,24 +765,23 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   }
 
   Future<void> _showRecoverChildren(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final phoneCtrl = TextEditingController(text: '+628126281233300011');
     final previous = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Pulihkan anak'),
+        title: Text(l10n.recoverChildrenTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Masukkan nomor yang dipakai akun orang tua sebelumnya.',
-            ),
+            Text(l10n.recoverChildrenPrompt),
             const SizedBox(height: 12),
             TextField(
               controller: phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Nomor lama',
+              decoration: InputDecoration(
+                labelText: l10n.oldPhoneNumberLabel,
                 hintText: '+62812...',
               ),
             ),
@@ -729,12 +790,12 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, phoneCtrl.text.trim()),
             style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-            child: const Text('Pulihkan'),
+            child: Text(l10n.recoverAction),
           ),
         ],
       ),
@@ -756,20 +817,78 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         SnackBar(
           content: Text(
             count > 0
-                ? 'Berhasil memulihkan $count anak. Lalu buat kode masuk ulang di menu anak.'
-                : 'Tidak ada anak yang dipindahkan. Cek nomor lama.',
+                ? l10n.recoverChildrenSuccess(count)
+                : l10n.recoverChildrenNone,
           ),
         ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memulihkan: $e')),
+        SnackBar(content: Text(l10n.recoverChildrenFailed('$e'))),
       );
     }
   }
 
   Future<void> _showRelinkInvite(BuildContext context, ChildSummary child) async {
+    final l10n = AppLocalizations.of(context);
+    final hasPending = ref
+        .read(childrenControllerProvider.notifier)
+        .hasPendingInviteForChild(child);
+    if (hasPending) {
+      final proceed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) {
+              final refresh = visualRefreshOf(ctx);
+              return AlertDialog(
+                backgroundColor:
+                    refresh ? VisualRefreshColors.surface : null,
+                shape: refresh
+                    ? RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      )
+                    : null,
+                title: Text(
+                  l10n.relinkCodeTitle(child.name),
+                  style: refresh
+                      ? GoogleFonts.fraunces(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: VisualRefreshColors.textPrimary,
+                        )
+                      : null,
+                ),
+                content: Text(
+                  l10n.relinkReplaceConfirmBody(child.name),
+                  style: refresh
+                      ? const TextStyle(
+                          color: VisualRefreshColors.textSecondary,
+                          height: 1.35,
+                        )
+                      : null,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(l10n.cancel),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: refresh
+                          ? VisualRefreshColors.anchor
+                          : AppColors.teal,
+                    ),
+                    child: Text(l10n.generateNewCodeAction),
+                  ),
+                ],
+              );
+            },
+          ) ==
+          true;
+      if (!proceed || !context.mounted) return;
+    }
+
     try {
       final invite =
           await ref.read(childrenControllerProvider.notifier).createInvite(
@@ -777,33 +896,42 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 relinkChildId: child.id,
               );
       if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Kode masuk ulang ${child.name}'),
-          content: Text(
-            invite.code,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 4,
-              color: AppColors.tealDeep,
+      if (visualRefreshOf(context)) {
+        await showSignInCodeSheet(
+          context: context,
+          childName: child.name,
+          code: invite.code,
+          expiresAt: invite.expiresAt,
+        );
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.relinkCodeTitle(child.name)),
+            content: Text(
+              invite.code,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+                color: AppColors.tealDeep,
+              ),
             ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                child: Text(l10n.okAction),
+              ),
+            ],
           ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+        );
+      }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal buat kode: $e')),
+        SnackBar(content: Text(l10n.createCodeFailed('$e'))),
       );
     }
   }
@@ -812,102 +940,156 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     BuildContext context,
     ChildSummary child,
   ) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Hapus ${child.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final bool ok;
+    if (visualRefreshOf(context)) {
+      ok = await showRemoveChildSheet(
+        context: context,
+        childName: child.name,
+      );
+    } else {
+      ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(l10n.removeChildConfirmTitle(child.name)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style:
+                      FilledButton.styleFrom(backgroundColor: AppColors.coral),
+                  child: Text(l10n.delete),
+                ),
+              ],
+            ),
+          ) ==
+          true;
+    }
+    if (!ok || !context.mounted) return;
     try {
       await ref.read(childrenControllerProvider.notifier).unlinkChild(child.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${child.name} dihapus')),
+        SnackBar(content: Text(l10n.childRemoved(child.name))),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal hapus: $e')),
+        SnackBar(content: Text(l10n.deleteFailedWithDetail('$e'))),
       );
     }
   }
 
   Future<void> _showCreateInvite(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
     final nameCtrl = TextEditingController();
+    final refresh = visualRefreshOf(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Tambah anak'),
+        backgroundColor: refresh ? VisualRefreshColors.surface : null,
+        surfaceTintColor: refresh ? Colors.transparent : null,
+        shape: refresh
+            ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(24))
+            : null,
+        title: Text(
+          l10n.addChildTitle,
+          style: refresh
+              ? GoogleFonts.fraunces(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: VisualRefreshColors.textPrimary,
+                )
+              : null,
+        ),
         content: TextField(
           controller: nameCtrl,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Nama',
+          decoration: InputDecoration(
+            labelText: l10n.nameLabel,
+            filled: refresh,
+            fillColor: refresh ? VisualRefreshColors.surface : null,
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
+            style: refresh
+                ? TextButton.styleFrom(
+                    foregroundColor: VisualRefreshColors.textPrimary,
+                  )
+                : null,
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-            child: const Text('Buat kode'),
+            style: FilledButton.styleFrom(
+              backgroundColor:
+                  refresh ? VisualRefreshColors.anchor : AppColors.teal,
+              foregroundColor:
+                  refresh ? VisualRefreshColors.background : null,
+              shape: refresh ? const StadiumBorder() : null,
+            ),
+            child: Text(l10n.createCodeAction),
           ),
         ],
       ),
     );
+    final name = nameCtrl.text;
+    nameCtrl.dispose();
     if (ok != true || !context.mounted) return;
 
     try {
       final invite =
           await ref.read(childrenControllerProvider.notifier).createInvite(
-                childDisplayName: nameCtrl.text,
+                childDisplayName: name,
               );
       if (!context.mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Kode'),
-          content: Text(
-            invite.code,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 4,
-              color: AppColors.tealDeep,
+      final displayName = name.trim().isEmpty
+          ? invite.childDisplayName ?? invite.code
+          : name.trim();
+      if (visualRefreshOf(context)) {
+        await showSignInCodeSheet(
+          context: context,
+          childName: displayName,
+          code: invite.code,
+          expiresAt: invite.expiresAt,
+        );
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.codeTitle),
+            content: Text(
+              invite.code,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+                color: AppColors.tealDeep,
+              ),
             ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                child: Text(l10n.okAction),
+              ),
+            ],
           ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-              child: const Text('OK'),
-            ),
-          ],
-        ),
-      );
+        );
+      }
       if (context.mounted) {
         await ref.read(childrenControllerProvider.notifier).refresh(force: true);
       }
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal buat kode: $e')),
+        SnackBar(content: Text(l10n.createCodeFailed('$e'))),
       );
     }
   }
@@ -936,6 +1118,7 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -943,12 +1126,16 @@ class _HomeHeader extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: greetingIconColor.withValues(alpha: 0.16),
+            color: refresh
+                ? VisualRefreshColors.weatherTint
+                : greetingIconColor.withValues(alpha: 0.16),
             shape: BoxShape.circle,
           ),
           child: Icon(
             greetingIcon,
-            color: greetingIconColor,
+            color: refresh
+                ? VisualRefreshColors.anchor
+                : greetingIconColor,
             size: 24,
           ),
         ),
@@ -959,22 +1146,34 @@ class _HomeHeader extends StatelessWidget {
             children: [
               Text(
                 '$greeting,',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.inkSoft,
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
               ),
               Text(
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                  color: AppColors.ink,
-                ),
+                style: refresh
+                    ? GoogleFonts.fraunces(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.4,
+                        color: VisualRefreshColors.textPrimary,
+                      )
+                    : const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                        color: AppColors.ink,
+                      ),
               ),
             ],
           ),
@@ -983,17 +1182,30 @@ class _HomeHeader extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Material(
-              color: Colors.white,
-              shape: const CircleBorder(),
-              elevation: 1,
+              color: refresh ? VisualRefreshColors.surface : Colors.white,
+              shape: CircleBorder(
+                side: refresh
+                    ? const BorderSide(
+                        color: VisualRefreshColors.border,
+                        width: 0.5,
+                      )
+                    : BorderSide.none,
+              ),
+              elevation: refresh ? 0 : 1,
               shadowColor: Colors.black12,
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: onNotifications,
-                child: const SizedBox(
+                child: SizedBox(
                   width: 42,
                   height: 42,
-                  child: Icon(Icons.notifications_none_rounded, size: 22),
+                  child: Icon(
+                    Icons.notifications_none_rounded,
+                    size: 22,
+                    color: refresh
+                        ? VisualRefreshColors.textPrimary
+                        : null,
+                  ),
                 ),
               ),
             ),
@@ -1006,7 +1218,9 @@ class _HomeHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   height: 18,
                   decoration: BoxDecoration(
-                    color: AppColors.coral,
+                    color: refresh
+                        ? VisualRefreshColors.danger
+                        : AppColors.coral,
                     borderRadius: BorderRadius.circular(99),
                   ),
                   alignment: Alignment.center,
@@ -1024,7 +1238,7 @@ class _HomeHeader extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Material(
-          color: AppColors.tealDeep,
+          color: refresh ? VisualRefreshColors.anchor : AppColors.tealDeep,
           shape: const CircleBorder(),
           child: InkWell(
             customBorder: const CircleBorder(),
@@ -1035,10 +1249,13 @@ class _HomeHeader extends StatelessWidget {
               child: Center(
                 child: Text(
                   initials,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
                     fontSize: 13,
+                    fontFamily: refresh
+                        ? GoogleFonts.plusJakartaSans().fontFamily
+                        : null,
                   ),
                 ),
               ),
@@ -1069,8 +1286,15 @@ class _ChildChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    final selectedFill =
+        refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
+    final selectedFg =
+        refresh ? VisualRefreshColors.background : Colors.white;
+    final unselectedFg =
+        refresh ? VisualRefreshColors.anchor : AppColors.ink;
     return Material(
-      color: selected ? AppColors.tealDeep : Colors.white,
+      color: selected ? selectedFill : (refresh ? VisualRefreshColors.surface : Colors.white),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
@@ -1082,7 +1306,12 @@ class _ChildChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: selected
                 ? null
-                : Border.all(color: const Color(0xFFE2E6EA)),
+                : Border.all(
+                    color: refresh
+                        ? VisualRefreshColors.border
+                        : const Color(0xFFE2E6EA),
+                    width: refresh ? 0.5 : 1,
+                  ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1099,10 +1328,21 @@ class _ChildChip extends StatelessWidget {
                       height: 10,
                       decoration: BoxDecoration(
                         color: online
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFFFBBF24),
+                            ? (refresh
+                                ? VisualRefreshColors.accent
+                                : const Color(0xFF22C55E))
+                            : (refresh
+                                ? VisualRefreshColors.textSecondary
+                                : const Color(0xFFFBBF24)),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
+                        border: Border.all(
+                          color: selected
+                              ? selectedFill
+                              : (refresh
+                                  ? VisualRefreshColors.surface
+                                  : Colors.white),
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
@@ -1114,7 +1354,10 @@ class _ChildChip extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13.5,
-                  color: selected ? Colors.white : AppColors.ink,
+                  color: selected ? selectedFg : unselectedFg,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
               ),
             ],
@@ -1133,39 +1376,62 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: refresh ? VisualRefreshColors.surface : Colors.white,
+        borderRadius: BorderRadius.circular(refresh ? AppRadius.vrCard : 20),
+        border: refresh
+            ? Border.all(color: VisualRefreshColors.border, width: 0.5)
+            : null,
+        boxShadow: refresh
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: refresh
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.8,
-              height: 1.05,
-              color: AppColors.teal,
-            ),
+            textAlign: refresh ? TextAlign.center : TextAlign.start,
+            style: refresh
+                ? GoogleFonts.fraunces(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.8,
+                    height: 1.05,
+                    color: VisualRefreshColors.textPrimary,
+                  )
+                : const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.8,
+                    height: 1.05,
+                    color: AppColors.teal,
+                  ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(
+            textAlign: refresh ? TextAlign.center : TextAlign.start,
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.inkSoft,
+              color: refresh
+                  ? VisualRefreshColors.textSecondary
+                  : AppColors.inkSoft,
+              fontFamily: refresh
+                  ? GoogleFonts.plusJakartaSans().fontFamily
+                  : null,
             ),
           ),
         ],
@@ -1181,31 +1447,44 @@ class _AddChildButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final fill = refresh
+        ? VisualRefreshColors.accentTint
+        : const Color(0xFFE8F6F1);
+    final dash = refresh
+        ? VisualRefreshColors.dashedAction
+        : AppColors.teal.withValues(alpha: 0.55);
+    final fg = refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
+    final radius = refresh ? AppRadius.pill : 16.0;
     return Material(
-      color: const Color(0xFFE8F6F1),
-      borderRadius: BorderRadius.circular(16),
+      color: fill,
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(radius),
         child: CustomPaint(
           painter: _DashedBorderPainter(
-            color: AppColors.teal.withValues(alpha: 0.55),
-            radius: 16,
+            color: dash,
+            radius: radius,
           ),
-          child: const SizedBox(
+          child: SizedBox(
             height: 54,
             width: double.infinity,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.add_rounded, color: AppColors.tealDeep),
-                SizedBox(width: 8),
+                Icon(Icons.add_rounded, color: fg),
+                const SizedBox(width: 8),
                 Text(
-                  'Tambah anak',
+                  l10n.addChildTitle,
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
-                    color: AppColors.tealDeep,
+                    color: fg,
+                    fontFamily: refresh
+                        ? GoogleFonts.plusJakartaSans().fontFamily
+                        : null,
                   ),
                 ),
               ],
@@ -1259,6 +1538,8 @@ class _EmpActiveBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final children = (activation['children'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
         .where((c) => c['notified'] == true)
@@ -1270,25 +1551,45 @@ class _EmpActiveBanner extends StatelessWidget {
         .where((n) => n.isNotEmpty)
         .toList();
     final subtitle = children.isEmpty
-        ? 'Ketuk untuk lihat status'
+        ? l10n.tapToViewStatus
         : pending.isEmpty
-            ? 'Semua anak sudah sampai'
-            : '$arrived/${children.length} sudah sampai - '
-                'menunggu ${pending.join(', ')}';
+            ? l10n.allChildrenArrived
+            : l10n.arrivedWaitingSummary(
+                arrived,
+                children.length,
+                pending.join(', '),
+              );
+
+    final radius = BorderRadius.circular(refresh ? AppRadius.vrCard : 16);
 
     return Material(
-      color: const Color(0xFFFFE8E6),
-      borderRadius: BorderRadius.circular(16),
+      color: refresh
+          ? VisualRefreshColors.dangerTint
+          : const Color(0xFFFFE8E6),
+      borderRadius: radius,
       child: InkWell(
         onTap: onOpen,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
+        borderRadius: radius,
+        child: Container(
           padding: const EdgeInsets.all(12),
+          decoration: refresh
+              ? BoxDecoration(
+                  borderRadius: radius,
+                  border: Border.all(
+                    color: VisualRefreshColors.dangerTintBorder,
+                    width: 0.5,
+                  ),
+                )
+              : null,
           child: Row(
             children: [
-              const Icon(
-                Icons.notifications_active_rounded,
-                color: AppColors.danger,
+              Icon(
+                refresh
+                    ? Icons.notifications_outlined
+                    : Icons.notifications_active_rounded,
+                color: refresh
+                    ? VisualRefreshColors.danger
+                    : AppColors.danger,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -1296,26 +1597,42 @@ class _EmpActiveBanner extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Titik kumpul darurat aktif',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.danger,
-                      ),
+                    Text(
+                      l10n.empBannerActiveTitle,
+                      style: refresh
+                          ? GoogleFonts.fraunces(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color: VisualRefreshColors.danger,
+                            )
+                          : const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.danger,
+                            ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12.5,
-                        color: AppColors.ink,
+                        color: refresh
+                            ? VisualRefreshColors.dangerTintText
+                            : AppColors.ink,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.inkSoft),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: refresh
+                    ? VisualRefreshColors.textTertiary
+                    : AppColors.inkSoft,
+              ),
             ],
           ),
         ),
@@ -1337,6 +1654,7 @@ class _UrgentBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -1368,7 +1686,7 @@ class _UrgentBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${msg.childName} butuh bantuan',
+                        l10n.childNeedsHelp(msg.childName),
                         style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           color: AppColors.coral,
@@ -1377,7 +1695,7 @@ class _UrgentBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${kabarRelativeTime(msg.sentAt)} · Tap untuk detail',
+                        l10n.withTapDetail(kabarRelativeTime(l10n, msg.sentAt)),
                         style: const TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -1388,7 +1706,7 @@ class _UrgentBanner extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Tandai dibaca',
+                  tooltip: l10n.markReadAction,
                   onPressed: onDismiss,
                   icon: const Icon(Icons.close, color: AppColors.coral),
                 ),
@@ -1418,7 +1736,10 @@ class ParentShell extends ConsumerStatefulWidget {
 class _ParentShellState extends ConsumerState<ParentShell> {
   @override
   Widget build(BuildContext context) {
+    final locale = ref.watch(localeControllerProvider);
+    final l10n = AppLocalizations.of(context);
     final index = ref.watch(parentShellTabProvider);
+    final refresh = visualRefreshOf(context);
     final pages = [
       const ParentHomeScreen(),
       const ScreenTimeScreen(),
@@ -1428,38 +1749,64 @@ class _ParentShellState extends ConsumerState<ParentShell> {
     return ParentZoneAlertHost(
       child: Scaffold(
         body: IndexedStack(index: index, children: pages),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: (value) {
-            ref.read(parentShellTabProvider.notifier).state = value;
-            if (value == 0) {
-              unawaited(
-                ref.read(childrenControllerProvider.notifier).refresh(),
-              );
-            }
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.family_restroom_outlined),
-              selectedIcon: Icon(Icons.family_restroom),
-              label: 'Anak',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.timer_outlined),
-              selectedIcon: Icon(Icons.timer),
-              label: 'Waktu Layar',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.home_work_outlined),
-              selectedIcon: Icon(Icons.home_work),
-              label: 'Zona',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view),
-              label: 'Lainnya',
-            ),
-          ],
+        bottomNavigationBar: DecoratedBox(
+          decoration: BoxDecoration(
+            color: refresh
+                ? VisualRefreshColors.surface
+                : Colors.white,
+            border: refresh
+                ? const Border(
+                    top: BorderSide(
+                      color: VisualRefreshColors.border,
+                      width: 0.5,
+                    ),
+                  )
+                : null,
+          ),
+          child: NavigationBar(
+            key: ValueKey('parent-nav-${locale.languageCode}'),
+            selectedIndex: index,
+            onDestinationSelected: (value) {
+              ref.read(parentShellTabProvider.notifier).state = value;
+              if (value == 0) {
+                unawaited(
+                  ref.read(childrenControllerProvider.notifier).refresh(),
+                );
+              }
+            },
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(Icons.family_restroom_outlined),
+                selectedIcon: Icon(
+                  refresh
+                      ? Icons.family_restroom_outlined
+                      : Icons.family_restroom,
+                ),
+                label: l10n.navChildrenLabel,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.timer_outlined),
+                selectedIcon: Icon(
+                  refresh ? Icons.timer_outlined : Icons.timer,
+                ),
+                label: l10n.featureScreenTime,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.home_work_outlined),
+                selectedIcon: Icon(
+                  refresh ? Icons.home_work_outlined : Icons.home_work,
+                ),
+                label: l10n.navZonesLabel,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.grid_view_outlined),
+                selectedIcon: Icon(
+                  refresh ? Icons.grid_view_outlined : Icons.grid_view,
+                ),
+                label: l10n.navMoreLabel,
+              ),
+            ],
+          ),
         ),
       ),
     );

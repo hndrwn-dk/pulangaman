@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import 'theme.dart';
 
 /// Local-time bands used for greetings and top-bar icons.
@@ -14,29 +15,29 @@ DayPeriod dayPeriodFor([DateTime? when]) {
 }
 
 extension DayPeriodUi on DayPeriod {
-  String get greetingId {
+  String greeting(AppLocalizations l10n) {
     switch (this) {
       case DayPeriod.morning:
-        return 'Selamat pagi';
+        return l10n.greetingMorning;
       case DayPeriod.midday:
-        return 'Selamat siang';
+        return l10n.greetingMidday;
       case DayPeriod.afternoon:
-        return 'Selamat sore';
+        return l10n.greetingAfternoon;
       case DayPeriod.night:
-        return 'Selamat malam';
+        return l10n.greetingNight;
     }
   }
 
-  String get shortId {
+  String shortLabel(AppLocalizations l10n) {
     switch (this) {
       case DayPeriod.morning:
-        return 'Pagi';
+        return l10n.periodMorningShort;
       case DayPeriod.midday:
-        return 'Siang';
+        return l10n.periodMiddayShort;
       case DayPeriod.afternoon:
-        return 'Sore';
+        return l10n.periodAfternoonShort;
       case DayPeriod.night:
-        return 'Malam';
+        return l10n.periodNightShort;
     }
   }
 

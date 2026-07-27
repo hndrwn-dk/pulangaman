@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
+
 class UsageAppEntry {
   UsageAppEntry({
     required this.packageName,
@@ -34,35 +36,35 @@ extension UsagePeriodX on UsagePeriod {
     }
   }
 
-  String get label {
+  String label(AppLocalizations l10n) {
     switch (this) {
       case UsagePeriod.today:
-        return 'Hari ini';
+        return l10n.todayShortLabel;
       case UsagePeriod.week:
-        return 'Minggu ini';
+        return l10n.thisWeekLabel;
       case UsagePeriod.month:
-        return 'Bulan ini';
+        return l10n.thisMonthLabel;
     }
   }
 
-  String get shortLabel {
+  String shortLabel(AppLocalizations l10n) {
     switch (this) {
       case UsagePeriod.today:
-        return 'Hari';
+        return l10n.dayShortLabel;
       case UsagePeriod.week:
-        return 'Minggu';
+        return l10n.weekShortLabel;
       case UsagePeriod.month:
-        return 'Bulan';
+        return l10n.monthShortLabel;
     }
   }
 }
 
-String formatDuration(int totalSeconds) {
-  if (totalSeconds <= 0) return '0 mnt';
+String formatDuration(AppLocalizations l10n, int totalSeconds) {
+  if (totalSeconds <= 0) return l10n.durationMinutesOnly(0);
   final hours = totalSeconds ~/ 3600;
   final minutes = (totalSeconds % 3600) ~/ 60;
-  if (hours > 0) return '$hours jam $minutes mnt';
-  return '$minutes mnt';
+  if (hours > 0) return l10n.durationHoursMinutes(hours, minutes);
+  return l10n.durationMinutesOnly(minutes);
 }
 
 /// Compact form for tight spaces (inside rings).

@@ -47,6 +47,7 @@ class ChildInvite {
     required this.status,
     required this.expiresAt,
     this.childDisplayName,
+    this.relinkChildId,
   });
 
   final String id;
@@ -54,6 +55,10 @@ class ChildInvite {
   final String status;
   final DateTime expiresAt;
   final String? childDisplayName;
+  final String? relinkChildId;
+
+  bool get isStillValid =>
+      status == 'pending' && expiresAt.isAfter(DateTime.now());
 
   factory ChildInvite.fromJson(Map<String, dynamic> json) {
     final expires = json['expires_at'] ?? json['expiresAt'];
@@ -64,6 +69,8 @@ class ChildInvite {
       expiresAt: DateTime.parse(expires as String),
       childDisplayName:
           json['child_display_name'] as String? ?? json['childDisplayName'] as String?,
+      relinkChildId:
+          json['relink_child_id'] as String? ?? json['relinkChildId'] as String?,
     );
   }
 
@@ -73,6 +80,7 @@ class ChildInvite {
         'status': status,
         'expires_at': expiresAt.toIso8601String(),
         'child_display_name': childDisplayName,
+        'relink_child_id': relinkChildId,
       };
 }
 
@@ -127,7 +135,7 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       if (cached != null && (cached.items.isNotEmpty || cached.invites.isNotEmpty)) {
         state = ChildrenState(
           items: cached.items,
-          invites: cached.invites,
+          invites: cached.invites.where((i) => i.isStillValid).toList(),
           fromCache: true,
         );
       }
@@ -171,7 +179,7 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       final invites = (results[1]['invites'] as List<dynamic>? ?? [])
           .cast<Map<String, dynamic>>()
           .map(ChildInvite.fromJson)
-          .where((invite) => invite.status == 'pending')
+          .where((invite) => invite.isStillValid)
           .toList();
 
       state = ChildrenState(items: list, invites: invites);
@@ -215,14 +223,42 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       status: 'pending',
       expiresAt: DateTime.parse(data['expiresAt'] as String),
       childDisplayName: data['childDisplayName'] as String?,
+      relinkChildId:
+          data['relinkChildId'] as String? ?? relinkChildId,
     );
-    final existing = state.invites.where((it) => it.code != invite.code).toList();
+    final nameKey = invite.childDisplayName?.trim().toLowerCase();
+    final remaining = state.invites.where((it) {
+      if (it.code == invite.code) return false;
+      if (invite.relinkChildId != null &&
+          it.relinkChildId == invite.relinkChildId) {
+        return false;
+      }
+      if (invite.relinkChildId == null &&
+          nameKey != null &&
+          it.relinkChildId == null &&
+          it.childDisplayName?.trim().toLowerCase() == nameKey) {
+        return false;
+      }
+      return it.isStillValid;
+    }).toList();
     state = ChildrenState(
       items: state.items,
-      invites: [invite, ...existing],
+      invites: [invite, ...remaining],
     );
     unawaited(refresh(force: true));
     return invite;
+  }
+
+  /// True when a still-valid pending invite already exists for this child.
+  bool hasPendingInviteForChild(ChildSummary child) {
+    return state.invites.any(
+      (it) =>
+          it.isStillValid &&
+          (it.relinkChildId == child.id ||
+              (it.relinkChildId == null &&
+                  it.childDisplayName?.trim().toLowerCase() ==
+                      child.name.trim().toLowerCase())),
+    );
   }
 
   Future<void> unlinkChild(String childId) async {

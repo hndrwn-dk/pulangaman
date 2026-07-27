@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/day_period.dart';
-import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import 'child_usage_utils.dart';
 
 class ChildBerandaTab extends StatelessWidget {
@@ -23,6 +25,7 @@ class ChildBerandaTab extends StatelessWidget {
     required this.reminderCount,
     required this.exactAlarmOk,
     required this.onPanicTap,
+    this.onPanicHoldComplete,
     required this.onOpenUsageSettings,
     required this.onOpenAccessibilitySettings,
     required this.onOpenReminderPermissions,
@@ -58,6 +61,8 @@ class ChildBerandaTab extends StatelessWidget {
   final int reminderCount;
   final bool exactAlarmOk;
   final VoidCallback onPanicTap;
+  /// Visual Refresh: press-and-hold completed — fires the same panic cascade.
+  final VoidCallback? onPanicHoldComplete;
   final VoidCallback onOpenUsageSettings;
   final VoidCallback onOpenAccessibilitySettings;
   final VoidCallback onOpenReminderPermissions;
@@ -79,11 +84,20 @@ class ChildBerandaTab extends StatelessWidget {
   final String? empNote;
   final VoidCallback? onOpenEmp;
 
-  String _timeGreeting() => dayPeriodFor().shortId;
+  String _timeGreeting(AppLocalizations l10n) =>
+      dayPeriodFor().shortLabel(l10n);
 
   @override
   Widget build(BuildContext context) {
+    if (visualRefreshOf(context)) {
+      return _buildVisualRefresh(context);
+    }
+    return _buildClassic(context);
+  }
+
+  Widget _buildClassic(BuildContext context) {
     final period = dayPeriodFor();
+    final l10n = AppLocalizations.of(context);
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
@@ -101,7 +115,7 @@ class ChildBerandaTab extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                '${_timeGreeting()}, $childName!',
+                '${_timeGreeting(l10n)}, $childName!',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -110,26 +124,26 @@ class ChildBerandaTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        const Text('Tetap aman, kumpulkan poin, dan beri kabar keluarga.'),
+        Text(l10n.homeSubtitleTagline),
         const SizedBox(height: AppSpacing.md),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             PaStatusPill(
-              label: tracking ? 'Lokasi aktif' : 'Lokasi mati',
+              label: tracking ? l10n.pillLocationOn : l10n.pillLocationOff,
               icon: tracking ? Icons.location_on : Icons.location_off,
               color: tracking ? AppColors.success : AppColors.danger,
             ),
             PaStatusPill(
-              label: '$points poin · $streak hari',
+              label: l10n.pointsStreakLabel(points, streak),
               icon: Icons.star,
               color: AppColors.coral,
             ),
             PaStatusPill(
               label: usageAccess && accessibility
-                  ? 'Aturan layar aktif'
-                  : 'Izin layar belum lengkap',
+                  ? l10n.screenRulesActive
+                  : l10n.screenPermissionIncomplete,
               icon: Icons.hourglass_bottom,
               color: AppColors.lavender,
             ),
@@ -137,10 +151,10 @@ class ChildBerandaTab extends StatelessWidget {
               onTap: exactAlarmOk ? null : onOpenReminderPermissions,
               child: PaStatusPill(
                 label: !exactAlarmOk
-                    ? 'Izin alarm belum lengkap'
+                    ? l10n.alarmPermissionIncomplete
                     : reminderCount > 0
-                        ? 'Pengingat aktif ($reminderCount)'
-                        : 'Belum ada pengingat',
+                        ? l10n.reminderActiveCount(reminderCount)
+                        : l10n.noRemindersYet,
                 icon: Icons.alarm_rounded,
                 color: exactAlarmOk ? AppColors.sky : AppColors.amber,
               ),
@@ -148,14 +162,19 @@ class ChildBerandaTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
-        _QuickStatsRow(todayUsageSeconds: todayUsageSeconds, points: points),
+        _QuickStatsRow(
+          todayUsageSeconds: todayUsageSeconds,
+          points: points,
+          refresh: false,
+        ),
         if (empConfigured || empActive) ...[
           const SizedBox(height: AppSpacing.md),
           _EmpKnowYourPointCard(
             active: empActive,
-            placeName: empPlaceName ?? 'Titik kumpul',
+            placeName: empPlaceName ?? l10n.empDefaultPlaceName,
             note: empNote,
             onOpen: onOpenEmp,
+            refresh: false,
           ),
         ],
         if (homeByAckVisible || homeByAckSent) ...[
@@ -167,8 +186,8 @@ class ChildBerandaTab extends StatelessWidget {
               children: [
                 Text(
                   homeByAckSent
-                      ? 'Sudah dikirim ke orang tua'
-                      : 'Aku otw pulang',
+                      ? l10n.homeByChildAckSent
+                      : l10n.homeByChildAckButton,
                   style: const TextStyle(fontWeight: FontWeight.w800),
                   textAlign: TextAlign.center,
                 ),
@@ -176,7 +195,7 @@ class ChildBerandaTab extends StatelessWidget {
                   const SizedBox(height: 8),
                   FilledButton(
                     onPressed: onHomeByAck,
-                    child: const Text('Beri kabar ke orang tua'),
+                    child: Text(l10n.homeByChildAckTitle),
                   ),
                 ],
               ],
@@ -193,6 +212,7 @@ class ChildBerandaTab extends StatelessWidget {
             onStart: onStartTrip,
             onCancel: onCancelTrip,
             onArrive: onArriveTrip,
+            refresh: false,
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
@@ -203,13 +223,14 @@ class ChildBerandaTab extends StatelessWidget {
               SizedBox(
                 height: 180,
                 child: FilledButton(
-                  onPressed: (panicInFlight || panicOnCooldown) ? null : onPanicTap,
+                  onPressed:
+                      (panicInFlight || panicOnCooldown) ? null : onPanicTap,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.danger,
                     shape: const CircleBorder(),
                   ),
                   child: Text(
-                    AppStrings.panicButton,
+                    l10n.panicButton,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
@@ -218,15 +239,15 @@ class ChildBerandaTab extends StatelessWidget {
                   ),
                 ),
               ),
-              const Text(AppStrings.panicConfirm, textAlign: TextAlign.center),
+              Text(l10n.panicConfirm, textAlign: TextAlign.center),
               const SizedBox(height: 4),
               Text(
                 panicInFlight
-                    ? 'Mengirim peringatan...'
+                    ? l10n.sendingAlert
                     : panicOnCooldown
-                        ? 'Panik terkirim. Tunggu sebentar sebelum bisa dikirim lagi.'
+                        ? l10n.panicCooldownMessage
                         : panicActive
-                            ? 'Mode panik aktif — menunggu respons orang tua'
+                            ? l10n.panicModeActiveWaiting
                             : (status ?? ''),
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -246,31 +267,27 @@ class ChildBerandaTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Aktifkan perlindungan waktu layar',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                Text(
+                  l10n.enableScreenProtectionTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'PulangAman, Telepon, dan Pesan tidak pernah diblokir.',
-                ),
+                Text(l10n.neverBlockedAppsNote),
                 const SizedBox(height: 10),
                 if (!usageAccess)
                   OutlinedButton(
                     onPressed: onOpenUsageSettings,
-                    child: const Text('Izinkan akses pemakaian'),
+                    child: Text(l10n.allowUsageAccess),
                   ),
                 if (!accessibility) ...[
                   OutlinedButton(
                     onPressed: onOpenAccessibilitySettings,
-                    child: const Text('Aktifkan pemblokiran aplikasi'),
+                    child: Text(l10n.enableAppBlocking),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Tombolnya terkunci ("Setelan dibatasi")? Buka Info aplikasi, '
-                    'ketuk menu titik tiga di kanan atas, lalu pilih '
-                    '"Izinkan setelan yang dibatasi". Setelah itu coba lagi.',
-                    style: TextStyle(
+                  Text(
+                    l10n.restrictedSettingsHelp,
+                    style: const TextStyle(
                       fontSize: 12.5,
                       height: 1.4,
                       color: AppColors.inkSoft,
@@ -283,9 +300,9 @@ class ChildBerandaTab extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: AppColors.tealDeep,
                       ),
-                      child: const Text(
-                        'Buka Info aplikasi',
-                        style: TextStyle(fontWeight: FontWeight.w800),
+                      child: Text(
+                        l10n.openAppInfo,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
                   ],
@@ -297,6 +314,519 @@ class ChildBerandaTab extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildVisualRefresh(BuildContext context) {
+    final period = dayPeriodFor();
+    final l10n = AppLocalizations.of(context);
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: period.accent.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(period.icon, color: period.accent, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_timeGreeting(l10n)}, $childName!',
+                    style: GoogleFonts.fraunces(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.4,
+                      height: 1.15,
+                      color: VisualRefreshColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.homeSubtitleTagline,
+                    style: TextStyle(
+                      fontFamily: jakarta,
+                      fontSize: 13.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w500,
+                      color: VisualRefreshColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _VrStatusPill(
+              label: tracking ? l10n.pillLocationOn : l10n.pillLocationOff,
+              icon: tracking ? Icons.location_on : Icons.location_off,
+            ),
+            _VrStatusPill(
+              label: l10n.pointsStreakLabel(points, streak),
+              icon: Icons.star_rounded,
+            ),
+            _VrStatusPill(
+              label: usageAccess && accessibility
+                  ? l10n.screenRulesActive
+                  : l10n.screenPermissionIncomplete,
+              icon: Icons.hourglass_bottom,
+            ),
+            GestureDetector(
+              onTap: exactAlarmOk ? null : onOpenReminderPermissions,
+              child: _VrStatusPill(
+                label: !exactAlarmOk
+                    ? l10n.alarmPermissionIncomplete
+                    : reminderCount > 0
+                        ? l10n.reminderActiveCount(reminderCount)
+                        : l10n.noRemindersYet,
+                icon: Icons.alarm_rounded,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _QuickStatsRow(
+          todayUsageSeconds: todayUsageSeconds,
+          points: points,
+          refresh: true,
+        ),
+        if (empConfigured || empActive) ...[
+          const SizedBox(height: 14),
+          _EmpKnowYourPointCard(
+            active: empActive,
+            placeName: empPlaceName ?? l10n.empDefaultPlaceName,
+            note: empNote,
+            onOpen: onOpenEmp,
+            refresh: true,
+          ),
+        ],
+        if (homeByAckVisible || homeByAckSent) ...[
+          const SizedBox(height: 14),
+          Material(
+            color: VisualRefreshColors.accentTint,
+            borderRadius: BorderRadius.circular(AppRadius.vrCard),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    homeByAckSent
+                        ? l10n.homeByChildAckSent
+                        : l10n.homeByChildAckButton,
+                    style: TextStyle(
+                      fontFamily: jakarta,
+                      fontWeight: FontWeight.w700,
+                      color: VisualRefreshColors.accent,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (!homeByAckSent) ...[
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: onHomeByAck,
+                      child: Text(l10n.homeByChildAckTitle),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+        if (tripActive || tripArrived || onStartTrip != null) ...[
+          const SizedBox(height: 14),
+          _TripActionCard(
+            active: tripActive,
+            arrived: tripArrived,
+            toLabel: tripToLabel,
+            progress: tripProgress,
+            onStart: onStartTrip,
+            onCancel: onCancelTrip,
+            onArrive: onArriveTrip,
+            refresh: true,
+          ),
+        ],
+        const SizedBox(height: 20),
+        _VrPanicSection(
+          enabled: !panicInFlight && !panicOnCooldown,
+          panicInFlight: panicInFlight,
+          panicOnCooldown: panicOnCooldown,
+          panicActive: panicActive,
+          status: status,
+          onHoldComplete: onPanicHoldComplete ?? onPanicTap,
+        ),
+        if (!usageAccess || !accessibility) ...[
+          const SizedBox(height: 14),
+          Material(
+            color: VisualRefreshColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.vrCard),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppRadius.vrCard),
+                border: Border.all(
+                  color: VisualRefreshColors.border,
+                  width: 0.5,
+                ),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.enableScreenProtectionTitle,
+                    style: TextStyle(
+                      fontFamily: jakarta,
+                      fontWeight: FontWeight.w800,
+                      color: VisualRefreshColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.neverBlockedAppsNote,
+                    style: TextStyle(
+                      fontFamily: jakarta,
+                      color: VisualRefreshColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (!usageAccess)
+                    OutlinedButton(
+                      onPressed: onOpenUsageSettings,
+                      child: Text(l10n.allowUsageAccess),
+                    ),
+                  if (!accessibility) ...[
+                    OutlinedButton(
+                      onPressed: onOpenAccessibilitySettings,
+                      child: Text(l10n.enableAppBlocking),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.restrictedSettingsHelp,
+                      style: TextStyle(
+                        fontFamily: jakarta,
+                        fontSize: 12.5,
+                        height: 1.4,
+                        color: VisualRefreshColors.textSecondary,
+                      ),
+                    ),
+                    if (onOpenAppInfo != null) ...[
+                      const SizedBox(height: 6),
+                      TextButton(
+                        onPressed: onOpenAppInfo,
+                        style: TextButton.styleFrom(
+                          foregroundColor: VisualRefreshColors.accent,
+                        ),
+                        child: Text(
+                          l10n.openAppInfo,
+                          style: TextStyle(
+                            fontFamily: jakarta,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _VrStatusPill extends StatelessWidget {
+  const _VrStatusPill({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.accentTint,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: VisualRefreshColors.accent),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                color: VisualRefreshColors.accent,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VrPanicSection extends StatelessWidget {
+  const _VrPanicSection({
+    required this.enabled,
+    required this.panicInFlight,
+    required this.panicOnCooldown,
+    required this.panicActive,
+    required this.status,
+    required this.onHoldComplete,
+  });
+
+  final bool enabled;
+  final bool panicInFlight;
+  final bool panicOnCooldown;
+  final bool panicActive;
+  final String? status;
+  final VoidCallback onHoldComplete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
+    final statusText = panicInFlight
+        ? l10n.sendingAlert
+        : panicOnCooldown
+            ? l10n.panicCooldownMessage
+            : panicActive
+                ? l10n.panicModeActiveWaiting
+                : (status ?? '');
+
+    return Material(
+      color: VisualRefreshColors.dangerTint,
+      borderRadius: BorderRadius.circular(AppRadius.vrHero),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+        child: Column(
+          children: [
+            _VrPanicHoldButton(
+              enabled: enabled,
+              label: l10n.panicButton,
+              onHoldComplete: onHoldComplete,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.panicHoldConfirm,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: jakarta,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: VisualRefreshColors.danger,
+              ),
+            ),
+            if (statusText.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                statusText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: jakarta,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: panicActive || panicOnCooldown
+                      ? VisualRefreshColors.dangerTintText
+                      : VisualRefreshColors.dangerTintText,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Press-and-hold panic control with a filling progress ring (~3s).
+class _VrPanicHoldButton extends StatefulWidget {
+  const _VrPanicHoldButton({
+    required this.enabled,
+    required this.label,
+    required this.onHoldComplete,
+  });
+
+  final bool enabled;
+  final String label;
+  final VoidCallback onHoldComplete;
+
+  @override
+  State<_VrPanicHoldButton> createState() => _VrPanicHoldButtonState();
+}
+
+class _VrPanicHoldButtonState extends State<_VrPanicHoldButton>
+    with SingleTickerProviderStateMixin {
+  static const _holdDuration = Duration(milliseconds: 3000);
+
+  late final AnimationController _controller;
+  bool _fired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _holdDuration)
+      ..addStatusListener(_onStatus);
+  }
+
+  @override
+  void didUpdateWidget(covariant _VrPanicHoldButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled && _controller.isAnimating) {
+      _cancelHold();
+    }
+  }
+
+  void _onStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && !_fired) {
+      _fired = true;
+      HapticFeedback.heavyImpact();
+      widget.onHoldComplete();
+      _controller.reset();
+      _fired = false;
+    }
+  }
+
+  void _startHold() {
+    if (!widget.enabled || _fired) return;
+    _controller.forward(from: 0);
+  }
+
+  void _cancelHold() {
+    if (_fired) return;
+    _controller.stop();
+    _controller.reset();
+  }
+
+  @override
+  void dispose() {
+    _controller.removeStatusListener(_onStatus);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 168.0;
+    const ringWidth = 6.0;
+
+    return Listener(
+      onPointerDown: (_) => _startHold(),
+      onPointerUp: (_) => _cancelHold(),
+      onPointerCancel: (_) => _cancelHold(),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return CustomPaint(
+              painter: _PanicRingPainter(
+                progress: _controller.value,
+                trackColor: VisualRefreshColors.danger.withValues(alpha: 0.22),
+                progressColor: VisualRefreshColors.danger,
+                strokeWidth: ringWidth,
+              ),
+              child: child,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Material(
+              color: widget.enabled
+                  ? VisualRefreshColors.danger
+                  : VisualRefreshColors.danger.withValues(alpha: 0.45),
+              shape: const CircleBorder(),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    widget.label,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      height: 1.2,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PanicRingPainter extends CustomPainter {
+  _PanicRingPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.progressColor,
+    required this.strokeWidth,
+  });
+
+  final double progress;
+  final Color trackColor;
+  final Color progressColor;
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    final track = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    final fill = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, track);
+    if (progress > 0) {
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        -1.57079632679, // top
+        progress * 6.28318530718,
+        false,
+        fill,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PanicRingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.trackColor != trackColor ||
+      oldDelegate.progressColor != progressColor ||
+      oldDelegate.strokeWidth != strokeWidth;
 }
 
 class _EmpKnowYourPointCard extends StatelessWidget {
@@ -305,22 +835,39 @@ class _EmpKnowYourPointCard extends StatelessWidget {
     required this.placeName,
     this.note,
     this.onOpen,
+    this.refresh = false,
   });
 
   final bool active;
   final String placeName;
   final String? note;
   final VoidCallback? onOpen;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
-    final accent = active ? AppColors.danger : AppColors.tealDeep;
+    final l10n = AppLocalizations.of(context);
+    final accent = active
+        ? (refresh ? VisualRefreshColors.danger : AppColors.danger)
+        : (refresh ? VisualRefreshColors.accent : AppColors.tealDeep);
     final wash = active
-        ? const Color(0xFFFFE8E6)
-        : AppColors.teal.withValues(alpha: 0.10);
+        ? (refresh
+            ? VisualRefreshColors.dangerTint
+            : const Color(0xFFFFE8E6))
+        : (refresh
+            ? VisualRefreshColors.accentTint
+            : AppColors.teal.withValues(alpha: 0.10));
+    final border = refresh
+        ? (active
+            ? VisualRefreshColors.dangerTintBorder
+            : VisualRefreshColors.border)
+        : (active
+            ? AppColors.danger.withValues(alpha: 0.35)
+            : const Color(0xFFE2E6EA));
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
 
     return Material(
-      color: Colors.white,
+      color: refresh ? VisualRefreshColors.surface : Colors.white,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -328,9 +875,8 @@ class _EmpKnowYourPointCard extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             border: Border.all(
-              color: active
-                  ? AppColors.danger.withValues(alpha: 0.35)
-                  : const Color(0xFFE2E6EA),
+              color: border,
+              width: refresh ? 0.5 : 1,
             ),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -366,9 +912,10 @@ class _EmpKnowYourPointCard extends StatelessWidget {
                             children: [
                               Text(
                                 active
-                                    ? 'Darurat — segera ke sini'
-                                    : 'Titik kumpul keluarga',
+                                    ? l10n.empActiveNowLabel
+                                    : l10n.empFamilyMeetingPoint,
                                 style: TextStyle(
+                                  fontFamily: refresh ? jakarta : null,
                                   fontWeight: FontWeight.w800,
                                   fontSize: 12,
                                   color: accent,
@@ -379,9 +926,13 @@ class _EmpKnowYourPointCard extends StatelessWidget {
                                 placeName,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style: TextStyle(
+                                  fontFamily: refresh ? jakarta : null,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 15,
+                                  color: refresh
+                                      ? VisualRefreshColors.textPrimary
+                                      : null,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -389,12 +940,15 @@ class _EmpKnowYourPointCard extends StatelessWidget {
                                 active
                                     ? ((note != null && note!.trim().isNotEmpty)
                                         ? note!.trim()
-                                        : 'Ikuti arahan orang tua')
-                                    : 'Hafalkan tempat ini untuk kondisi darurat',
+                                        : l10n.followParentInstructions)
+                                    : l10n.memorizeEmpPlace,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.inkSoft,
+                                style: TextStyle(
+                                  fontFamily: refresh ? jakarta : null,
+                                  color: refresh
+                                      ? VisualRefreshColors.textSecondary
+                                      : AppColors.inkSoft,
                                   fontWeight: FontWeight.w600,
                                   fontSize: 12,
                                 ),
@@ -405,7 +959,9 @@ class _EmpKnowYourPointCard extends StatelessWidget {
                         if (onOpen != null)
                           Icon(
                             Icons.chevron_right_rounded,
-                            color: AppColors.inkSoft.withValues(alpha: 0.8),
+                            color: refresh
+                                ? VisualRefreshColors.textSecondary
+                                : AppColors.inkSoft.withValues(alpha: 0.8),
                           ),
                       ],
                     ),
@@ -430,6 +986,7 @@ class _TripActionCard extends StatelessWidget {
     this.onStart,
     this.onCancel,
     this.onArrive,
+    this.refresh = false,
   });
 
   final bool active;
@@ -439,31 +996,52 @@ class _TripActionCard extends StatelessWidget {
   final VoidCallback? onStart;
   final VoidCallback? onCancel;
   final VoidCallback? onArrive;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final destination = toLabel ?? l10n.destinationFallback;
     final title = arrived
-        ? 'Tiba di ${toLabel ?? 'tujuan'}'
+        ? l10n.tripArrivedAt(destination)
         : active
             ? (progress <= 0 && onStart != null
-                ? 'Rute siap'
-                : 'Menuju ${toLabel ?? 'tujuan'}')
-            : 'Perjalanan';
+                ? l10n.tripRouteReady
+                : l10n.tripChildActiveTo(destination))
+            : l10n.tripGenericLabel;
     final subtitle = arrived
-        ? 'Orang tua sudah diberi tahu'
+        ? l10n.tripParentNotified
         : active
-            ? (onStart != null ? (toLabel ?? 'Siap dimulai') : 'Sedang berjalan')
-            : 'Pilih tujuan aman ke tempat tersimpan';
+            ? (onStart != null
+                ? (toLabel ?? l10n.tripReadyToStart)
+                : l10n.tripInProgress)
+            : l10n.tripChooseSafeDestination;
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
+    final iconBg = arrived
+        ? (refresh
+            ? VisualRefreshColors.accentTint
+            : AppColors.teal.withValues(alpha: 0.14))
+        : (refresh
+            ? VisualRefreshColors.accentTint
+            : const Color(0xFFE8F1FF));
+    final iconColor = arrived
+        ? (refresh ? VisualRefreshColors.accent : AppColors.tealDeep)
+        : (refresh ? VisualRefreshColors.accent : AppColors.sky);
 
     return Material(
-      color: Colors.white,
+      color: refresh ? VisualRefreshColors.surface : Colors.white,
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: !active && !arrived ? onStart : null,
         child: Ink(
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFE2E6EA)),
+            border: Border.all(
+              color: refresh
+                  ? VisualRefreshColors.border
+                  : const Color(0xFFE2E6EA),
+              width: refresh ? 0.5 : 1,
+            ),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Padding(
@@ -477,16 +1055,14 @@ class _TripActionCard extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: arrived
-                            ? AppColors.teal.withValues(alpha: 0.14)
-                            : const Color(0xFFE8F1FF),
+                        color: iconBg,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
                         arrived
                             ? Icons.check_circle_rounded
                             : Icons.directions_walk_rounded,
-                        color: arrived ? AppColors.tealDeep : AppColors.sky,
+                        color: iconColor,
                         size: 22,
                       ),
                     ),
@@ -497,9 +1073,13 @@ class _TripActionCard extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
+                              fontFamily: refresh ? jakarta : null,
                               fontWeight: FontWeight.w900,
                               fontSize: 15,
+                              color: refresh
+                                  ? VisualRefreshColors.textPrimary
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: 2),
@@ -507,8 +1087,11 @@ class _TripActionCard extends StatelessWidget {
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.inkSoft,
+                            style: TextStyle(
+                              fontFamily: refresh ? jakarta : null,
+                              color: refresh
+                                  ? VisualRefreshColors.textSecondary
+                                  : AppColors.inkSoft,
                               fontWeight: FontWeight.w600,
                               fontSize: 12.5,
                             ),
@@ -520,14 +1103,19 @@ class _TripActionCard extends StatelessWidget {
                       TextButton(
                         onPressed: onStart,
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.tealDeep,
+                          foregroundColor: refresh
+                              ? VisualRefreshColors.accent
+                              : AppColors.tealDeep,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text(
-                          'Mulai',
-                          style: TextStyle(fontWeight: FontWeight.w800),
+                        child: Text(
+                          l10n.startAction,
+                          style: TextStyle(
+                            fontFamily: refresh ? jakarta : null,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                   ],
@@ -539,8 +1127,12 @@ class _TripActionCard extends StatelessWidget {
                     child: LinearProgressIndicator(
                       value: progress.clamp(0.0, 1.0),
                       minHeight: 6,
-                      backgroundColor: const Color(0xFFE2E6EA),
-                      color: AppColors.teal,
+                      backgroundColor: refresh
+                          ? VisualRefreshColors.border
+                          : const Color(0xFFE2E6EA),
+                      color: refresh
+                          ? VisualRefreshColors.accent
+                          : AppColors.teal,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -551,13 +1143,16 @@ class _TripActionCard extends StatelessWidget {
                           child: FilledButton(
                             onPressed: onArrive,
                             style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.tealDeep,
-                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              backgroundColor: refresh
+                                  ? VisualRefreshColors.anchor
+                                  : AppColors.tealDeep,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
                               visualDensity: VisualDensity.compact,
                             ),
-                            child: const Text(
-                              'Sudah sampai',
-                              style: TextStyle(fontWeight: FontWeight.w800),
+                            child: Text(
+                              l10n.tripArrived,
+                              style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                           ),
                         ),
@@ -572,7 +1167,7 @@ class _TripActionCard extends StatelessWidget {
                                   const EdgeInsets.symmetric(vertical: 10),
                               visualDensity: VisualDensity.compact,
                             ),
-                            child: const Text('Batalkan'),
+                            child: Text(l10n.tripCancel),
                           ),
                         ),
                     ],
@@ -589,7 +1184,7 @@ class _TripActionCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             visualDensity: VisualDensity.compact,
                           ),
-                          child: const Text('Mulai perjalanan'),
+                          child: Text(l10n.tripChildStart),
                         ),
                       ),
                       if (onCancel != null) ...[
@@ -602,7 +1197,7 @@ class _TripActionCard extends StatelessWidget {
                                   const EdgeInsets.symmetric(vertical: 10),
                               visualDensity: VisualDensity.compact,
                             ),
-                            child: const Text('Batalkan'),
+                            child: Text(l10n.tripCancel),
                           ),
                         ),
                       ],
@@ -622,13 +1217,48 @@ class _QuickStatsRow extends StatelessWidget {
   const _QuickStatsRow({
     required this.todayUsageSeconds,
     required this.points,
+    this.refresh = false,
   });
 
   final int todayUsageSeconds;
   final int points;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
+
+    if (refresh) {
+      return Row(
+        children: [
+          Expanded(
+            child: _VrStatTile(
+              icon: Icons.schedule,
+              iconColor: VisualRefreshColors.accent,
+              background: VisualRefreshColors.accentTint,
+              value: formatDuration(l10n, todayUsageSeconds),
+              label: l10n.screenTimeToday,
+              valueColor: VisualRefreshColors.accent,
+              fontFamily: jakarta,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: _VrStatTile(
+              icon: Icons.emoji_events,
+              iconColor: VisualRefreshColors.routeText,
+              background: VisualRefreshColors.routeTint,
+              value: '$points',
+              label: l10n.yourPoints,
+              valueColor: VisualRefreshColors.routeText,
+              fontFamily: jakarta,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         Expanded(
@@ -640,13 +1270,13 @@ class _QuickStatsRow extends StatelessWidget {
                 const Icon(Icons.schedule, color: AppColors.teal),
                 const SizedBox(height: 8),
                 Text(
-                  formatDuration(todayUsageSeconds),
+                  formatDuration(l10n, todayUsageSeconds),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                         color: AppColors.teal,
                       ),
                 ),
-                const Text('Layar hari ini'),
+                Text(l10n.screenTimeToday),
               ],
             ),
           ),
@@ -667,12 +1297,69 @@ class _QuickStatsRow extends StatelessWidget {
                         color: AppColors.coral,
                       ),
                 ),
-                const Text('Poin kamu'),
+                Text(l10n.yourPoints),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _VrStatTile extends StatelessWidget {
+  const _VrStatTile({
+    required this.icon,
+    required this.iconColor,
+    required this.background,
+    required this.value,
+    required this.label,
+    required this.valueColor,
+    required this.fontFamily,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color background;
+  final String value;
+  final String label;
+  final Color valueColor;
+  final String? fontFamily;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(AppRadius.vrCard),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: iconColor, size: 22),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                color: valueColor,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: fontFamily,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                color: VisualRefreshColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

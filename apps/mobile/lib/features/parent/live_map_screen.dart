@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/network/ws_client.dart';
-import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import 'children_controller.dart';
 import 'zones_screen.dart';
@@ -303,7 +303,8 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
       setState(() => _alertId = payload['alertId'] as String?);
     }
     if (event == 'child:message' && payload['childId'] == widget.child.id) {
-      final text = payload['text'] as String? ?? 'Kabar baru';
+      final l10n = AppLocalizations.of(context);
+      final text = payload['text'] as String? ?? l10n.newKabarBanner;
       final name = payload['childName'] as String? ?? widget.child.name;
       setState(() => _kabarBanner = '$name: $text');
       _kabarClear?.cancel();
@@ -313,11 +314,12 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     }
     if (event == 'parent:zone_event' &&
         payload['childId'] == widget.child.id) {
-      final message = payload['message'] as String? ??
-          (payload['event'] == 'enter'
-              ? '${widget.child.name} sudah di zona aman'
-              : '${widget.child.name} meninggalkan zona aman');
+      final l10n = AppLocalizations.of(context);
       final isEnter = payload['event'] == 'enter';
+      final message = payload['message'] as String? ??
+          (isEnter
+              ? l10n.childInSafeZoneMsg(widget.child.name)
+              : l10n.leftSafeZoneMsg(widget.child.name));
       setState(() {
         _kabarBanner = message;
         if (isEnter) _atHome = payload['zoneType'] == 'home' || _atHome;
@@ -365,30 +367,32 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     final api = ref.read(apiClientProvider);
     await api.post('/api/v1/panic/$_alertId/ack');
     if (mounted) {
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Peringatan direspons')),
+        SnackBar(content: Text(l10n.alertAcknowledged)),
       );
     }
   }
 
   Future<void> _resolve() async {
     if (_alertId == null) return;
+    final l10n = AppLocalizations.of(context);
     final api = ref.read(apiClientProvider);
     await api.post('/api/v1/panic/$_alertId/resolve', body: {
-      'notes': 'Diselesaikan orang tua',
+      'notes': l10n.resolvedByParentNote,
     });
     setState(() => _alertId = null);
   }
 
-  String _statusLabel() {
-    if (_position == null) return 'Menunggu sinyal lokasi...';
-    if (_atHome) return 'Di rumah · jejak dihentikan';
-    if (_stale) return 'Lokasi tidak diperbarui baru-baru ini';
-    if (_updatedAt == null) return 'Sedang bergerak';
+  String _statusLabel(AppLocalizations l10n) {
+    if (_position == null) return l10n.waitingGpsSignal;
+    if (_atHome) return l10n.atHomeTrackingStopped;
+    if (_stale) return l10n.locationNotUpdatedRecently;
+    if (_updatedAt == null) return l10n.movingNow;
     final age = DateTime.now().difference(_updatedAt!);
-    if (age.inSeconds < 20) return 'Live · baru saja';
-    if (age.inMinutes < 1) return 'Live · ${age.inSeconds} dtk lalu';
-    return 'Live · ${age.inMinutes} mnt lalu';
+    if (age.inSeconds < 20) return l10n.liveJustNow;
+    if (age.inMinutes < 1) return l10n.liveSecondsAgo(age.inSeconds);
+    return l10n.liveMinutesAgo(age.inMinutes);
   }
 
   @override
@@ -401,179 +405,284 @@ class _LiveMapScreenState extends ConsumerState<LiveMapScreen> {
     super.dispose();
   }
 
+  Future<void> _openSafeZones() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlacesScreen(child: widget.child),
+      ),
+    );
+    await _loadHomeZone();
+    if (_position != null && mounted) {
+      setState(() => _atHome = _isInsideHome(_position!));
+    }
+  }
+
+  Widget _statusCard(AppLocalizations l10n, {required bool refresh}) {
+    final dotColor = refresh
+        ? (_atHome
+            ? VisualRefreshColors.accent
+            : _stale
+                ? VisualRefreshColors.routeText
+                : VisualRefreshColors.accent)
+        : (_atHome
+            ? AppColors.teal
+            : _stale
+                ? AppColors.amber
+                : AppColors.success);
+    final muted = refresh
+        ? VisualRefreshColors.textSecondary
+        : AppColors.inkSoft;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: refresh ? VisualRefreshColors.surface : Colors.white,
+        borderRadius: BorderRadius.circular(refresh ? 18 : 16),
+        border: refresh
+            ? const Border.fromBorderSide(VisualRefreshColors.hairline)
+            : null,
+        boxShadow: refresh
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _statusLabel(l10n),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: refresh ? VisualRefreshColors.textPrimary : null,
+                    ),
+                  ),
+                ),
+                Text(
+                  _atHome
+                      ? l10n.homeZone
+                      : _trail.length < 2
+                          ? l10n.shortTrailLabel
+                          : l10n.trailPointsCount(_trail.length),
+                  style: TextStyle(
+                    color: muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            if (_placeLabel != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _placeLabel!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: muted,
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _safeZonesButton(AppLocalizations l10n, {required bool refresh}) {
+    final label = Text(l10n.importantPlacesLabel);
+    final icon = Icon(
+      Icons.home_work_outlined,
+      size: 18,
+      color: refresh ? VisualRefreshColors.background : Colors.white,
+    );
+    if (refresh) {
+      return FilledButton.icon(
+        onPressed: _openSafeZones,
+        style: FilledButton.styleFrom(
+          backgroundColor: VisualRefreshColors.anchor,
+          foregroundColor: VisualRefreshColors.background,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: const StadiumBorder(),
+        ),
+        icon: icon,
+        label: label,
+      );
+    }
+    return FloatingActionButton.extended(
+      onPressed: _openSafeZones,
+      backgroundColor: AppColors.teal,
+      label: label,
+      icon: const Icon(Icons.home_work_outlined),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final center = _position ?? const LatLng(-6.2, 106.8);
+    final trailColor =
+        refresh ? VisualRefreshColors.accent : AppColors.teal;
     final polylines = <Polyline>{
       if (!_atHome && _trail.length >= 2)
         Polyline(
           polylineId: const PolylineId('trail'),
           points: List<LatLng>.from(_trail),
-          color: AppColors.teal,
+          color: trailColor,
           width: 5,
           geodesic: true,
         ),
     };
 
+    final titleStyle = refresh
+        ? Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: VisualRefreshColors.textPrimary,
+            )
+        : null;
+
     return Scaffold(
+      backgroundColor:
+          refresh ? VisualRefreshColors.background : null,
       appBar: AppBar(
+        backgroundColor:
+            refresh ? VisualRefreshColors.background : null,
+        surfaceTintColor: refresh ? Colors.transparent : null,
+        scrolledUnderElevation: refresh ? 0 : null,
         leadingWidth: PaScreenHeader.appBarLeadingWidth,
         titleSpacing: PaScreenHeader.appBarTitleSpacing,
         leading: paAppBarLeading(context),
-        title: Text('${AppStrings.liveMap} · ${widget.child.name}'),
+        title: Text(
+          '${l10n.liveMap} · ${widget.child.name}',
+          style: titleStyle,
+        ),
       ),
       body: Column(
         children: [
           if (_stale)
             MaterialBanner(
-              content: const Text(AppStrings.staleLocation),
-              backgroundColor: const Color(0xFFFFF4E5),
+              content: Text(
+                l10n.staleLocation,
+                style: TextStyle(
+                  color: refresh
+                      ? VisualRefreshColors.routeText
+                      : null,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              backgroundColor: refresh
+                  ? VisualRefreshColors.routeTint
+                  : const Color(0xFFFFF4E5),
               actions: [
-                TextButton(onPressed: _fetchLocation, child: const Text('Muat ulang')),
+                TextButton(
+                  onPressed: _fetchLocation,
+                  style: TextButton.styleFrom(
+                    foregroundColor: refresh
+                        ? VisualRefreshColors.accent
+                        : null,
+                  ),
+                  child: Text(l10n.reloadTooltip),
+                ),
               ],
             ),
           if (_alertId != null)
             MaterialBanner(
-              content: const Text('PANIK aktif — hubungi anak / darurat'),
-              backgroundColor: const Color(0xFFFEE4E2),
+              content: Text(l10n.panicModeActiveWaiting),
+              backgroundColor: refresh
+                  ? VisualRefreshColors.dangerTint
+                  : const Color(0xFFFEE4E2),
               actions: [
-                TextButton(onPressed: _ack, child: const Text(AppStrings.ackAlert)),
-                TextButton(onPressed: _resolve, child: const Text(AppStrings.resolveAlert)),
+                TextButton(onPressed: _ack, child: Text(l10n.ackAlert)),
+                TextButton(
+                  onPressed: _resolve,
+                  child: Text(l10n.resolveAlert),
+                ),
               ],
             ),
           if (_kabarBanner != null)
             MaterialBanner(
               content: Text(_kabarBanner!),
-              backgroundColor: const Color(0xFFE8F8F2),
-              leading: const Icon(Icons.chat_bubble, color: AppColors.teal),
+              backgroundColor: refresh
+                  ? VisualRefreshColors.accentTint
+                  : const Color(0xFFE8F8F2),
+              leading: Icon(
+                Icons.chat_bubble,
+                color: refresh
+                    ? VisualRefreshColors.accent
+                    : AppColors.teal,
+              ),
               actions: [
                 TextButton(
                   onPressed: () => setState(() => _kabarBanner = null),
-                  child: const Text('Tutup'),
+                  child: Text(l10n.closeAction),
                 ),
               ],
             ),
           Expanded(
-            child: Stack(
-              children: [
-                GoogleMap(
-                  initialCameraPosition: CameraPosition(target: center, zoom: 15),
-                  onMapCreated: (controller) {
-                    _mapController = controller;
-                    if (_position != null) {
-                      controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(_position!, _atHome ? 16 : 15),
-                      );
-                    }
-                  },
-                  markers: {
-                    if (_position != null)
-                      Marker(
-                        markerId: MarkerId(widget.child.id),
-                        position: _position!,
-                        infoWindow: InfoWindow(
-                          title: widget.child.name,
-                          snippet: _atHome ? 'Di rumah' : _placeLabel,
-                        ),
-                      ),
-                  },
-                  circles: _circles,
-                  polylines: polylines,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                ),
-                Positioned(
-                  left: 12,
-                  right: 12,
-                  bottom: 16,
-                  child: Material(
-                    elevation: 3,
-                    borderRadius: BorderRadius.circular(16),
-                    color: Colors.white.withValues(alpha: 0.96),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  color: _atHome
-                                      ? AppColors.teal
-                                      : _stale
-                                          ? AppColors.amber
-                                          : AppColors.success,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _statusLabel(),
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
-                                ),
-                              ),
-                              Text(
-                                _atHome
-                                    ? 'Rumah'
-                                    : _trail.length < 2
-                                        ? 'Jejak singkat'
-                                        : '${_trail.length} titik jalur',
-                                style: const TextStyle(
-                                  color: AppColors.inkSoft,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_placeLabel != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              _placeLabel!,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.inkSoft,
-                                fontSize: 12,
-                                height: 1.3,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+            child: GoogleMap(
+              initialCameraPosition:
+                  CameraPosition(target: center, zoom: 15),
+              onMapCreated: (controller) {
+                _mapController = controller;
+                if (_position != null) {
+                  controller.animateCamera(
+                    CameraUpdate.newLatLngZoom(
+                      _position!,
+                      _atHome ? 16 : 15,
+                    ),
+                  );
+                }
+              },
+              markers: {
+                if (_position != null)
+                  Marker(
+                    markerId: MarkerId(widget.child.id),
+                    position: _position!,
+                    infoWindow: InfoWindow(
+                      title: widget.child.name,
+                      snippet:
+                          _atHome ? l10n.statusHomeLabel : _placeLabel,
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 16,
-                  bottom: 108,
-                  child: FloatingActionButton.extended(
-                    onPressed: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => PlacesScreen(child: widget.child),
-                        ),
-                      );
-                      await _loadHomeZone();
-                      if (_position != null) {
-                        setState(() => _atHome = _isInsideHome(_position!));
-                      }
-                    },
-                    backgroundColor: AppColors.teal,
-                    label: const Text('Lokasi penting'),
-                    icon: const Icon(Icons.home_work_outlined),
-                  ),
-                ),
-              ],
+              },
+              circles: _circles,
+              polylines: polylines,
+              myLocationButtonEnabled: false,
+              zoomControlsEnabled: false,
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _safeZonesButton(l10n, refresh: refresh),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+            child: _statusCard(l10n, refresh: refresh),
           ),
         ],
       ),

@@ -24,10 +24,23 @@ class PaRoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    final resolvedBg = refresh && backgroundColor == Colors.white
+        ? VisualRefreshColors.surface
+        : backgroundColor;
+    final resolvedIcon =
+        iconColor ?? (refresh ? VisualRefreshColors.textPrimary : AppColors.ink);
     return Material(
-      color: backgroundColor,
-      shape: const CircleBorder(),
-      elevation: elevation,
+      color: resolvedBg,
+      shape: CircleBorder(
+        side: refresh
+            ? const BorderSide(
+                color: VisualRefreshColors.border,
+                width: 0.5,
+              )
+            : BorderSide.none,
+      ),
+      elevation: refresh ? 0 : elevation,
       shadowColor: Colors.black26,
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -35,7 +48,7 @@ class PaRoundIconButton extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: Icon(icon, size: iconSize, color: iconColor ?? AppColors.ink),
+          child: Icon(icon, size: iconSize, color: resolvedIcon),
         ),
       ),
     );
@@ -80,11 +93,14 @@ class PaScreenHeader extends StatelessWidget {
     this.titleStyle,
     this.subtitleStyle,
     this.crossAxisAlignment = CrossAxisAlignment.center,
-    this.padding = const EdgeInsets.fromLTRB(edgePad, 8, 16, 0),
+    this.padding = const EdgeInsets.fromLTRB(edgePad, 8, 16, contentGap),
   });
 
   /// Left inset matching the map overlay back chip.
   static const edgePad = 12.0;
+
+  /// Space below the header before the next content (chips, list, etc.).
+  static const contentGap = 12.0;
 
   /// Gap from circular back chip to title text.
   static const titleGap = 12.0;
@@ -233,6 +249,98 @@ class PaEmptyState extends StatelessWidget {
           const SizedBox(height: 6),
           Text(message, textAlign: TextAlign.center),
         ],
+      ),
+    );
+  }
+}
+
+/// Centered empty-state template for Visual Refresh screens.
+///
+/// Icon in an accent-tint circle, message, optional solid anchor CTA —
+/// used by Trusted Guardians (per-child) and intended for EMP / similar.
+class PaVrEmptyState extends StatelessWidget {
+  const PaVrEmptyState({
+    super.key,
+    required this.icon,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.actionIcon,
+  });
+
+  final IconData icon;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final IconData? actionIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: VisualRefreshColors.accentTint,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 40,
+                color: VisualRefreshColors.accent,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+                color: VisualRefreshColors.textSecondary,
+              ),
+            ),
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: VisualRefreshColors.anchor,
+                    foregroundColor: VisualRefreshColors.background,
+                    elevation: 0,
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (actionIcon != null) ...[
+                        Icon(actionIcon, size: 20),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        actionLabel!,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

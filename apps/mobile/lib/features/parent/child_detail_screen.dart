@@ -3,11 +3,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/network/ws_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../child/child_usage_utils.dart';
 import '../screentime/screen_time_screen.dart';
@@ -20,7 +22,6 @@ import 'kabar_read_store.dart';
 import 'live_map_screen.dart';
 import 'reminders_screen.dart';
 import 'zones_screen.dart';
-import '../../l10n/app_localizations.dart';
 
 /// Find My Kids–inspired child hub: map + inline summaries + daily timeline.
 class ChildDetailScreen extends ConsumerStatefulWidget {
@@ -54,11 +55,11 @@ class _ZoneSummary {
   final double? lat;
   final double? lng;
 
-  String get displayName {
+  String displayName(AppLocalizations l10n) {
     if (name.trim().isNotEmpty) return name.trim();
-    if (type == 'home') return 'Rumah';
-    if (type == 'school') return 'Sekolah';
-    return 'Tempat aman';
+    if (type == 'home') return l10n.homeZone;
+    if (type == 'school') return l10n.schoolZone;
+    return l10n.safePlaceLabel;
   }
 }
 
@@ -503,7 +504,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
       if (!mounted) return;
       setState(() {
         _activityLoading = false;
-        _activityError = 'Riwayat hari ini belum bisa dimuat';
+        _activityError = AppLocalizations.of(context).activityLoadFailed;
       });
     }
   }
@@ -543,34 +544,34 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     super.dispose();
   }
 
-  String get _statusBubble {
-    if (_atHome) return 'Di rumah';
+  String _statusBubble(AppLocalizations l10n) {
+    if (_atHome) return l10n.statusHomeLabel;
     if (_placeLabel != null && _placeLabel!.isNotEmpty) {
       return _placeLabel!;
     }
-    if (_position == null) return 'Menunggu lokasi...';
-    return 'Terlihat di peta';
+    if (_position == null) return l10n.waitingLocationDots;
+    return l10n.seenOnMap;
   }
 
-  String get _whenLabel {
+  String _whenLabel(AppLocalizations l10n) {
     final at = _updatedAt;
-    if (at == null) return 'Belum ada sinyal';
+    if (at == null) return l10n.noSignalYet;
     final hm =
         '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
-    return 'Update $hm';
+    return l10n.updatedAtTime(hm);
   }
 
-  String? get _batteryBannerText {
+  String? _batteryBannerText(AppLocalizations l10n) {
     switch (_batteryAlert) {
       case 'dead':
-        return 'HP anak hampir habis / mati. Lokasi mungkin tidak diperbarui.';
+        return l10n.batteryDeadBanner;
       case 'low':
-        return 'Baterai HP anak lemah (${_batteryLevel ?? '?'}%).';
+        return l10n.batteryLowBanner('${_batteryLevel ?? '?'}');
       case 'stale':
-        return 'Sinyal lokasi lama. HP anak mungkin mati atau tanpa jaringan.';
+        return l10n.locationStaleBanner;
       default:
         if (_batteryLevel != null && _batteryLevel! <= 15 && !_batteryCharging) {
-          return 'Baterai HP anak lemah ($_batteryLevel%).';
+          return l10n.batteryLowBanner('$_batteryLevel');
         }
         return null;
     }
@@ -637,34 +638,45 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     await _loadRemindersSummary();
   }
 
-  String get _zoneBody {
-    if (_zones.isEmpty) return 'Belum ada zona';
-    _ZoneSummary? home;
-    _ZoneSummary? school;
+  int get _activeZoneCount {
+    var n = 0;
     for (final z in _zones) {
-      if (z.type == 'home') home ??= z;
-      if (z.type == 'school') school ??= z;
+      if (z.type == 'home' && _atHome) n++;
+    }
+    return n;
+  }
+
+  bool _zoneIsActive(_ZoneSummary z) => z.type == 'home' && _atHome;
+
+  String _zoneBody(AppLocalizations l10n, {required bool refresh}) {
+    if (_zones.isEmpty) return l10n.noZonesYet;
+    if (refresh) {
+      return l10n.zonesSummaryActiveCount(_zones.length, _activeZoneCount);
+    }
+    _ZoneSummary? home;
+    for (final z in _zones) {
+      if (z.type == 'home') {
+        home = z;
+        break;
+      }
     }
     if (_atHome && home != null) {
-      return '${home.displayName} · aktif';
+      return l10n.zoneNameActive(home.displayName(l10n));
     }
-    if (home != null) return '${home.displayName} · ${_zones.length} zona';
-    return '${_zones.length} zona aman';
+    if (home != null) {
+      return l10n.zoneNameWithCount(home.displayName(l10n), _zones.length);
+    }
+    return l10n.safeZonesCount(_zones.length);
   }
 
-  String? get _zoneDetail {
-    if (_zones.isEmpty) return 'Tambah rumah atau sekolah';
-    final chips = <String>[];
-    for (final z in _zones.take(3)) {
-      final active = z.type == 'home' && _atHome;
-      chips.add(active ? '${z.displayName} · aktif' : z.displayName);
-    }
-    if (_zones.length > 3) chips.add('+${_zones.length - 3}');
-    return chips.join(' · ');
+  String? _zoneDetail(AppLocalizations l10n, {required bool refresh}) {
+    if (_zones.isEmpty) return l10n.addHomeOrSchoolHint;
+    if (refresh) return null;
+    return l10n.zonesSummaryActiveCount(_zones.length, _activeZoneCount);
   }
 
-  String get _kabarBody {
-    if (_kabar.isEmpty) return 'Belum ada kabar';
+  String _kabarBody(AppLocalizations l10n) {
+    if (_kabar.isEmpty) return l10n.noKabarYet;
     final latest = _kabar.first;
     final clock =
         '${latest.sentAt.toLocal().hour.toString().padLeft(2, '0')}:'
@@ -672,16 +684,16 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     return '${latest.text} · $clock';
   }
 
-  String? get _kabarDetail {
+  String? _kabarDetail(AppLocalizations l10n) {
     if (_kabarUnread <= 0) return null;
-    return '$_kabarUnread belum dibaca';
+    return l10n.unreadKabarCount(_kabarUnread);
   }
 
-  String get _screenBody {
-    if (!_screenEnabled) return 'Batasan dimatikan';
+  String _screenBody(AppLocalizations l10n) {
+    if (!_screenEnabled) return l10n.screenLimitsOff;
     final used = formatDurationCompact(_screenUsedSeconds);
     final limit = _fmtLimitCompact(_screenLimitMinutes);
-    return '$used / $limit hari ini';
+    return l10n.screenUsedToday(used, limit);
   }
 
   double get _screenProgress {
@@ -690,16 +702,20 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     return (_screenUsedSeconds / limitSec).clamp(0.0, 1.0);
   }
 
-  String get _reminderBody {
+  String _reminderBody(AppLocalizations l10n) {
     final active = _reminders.where((r) => r.enabled).toList();
     if (active.isEmpty) {
       return _reminders.isEmpty
-          ? 'Belum ada pengingat'
-          : 'Tidak ada yang aktif';
+          ? l10n.noRemindersYet
+          : l10n.remindersNoneActive;
     }
     final next = _nextReminder(active);
-    if (next == null) return '${active.length} aktif';
-    return '${active.length} aktif · berikutnya ${next.title} ${next.timeLabel}';
+    if (next == null) return l10n.remindersActiveCount(active.length);
+    return l10n.remindersActiveNext(
+      active.length,
+      next.title,
+      next.timeLabel,
+    );
   }
 
   String _homeBySummaryBody(AppLocalizations l10n) {
@@ -727,7 +743,8 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
       case 'pending':
         return l10n.homeByStatusPending;
       default:
-        return l10n.homeBySummaryOff;
+        // Mode is configured but not actively monitoring yet.
+        return l10n.homeBySummaryNotTurnedOn;
     }
   }
 
@@ -766,25 +783,30 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     final center = _position ?? const LatLng(-6.2, 106.8);
     final polylines = <Polyline>{
       if (!_atHome && _trail.length >= 2)
         Polyline(
           polylineId: const PolylineId('trail'),
           points: List<LatLng>.from(_trail),
-          color: AppColors.teal,
+          color: refresh ? VisualRefreshColors.accent : AppColors.teal,
           width: 4,
           geodesic: true,
         ),
     };
-    final banner = _batteryBannerText;
+    final banner = _batteryBannerText(l10n);
     final mapHeight = MediaQuery.sizeOf(context).height * 0.36;
     final statusLine = _stale
-        ? 'Lokasi tidak bisa diperbarui'
-        : (_atHome ? 'Di rumah' : 'Sedang dipantau');
+        ? l10n.locationCannotUpdate
+        : (_atHome ? l10n.statusHomeLabel : l10n.beingMonitored);
+    final pillFill =
+        refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
+      backgroundColor:
+          refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
       body: Column(
         children: [
           SizedBox(
@@ -814,9 +836,9 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                         infoWindow: InfoWindow(
                           title: widget.child.name,
                           snippet: _batteryLevel == null
-                              ? _statusBubble
-                              : 'Baterai $_batteryLevel%'
-                                  '${_batteryCharging ? ' · cas' : ''}',
+                              ? _statusBubble(l10n)
+                              : '${l10n.batteryPercentLabel(_batteryLevel!)}'
+                                  '${_batteryCharging ? l10n.chargingShortSuffix : ''}',
                         ),
                       ),
                   },
@@ -847,7 +869,9 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                           children: [
                             PaRoundIconButton(
                               icon: Icons.gps_fixed_rounded,
-                              iconColor: const Color(0xFFE85A7A),
+                              iconColor: refresh
+                                  ? VisualRefreshColors.accent
+                                  : const Color(0xFFE85A7A),
                               onTap: () {
                                 if (_position == null) return;
                                 _mapController?.animateCamera(
@@ -887,25 +911,31 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                         vertical: 9,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.tealDeep,
+                        color: pillFill,
                         borderRadius: BorderRadius.circular(999),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.tealDeep.withValues(alpha: 0.35),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        boxShadow: refresh
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: AppColors.tealDeep
+                                      .withValues(alpha: 0.35),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                       ),
                       child: Text(
-                        '$_statusBubble · $_whenLabel',
+                        '${_statusBubble(l10n)} · ${_whenLabel(l10n)}',
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
                           fontSize: 13,
+                          fontFamily: refresh
+                              ? GoogleFonts.plusJakartaSans().fontFamily
+                              : null,
                         ),
                       ),
                     ),
@@ -918,7 +948,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
             child: Transform.translate(
               offset: const Offset(0, -28),
               child: RefreshIndicator(
-                color: AppColors.teal,
+                color: refresh ? VisualRefreshColors.accent : AppColors.teal,
                 onRefresh: () async {
                   await Future.wait([
                     _fetchLocation(),
@@ -940,68 +970,83 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                       batteryCharging: _batteryCharging,
                       onRefresh: _fetchLocation,
                       onEditGender: _editGender,
+                      refresh: refresh,
                     ),
                     const SizedBox(height: 14),
                     _FeatureSummaryCard(
-                      title: 'Zona aman',
-                      body: _zoneBody,
-                      detail: _zoneDetail,
+                      title: l10n.safeZoneFeatureTitle,
+                      body: _zoneBody(l10n, refresh: refresh),
+                      detail: _zoneDetail(l10n, refresh: refresh),
                       onOpen: _openZones,
+                      refresh: refresh,
                       chips: _zones.isEmpty
                           ? const []
                           : [
                               for (final z in _zones.take(3))
                                 _MiniZoneChip(
-                                  label: z.type == 'home' && _atHome
-                                      ? '${z.displayName} · aktif'
-                                      : z.displayName,
-                                  active: z.type == 'home' && _atHome,
+                                  label: _zoneIsActive(z)
+                                      ? l10n.zoneNameActive(
+                                          z.displayName(l10n),
+                                        )
+                                      : z.displayName(l10n),
+                                  active: _zoneIsActive(z),
+                                  refresh: refresh,
                                 ),
                             ],
                     ),
                     const SizedBox(height: 10),
                     _FeatureSummaryCard(
-                      title: 'Kabar',
-                      body: _kabarBody,
-                      detail: _kabarDetail,
+                      title: l10n.parentKabarFeatureTitle,
+                      body: _kabarBody(l10n),
+                      detail: _kabarDetail(l10n),
                       onOpen: _openKabar,
+                      refresh: refresh,
                     ),
                     const SizedBox(height: 10),
                     _FeatureSummaryCard(
-                      title: 'Waktu layar',
-                      body: _screenBody,
+                      title: l10n.screenTimeTitle,
+                      body: _screenBody(l10n),
                       onOpen: _openScreenTime,
+                      refresh: refresh,
                       progress: _screenEnabled ? _screenProgress : null,
                       progressCaption: _screenEnabled
-                          ? 'batas ${_fmtLimitCompact(_screenLimitMinutes)}'
+                          ? l10n.limitCaptionShort(
+                              _fmtLimitCompact(_screenLimitMinutes),
+                            )
                           : null,
                     ),
                     const SizedBox(height: 10),
                     _FeatureSummaryCard(
-                      title: 'Pengingat',
-                      body: _reminderBody,
+                      title: l10n.remindersFeatureTitle,
+                      body: _reminderBody(l10n),
                       onOpen: _openReminders,
+                      refresh: refresh,
                     ),
                     const SizedBox(height: 10),
-                    Builder(
-                      builder: (context) {
-                        final l10n = AppLocalizations.of(context);
-                        return _FeatureSummaryCard(
-                          title: l10n.homeByTitle,
-                          body: _homeBySummaryBody(l10n),
-                          onOpen: _openHomeBy,
-                          linkLabel: l10n.homeBySeeAll,
-                        );
-                      },
+                    _FeatureSummaryCard(
+                      title: l10n.homeByTitle,
+                      body: _homeBySummaryBody(l10n),
+                      onOpen: _openHomeBy,
+                      linkLabel: l10n.homeBySeeAll,
+                      refresh: refresh,
                     ),
                     const SizedBox(height: 22),
-                    const Text(
-                      'Hari ini',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                      ),
+                    Text(
+                      refresh
+                          ? l10n.todaySectionTitle.toUpperCase()
+                          : l10n.todaySectionTitle,
+                      style: refresh
+                          ? GoogleFonts.plusJakartaSans(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.1,
+                              color: VisualRefreshColors.textTertiary,
+                            )
+                          : const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.3,
+                            ),
                     ),
                     const SizedBox(height: 12),
                     if (_activityLoading)
@@ -1012,11 +1057,18 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                     else if (_activityError != null)
                       Text(
                         _activityError!,
-                        style: const TextStyle(color: AppColors.coral),
+                        style: TextStyle(
+                          color: refresh
+                              ? VisualRefreshColors.danger
+                              : AppColors.coral,
+                        ),
                       )
                     else ...[
                       if (_activitySummary != null)
-                        _ActivitySummaryRow(summary: _activitySummary!),
+                        _ActivitySummaryRow(
+                          summary: _activitySummary!,
+                          refresh: refresh,
+                        ),
                       const SizedBox(height: 12),
                       if (_activityEvents.isEmpty)
                         Container(
@@ -1025,13 +1077,18 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                             horizontal: 16,
                             vertical: 22,
                           ),
-                          decoration: _cardDecoration,
-                          child: const Text(
-                            'Belum ada jejak hari ini.',
+                          decoration: _cardDecoration(refresh),
+                          child: Text(
+                            l10n.noTrailToday,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: AppColors.inkSoft,
+                              color: refresh
+                                  ? VisualRefreshColors.textSecondary
+                                  : AppColors.inkSoft,
                               fontWeight: FontWeight.w600,
+                              fontFamily: refresh
+                                  ? GoogleFonts.plusJakartaSans().fontFamily
+                                  : null,
                             ),
                           ),
                         )
@@ -1044,12 +1101,13 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                             return _TimelineStayCard(
                               event: e,
                               showConnector: !isLast,
+                              refresh: refresh,
                             );
                           }
                           if (type == 'trip') {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: _TripCard(event: e),
+                              child: _TripCard(event: e, refresh: refresh),
                             );
                           }
                           return const SizedBox.shrink();
@@ -1066,17 +1124,26 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   }
 }
 
-final BoxDecoration _cardDecoration = BoxDecoration(
-  color: Colors.white,
-  borderRadius: BorderRadius.circular(22),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.06),
-      blurRadius: 18,
-      offset: const Offset(0, 6),
-    ),
-  ],
-);
+BoxDecoration _cardDecoration(bool refresh) {
+  if (refresh) {
+    return BoxDecoration(
+      color: VisualRefreshColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.vrCard),
+      border: Border.all(color: VisualRefreshColors.border, width: 0.5),
+    );
+  }
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(22),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.06),
+        blurRadius: 18,
+        offset: const Offset(0, 6),
+      ),
+    ],
+  );
+}
 
 class _ProfileStatusCard extends StatelessWidget {
   const _ProfileStatusCard({
@@ -1089,6 +1156,7 @@ class _ProfileStatusCard extends StatelessWidget {
     required this.batteryCharging,
     required this.onRefresh,
     required this.onEditGender,
+    this.refresh = false,
   });
 
   final String name;
@@ -1100,12 +1168,21 @@ class _ProfileStatusCard extends StatelessWidget {
   final bool batteryCharging;
   final Future<void> Function() onRefresh;
   final VoidCallback onEditGender;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final staleDot =
+        refresh ? VisualRefreshColors.routeText : const Color(0xFFE8A11A);
+    final staleText =
+        refresh ? VisualRefreshColors.routeText : const Color(0xFFC46A0A);
+    final liveDot = refresh ? VisualRefreshColors.accent : AppColors.teal;
+    final liveText =
+        refresh ? VisualRefreshColors.accent : AppColors.tealDeep;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
-      decoration: _cardDecoration,
+      padding: EdgeInsets.fromLTRB(16, 16, 12, refresh ? 14 : 16),
+      decoration: _cardDecoration(refresh),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1120,7 +1197,7 @@ class _ProfileStatusCard extends StatelessWidget {
                     name: name,
                     gender: gender,
                     size: 52,
-                    showEditBadge: true,
+                    showEditBadge: !refresh,
                   ),
                 ),
               ),
@@ -1131,12 +1208,20 @@ class _ProfileStatusCard extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                        color: AppColors.ink,
-                      ),
+                      style: refresh
+                          ? GoogleFonts.fraunces(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.3,
+                              height: 1.15,
+                              color: VisualRefreshColors.textPrimary,
+                            )
+                          : const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.3,
+                              color: AppColors.ink,
+                            ),
                     ),
                     const SizedBox(height: 3),
                     Row(
@@ -1145,9 +1230,7 @@ class _ProfileStatusCard extends StatelessWidget {
                           width: 7,
                           height: 7,
                           decoration: BoxDecoration(
-                            color: stale
-                                ? const Color(0xFFE8A11A)
-                                : AppColors.teal,
+                            color: stale ? staleDot : liveDot,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -1158,42 +1241,56 @@ class _ProfileStatusCard extends StatelessWidget {
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 13.5,
-                              color: stale
-                                  ? const Color(0xFFC46A0A)
-                                  : AppColors.tealDeep,
+                              color: stale ? staleText : liveText,
+                              fontFamily: refresh
+                                  ? GoogleFonts.plusJakartaSans().fontFamily
+                                  : null,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    GestureDetector(
-                      onTap: onEditGender,
-                      child: const Text(
-                        'Ubah wajah avatar',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.tealDeep,
+                    if (!refresh) ...[
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: onEditGender,
+                        child: Text(
+                          AppLocalizations.of(context).changeAvatarAction,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.tealDeep,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
               Material(
-                color: const Color(0xFFF3F5F7),
-                shape: const CircleBorder(),
+                color: refresh
+                    ? VisualRefreshColors.surface
+                    : const Color(0xFFF3F5F7),
+                shape: CircleBorder(
+                  side: refresh
+                      ? const BorderSide(
+                          color: VisualRefreshColors.border,
+                          width: 0.5,
+                        )
+                      : BorderSide.none,
+                ),
                 child: InkWell(
                   customBorder: const CircleBorder(),
                   onTap: () => onRefresh(),
-                  child: const SizedBox(
+                  child: SizedBox(
                     width: 40,
                     height: 40,
                     child: Icon(
                       Icons.refresh_rounded,
                       size: 20,
-                      color: AppColors.inkSoft,
+                      color: refresh
+                          ? VisualRefreshColors.textSecondary
+                          : AppColors.inkSoft,
                     ),
                   ),
                 ),
@@ -1202,10 +1299,18 @@ class _ProfileStatusCard extends StatelessWidget {
           ),
           if (banner != null) ...[
             const SizedBox(height: 12),
-            _AlertPill(text: banner!, onTap: () => onRefresh()),
+            _AlertPill(
+              text: banner!,
+              onTap: () => onRefresh(),
+              refresh: refresh,
+            ),
           ],
           const SizedBox(height: 14),
-          _BatteryMeter(level: batteryLevel, charging: batteryCharging),
+          _BatteryMeter(
+            level: batteryLevel,
+            charging: batteryCharging,
+            refresh: refresh,
+          ),
         ],
       ),
     );
@@ -1213,23 +1318,29 @@ class _ProfileStatusCard extends StatelessWidget {
 }
 
 class _BatteryMeter extends StatelessWidget {
-  const _BatteryMeter({required this.level, required this.charging});
+  const _BatteryMeter({
+    required this.level,
+    required this.charging,
+    this.refresh = false,
+  });
 
   final int? level;
   final bool charging;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final value = level;
     final known = value != null;
     final low = known && value <= 15 && !charging;
     final pct = known ? (value.clamp(0, 100) / 100.0) : 0.0;
-    final label = !known
-        ? 'Baterai belum diketahui'
-        : charging
-            ? 'Baterai $value% · di-cas'
-            : 'Baterai $value%';
-    final color = low ? AppColors.coral : AppColors.teal;
+    final color = low
+        ? (refresh ? VisualRefreshColors.danger : AppColors.coral)
+        : (refresh ? VisualRefreshColors.accent : AppColors.teal);
+    final track = refresh
+        ? VisualRefreshColors.tagMuted
+        : const Color(0xFFE8ECF0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1248,21 +1359,47 @@ class _BatteryMeter extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                label,
+                l10n.batteryMetricLabel,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
-                  color: low ? AppColors.coral : AppColors.ink,
+                  color: low
+                      ? (refresh ? VisualRefreshColors.danger : AppColors.coral)
+                      : (refresh
+                          ? VisualRefreshColors.textPrimary
+                          : AppColors.ink),
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
               ),
             ),
             if (known)
               Text(
-                '$value%',
+                charging
+                    ? '$value%${l10n.chargingShortSuffix}'
+                    : '$value%',
                 style: TextStyle(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                   fontSize: 15,
                   color: color,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
+              )
+            else
+              Text(
+                l10n.batteryUnknown,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
               ),
           ],
@@ -1273,7 +1410,7 @@ class _BatteryMeter extends StatelessWidget {
           child: LinearProgressIndicator(
             value: known ? pct : 0.08,
             minHeight: 6,
-            backgroundColor: const Color(0xFFE8ECF0),
+            backgroundColor: track,
             color: color,
           ),
         ),
@@ -1283,37 +1420,60 @@ class _BatteryMeter extends StatelessWidget {
 }
 
 class _AlertPill extends StatelessWidget {
-  const _AlertPill({required this.text, required this.onTap});
+  const _AlertPill({
+    required this.text,
+    required this.onTap,
+    this.refresh = false,
+  });
 
   final String text;
   final VoidCallback onTap;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final bg = refresh
+        ? VisualRefreshColors.routeTint
+        : const Color(0xFFFFF3E6);
+    final fg = refresh
+        ? VisualRefreshColors.routeText
+        : const Color(0xFF9A5B00);
+    final icon = refresh
+        ? VisualRefreshColors.routeText
+        : const Color(0xFFD97706);
+
     return Material(
-      color: const Color(0xFFFFF3E6),
-      borderRadius: BorderRadius.circular(14),
+      color: bg,
+      borderRadius: BorderRadius.circular(refresh ? AppRadius.vrChip : 14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
+        borderRadius: BorderRadius.circular(refresh ? AppRadius.vrChip : 14),
+        child: Container(
+          decoration: refresh
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(AppRadius.vrChip),
+                  border: Border.all(
+                    color: VisualRefreshColors.routeText.withValues(alpha: 0.28),
+                    width: 0.5,
+                  ),
+                )
+              : null,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              const Icon(
-                Icons.warning_amber_rounded,
-                color: Color(0xFFD97706),
-                size: 20,
-              ),
+              Icon(Icons.warning_amber_rounded, color: icon, size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   text,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     height: 1.3,
                     fontSize: 13,
-                    color: Color(0xFF9A5B00),
+                    color: fg,
+                    fontFamily: refresh
+                        ? GoogleFonts.plusJakartaSans().fontFamily
+                        : null,
                   ),
                 ),
               ),
@@ -1335,6 +1495,7 @@ class _FeatureSummaryCard extends StatelessWidget {
     this.progressCaption,
     this.chips = const [],
     this.linkLabel,
+    this.refresh = false,
   });
 
   final String title;
@@ -1345,11 +1506,80 @@ class _FeatureSummaryCard extends StatelessWidget {
   final String? progressCaption;
   final List<Widget> chips;
   final String? linkLabel;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final seeAll = linkLabel ?? l10n.homeBySeeAll;
+
+    if (refresh) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: onOpen,
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title.toUpperCase(),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                        color: VisualRefreshColors.textTertiary,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    seeAll,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                      color: VisualRefreshColors.accent,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: VisualRefreshColors.accent,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onOpen,
+              borderRadius: BorderRadius.circular(AppRadius.vrCard),
+              child: Ink(
+                decoration: _cardDecoration(true),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  child: _featureBody(
+                    body: body,
+                    detail: detail,
+                    progress: progress,
+                    progressCaption: progressCaption,
+                    chips: chips,
+                    refresh: true,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Container(
-      decoration: _cardDecoration.copyWith(
+      decoration: _cardDecoration(false).copyWith(
         borderRadius: BorderRadius.circular(18),
       ),
       child: Material(
@@ -1376,7 +1606,7 @@ class _FeatureSummaryCard extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      linkLabel ?? 'Lihat semua',
+                      seeAll,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 12.5,
@@ -1391,66 +1621,14 @@ class _FeatureSummaryCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15.5,
-                    height: 1.25,
-                    color: AppColors.ink,
-                  ),
+                _featureBody(
+                  body: body,
+                  detail: detail,
+                  progress: progress,
+                  progressCaption: progressCaption,
+                  chips: chips,
+                  refresh: false,
                 ),
-                if (detail != null && detail!.isNotEmpty) ...[
-                  const SizedBox(height: 3),
-                  Text(
-                    detail!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12.5,
-                      color: AppColors.inkSoft,
-                    ),
-                  ),
-                ],
-                if (progress != null) ...[
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(99),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: const Color(0xFFE8ECF0),
-                      color: progress! >= 1.0
-                          ? AppColors.coral
-                          : AppColors.teal,
-                    ),
-                  ),
-                  if (progressCaption != null) ...[
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        progressCaption!,
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.inkSoft,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-                if (chips.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: chips,
-                  ),
-                ],
               ],
             ),
           ),
@@ -1460,31 +1638,144 @@ class _FeatureSummaryCard extends StatelessWidget {
   }
 }
 
+Widget _featureBody({
+  required String body,
+  required String? detail,
+  required double? progress,
+  required String? progressCaption,
+  required List<Widget> chips,
+  required bool refresh,
+}) {
+  final track = refresh
+      ? VisualRefreshColors.tagMuted
+      : const Color(0xFFE8ECF0);
+  final fill = refresh
+      ? ((progress ?? 0) >= 1.0
+          ? VisualRefreshColors.danger
+          : VisualRefreshColors.accent)
+      : ((progress ?? 0) >= 1.0 ? AppColors.coral : AppColors.teal);
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        body,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 15.5,
+          height: 1.25,
+          color: refresh ? VisualRefreshColors.textPrimary : AppColors.ink,
+          fontFamily:
+              refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+        ),
+      ),
+      if (detail != null && detail.isNotEmpty) ...[
+        const SizedBox(height: 3),
+        Text(
+          detail,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12.5,
+            color: refresh
+                ? VisualRefreshColors.textSecondary
+                : AppColors.inkSoft,
+            fontFamily:
+                refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+          ),
+        ),
+      ],
+      if (progress != null) ...[
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor: track,
+            color: fill,
+          ),
+        ),
+        if (progressCaption != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              progressCaption,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: refresh
+                    ? VisualRefreshColors.textSecondary
+                    : AppColors.inkSoft,
+                fontFamily:
+                    refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+              ),
+            ),
+          ),
+        ],
+      ],
+      if (chips.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: chips,
+        ),
+      ],
+    ],
+  );
+}
+
 class _MiniZoneChip extends StatelessWidget {
-  const _MiniZoneChip({required this.label, this.active = false});
+  const _MiniZoneChip({
+    required this.label,
+    this.active = false,
+    this.refresh = false,
+  });
 
   final String label;
   final bool active;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final Color bg;
+    final Color border;
+    final Color fg;
+    if (refresh) {
+      bg = active ? VisualRefreshColors.accentTint : VisualRefreshColors.surface;
+      border =
+          active ? VisualRefreshColors.accent : VisualRefreshColors.border;
+      fg = active
+          ? VisualRefreshColors.accent
+          : VisualRefreshColors.textSecondary;
+    } else {
+      bg = active
+          ? AppColors.teal.withValues(alpha: 0.12)
+          : const Color(0xFFF3F5F7);
+      border = active ? AppColors.teal : const Color(0xFFE2E6EA);
+      fg = active ? AppColors.tealDeep : AppColors.inkSoft;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: active
-            ? AppColors.teal.withValues(alpha: 0.12)
-            : const Color(0xFFF3F5F7),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: active ? AppColors.teal : const Color(0xFFE2E6EA),
-        ),
+        color: bg,
+        borderRadius: BorderRadius.circular(refresh ? AppRadius.vrChip : 8),
+        border: Border.all(color: border, width: refresh ? 0.5 : 1),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 12,
           fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-          color: active ? AppColors.tealDeep : AppColors.inkSoft,
+          color: fg,
+          fontFamily:
+              refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
         ),
       ),
     );
@@ -1492,12 +1783,17 @@ class _MiniZoneChip extends StatelessWidget {
 }
 
 class _ActivitySummaryRow extends StatelessWidget {
-  const _ActivitySummaryRow({required this.summary});
+  const _ActivitySummaryRow({
+    required this.summary,
+    this.refresh = false,
+  });
 
   final Map<String, dynamic> summary;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final places = (summary['places'] as List<dynamic>? ?? [])
         .whereType<Map<String, dynamic>>()
         .toList();
@@ -1512,14 +1808,16 @@ class _ActivitySummaryRow extends StatelessWidget {
         Expanded(
           child: _SummaryStat(
             value: '$placeCount',
-            label: 'tempat',
+            label: l10n.placesCountLabel,
+            refresh: refresh,
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _SummaryStat(
             value: distLabel,
-            label: 'Perjalanan',
+            label: l10n.tripGenericLabel,
+            refresh: refresh,
           ),
         ),
       ],
@@ -1531,40 +1829,58 @@ class _SummaryStat extends StatelessWidget {
   const _SummaryStat({
     required this.value,
     required this.label,
+    this.refresh = false,
   });
 
   final String value;
   final String label;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: _cardDecoration,
+      decoration: _cardDecoration(refresh),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: refresh
+            ? CrossAxisAlignment.center
+            : CrossAxisAlignment.start,
         children: [
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 28,
-              height: 1.05,
-              letterSpacing: -0.8,
-              color: AppColors.teal,
-            ),
+            textAlign: refresh ? TextAlign.center : TextAlign.start,
+            style: refresh
+                ? GoogleFonts.fraunces(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 28,
+                    height: 1.05,
+                    letterSpacing: -0.8,
+                    color: VisualRefreshColors.textPrimary,
+                  )
+                : const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 28,
+                    height: 1.05,
+                    letterSpacing: -0.8,
+                    color: AppColors.teal,
+                  ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.inkSoft,
+            textAlign: refresh ? TextAlign.center : TextAlign.start,
+            style: TextStyle(
+              color: refresh
+                  ? VisualRefreshColors.textSecondary
+                  : AppColors.inkSoft,
               fontSize: 13,
               fontWeight: FontWeight.w600,
+              fontFamily:
+                  refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
             ),
           ),
         ],
@@ -1577,15 +1893,18 @@ class _TimelineStayCard extends StatelessWidget {
   const _TimelineStayCard({
     required this.event,
     required this.showConnector,
+    this.refresh = false,
   });
 
   final Map<String, dynamic> event;
   final bool showConnector;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final type = event['placeType'] as String? ?? 'custom';
-    final name = _friendlyPlaceName(event['placeName'] as String?, type);
+    final name = _friendlyPlaceName(l10n, event['placeName'] as String?, type);
     final start =
         DateTime.tryParse(event['startAt'] as String? ?? '')?.toLocal();
     final end = DateTime.tryParse(event['endAt'] as String? ?? '')?.toLocal();
@@ -1595,6 +1914,10 @@ class _TimelineStayCard extends StatelessWidget {
         : type == 'school'
             ? Icons.school_rounded
             : Icons.place_rounded;
+    final accent =
+        refresh ? VisualRefreshColors.accent : AppColors.teal;
+    final iconBg =
+        refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -1611,7 +1934,7 @@ class _TimelineStayCard extends StatelessWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: 0.45),
+                      color: accent.withValues(alpha: 0.45),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1620,7 +1943,10 @@ class _TimelineStayCard extends StatelessWidget {
                       child: Container(
                         width: 2,
                         margin: const EdgeInsets.symmetric(vertical: 4),
-                        color: AppColors.inkSoft.withValues(alpha: 0.22),
+                        color: (refresh
+                                ? VisualRefreshColors.textSecondary
+                                : AppColors.inkSoft)
+                            .withValues(alpha: 0.22),
                       ),
                     ),
                 ],
@@ -1630,15 +1956,17 @@ class _TimelineStayCard extends StatelessWidget {
               child: Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.fromLTRB(12, 14, 14, 14),
-                decoration: _cardDecoration,
+                decoration: _cardDecoration(refresh),
                 child: Row(
                   children: [
                     Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.tealDeep,
-                        borderRadius: BorderRadius.circular(12),
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(
+                          refresh ? AppRadius.vrChip : 12,
+                        ),
                       ),
                       child: Icon(icon, color: Colors.white, size: 24),
                     ),
@@ -1649,18 +1977,29 @@ class _TimelineStayCard extends StatelessWidget {
                         children: [
                           Text(
                             name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
+                              color: refresh
+                                  ? VisualRefreshColors.textPrimary
+                                  : null,
+                              fontFamily: refresh
+                                  ? GoogleFonts.plusJakartaSans().fontFamily
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: 3),
                           Text(
                             '${_fmtClock(start)} — ${_fmtClock(end)}',
-                            style: const TextStyle(
-                              color: AppColors.inkSoft,
+                            style: TextStyle(
+                              color: refresh
+                                  ? VisualRefreshColors.textSecondary
+                                  : AppColors.inkSoft,
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
+                              fontFamily: refresh
+                                  ? GoogleFonts.plusJakartaSans().fontFamily
+                                  : null,
                             ),
                           ),
                         ],
@@ -1668,10 +2007,13 @@ class _TimelineStayCard extends StatelessWidget {
                     ),
                     Text(
                       _fmtDuration(dur),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 14,
-                        color: AppColors.teal,
+                        color: accent,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
                       ),
                     ),
                   ],
@@ -1686,20 +2028,24 @@ class _TimelineStayCard extends StatelessWidget {
 }
 
 class _TripCard extends StatelessWidget {
-  const _TripCard({required this.event});
+  const _TripCard({required this.event, this.refresh = false});
 
   final Map<String, dynamic> event;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final start = DateTime.tryParse(event['startAt'] as String? ?? '')?.toLocal();
     final end = DateTime.tryParse(event['endAt'] as String? ?? '')?.toLocal();
     final dur = (event['durationSeconds'] as num?)?.toInt() ?? 0;
     final startLabel = _friendlyPlaceName(
+      l10n,
       event['startLabel'] as String?,
       null,
     );
     final endLabel = _friendlyPlaceName(
+      l10n,
       event['endLabel'] as String?,
       null,
     );
@@ -1714,9 +2060,11 @@ class _TripCard extends StatelessWidget {
         })
         .whereType<LatLng>()
         .toList();
+    final lineColor =
+        refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
 
     return Container(
-      decoration: _cardDecoration,
+      decoration: _cardDecoration(refresh),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1745,7 +2093,7 @@ class _TripCard extends StatelessWidget {
                   Polyline(
                     polylineId: const PolylineId('trip'),
                     points: path,
-                    color: AppColors.tealDeep,
+                    color: lineColor,
                     width: 5,
                   ),
                 },
@@ -1761,11 +2109,19 @@ class _TripCard extends StatelessWidget {
           else
             Container(
               height: 64,
-              color: AppColors.mint.withValues(alpha: 0.45),
+              color: refresh
+                  ? VisualRefreshColors.accentTint
+                  : AppColors.mint.withValues(alpha: 0.45),
               alignment: Alignment.center,
-              child: const Text(
-                'Perjalanan',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              child: Text(
+                l10n.tripGenericLabel,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: refresh ? VisualRefreshColors.accent : null,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
               ),
             ),
           Padding(
@@ -1778,45 +2134,70 @@ class _TripCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         '${_fmtClock(start)} → ${_fmtClock(end)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
+                          color: refresh
+                              ? VisualRefreshColors.textPrimary
+                              : null,
+                          fontFamily: refresh
+                              ? GoogleFonts.plusJakartaSans().fontFamily
+                              : null,
                         ),
                       ),
                     ),
                     Text(
                       _fmtDuration(dur),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w800,
-                        color: AppColors.tealDeep,
+                        color: refresh
+                            ? VisualRefreshColors.accent
+                            : AppColors.tealDeep,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 _TripEndpoint(
-                  color: AppColors.success,
+                  color: refresh
+                      ? VisualRefreshColors.accent
+                      : AppColors.success,
                   label: startLabel,
+                  refresh: refresh,
                 ),
                 Padding(
                   padding: const EdgeInsets.only(left: 3),
                   child: Container(
                     width: 2,
                     height: 12,
-                    color: AppColors.inkSoft.withValues(alpha: 0.35),
+                    color: (refresh
+                            ? VisualRefreshColors.textSecondary
+                            : AppColors.inkSoft)
+                        .withValues(alpha: 0.35),
                   ),
                 ),
                 _TripEndpoint(
-                  color: AppColors.coral,
+                  color: refresh
+                      ? VisualRefreshColors.danger
+                      : AppColors.coral,
                   label: endLabel,
+                  refresh: refresh,
                 ),
                 if (inaccurate) ...[
                   const SizedBox(height: 8),
-                  const Text(
-                    'Sinyal lemah — rute kurang akurat.',
+                  Text(
+                    AppLocalizations.of(context).weakSignalRoute,
                     style: TextStyle(
-                      color: AppColors.inkSoft,
+                      color: refresh
+                          ? VisualRefreshColors.textSecondary
+                          : AppColors.inkSoft,
                       fontSize: 12,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
                     ),
                   ),
                 ],
@@ -1830,10 +2211,15 @@ class _TripCard extends StatelessWidget {
 }
 
 class _TripEndpoint extends StatelessWidget {
-  const _TripEndpoint({required this.color, required this.label});
+  const _TripEndpoint({
+    required this.color,
+    required this.label,
+    this.refresh = false,
+  });
 
   final Color color;
   final String label;
+  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
@@ -1848,7 +2234,13 @@ class _TripEndpoint extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: refresh ? VisualRefreshColors.textPrimary : null,
+              fontFamily:
+                  refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+            ),
           ),
         ),
       ],
@@ -1856,15 +2248,21 @@ class _TripEndpoint extends StatelessWidget {
   }
 }
 
-String _friendlyPlaceName(String? raw, String? type) {
+String _friendlyPlaceName(
+  AppLocalizations l10n,
+  String? raw,
+  String? type,
+) {
   final name = raw?.trim() ?? '';
   if (name.isEmpty || RegExp(r'^\d{4,}$').hasMatch(name)) {
-    if (type == 'home') return 'Rumah';
-    if (type == 'school') return 'Sekolah';
+    if (type == 'home') return l10n.homeZone;
+    if (type == 'school') return l10n.schoolZone;
     if (name == 'Berangkat' || name == 'Dalam perjalanan' || name == 'Tiba') {
       return name;
     }
-    return type == 'custom' ? 'Tempat aman' : (name.isEmpty ? 'Tempat' : name);
+    return type == 'custom'
+        ? l10n.safePlaceLabel
+        : (name.isEmpty ? l10n.zoneGenericLabel : name);
   }
   return name;
 }

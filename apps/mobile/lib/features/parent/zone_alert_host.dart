@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/network/ws_client.dart';
-import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import 'children_controller.dart';
 import 'live_map_screen.dart';
@@ -14,48 +14,65 @@ class ZoneArrivalNotice {
   ZoneArrivalNotice({
     required this.childId,
     required this.childName,
-    required this.zoneLabel,
+    this.zoneName,
+    this.zoneLabelFromServer,
     required this.zoneType,
     required this.event,
-    required this.message,
+    this.serverMessage,
     required this.at,
   });
 
   final String childId;
   final String childName;
-  final String zoneLabel;
+  final String? zoneName;
+  final String? zoneLabelFromServer;
   final String zoneType;
   final String event;
-  final String message;
+  final String? serverMessage;
   final DateTime at;
 
   bool get isEnter => event == 'enter';
 
+  String zoneLabel(AppLocalizations l10n) {
+    final fromServer = zoneLabelFromServer?.trim();
+    if (fromServer != null && fromServer.isNotEmpty) return fromServer;
+    final name = zoneName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    switch (zoneType) {
+      case 'home':
+        return l10n.homeZone;
+      case 'school':
+        return l10n.schoolZone;
+      default:
+        return l10n.safeZoneFeatureTitle;
+    }
+  }
+
+  String localizedMessage(AppLocalizations l10n) {
+    final override = serverMessage?.trim();
+    if (override != null && override.isNotEmpty) return override;
+    final name =
+        childName.trim().isEmpty ? l10n.childFallbackName : childName.trim();
+    if (isEnter) {
+      return l10n.arrivedAtZoneMsg(name, zoneLabel(l10n));
+    }
+    return l10n.leftSafeZoneMsg(name);
+  }
+
   factory ZoneArrivalNotice.fromPayload(Map<String, dynamic> payload) {
     final zoneType = payload['zoneType'] as String? ?? 'custom';
     final zoneName = payload['zoneName'] as String?;
-    final zoneLabel = (payload['zoneLabel'] as String?) ??
-        (zoneName?.trim().isNotEmpty == true
-            ? zoneName!.trim()
-            : zoneType == 'home'
-                ? 'Rumah'
-                : zoneType == 'school'
-                    ? 'Sekolah'
-                    : 'Zona aman');
-    final childName = payload['childName'] as String? ?? 'Anak';
+    final childName = payload['childName'] as String? ?? '';
     final event = payload['event'] as String? ?? 'enter';
-    final message = payload['message'] as String? ??
-        (event == 'enter'
-            ? '$childName sudah sampai di $zoneLabel'
-            : '$childName meninggalkan $zoneLabel');
     final atRaw = payload['at'] as String?;
     return ZoneArrivalNotice(
       childId: payload['childId'] as String? ?? '',
       childName: childName,
-      zoneLabel: zoneLabel,
+      zoneName: zoneName,
+      zoneLabelFromServer: payload['zoneLabel'] as String?,
       zoneType: zoneType,
       event: event,
-      message: message,
+      serverMessage: payload['message'] as String?,
       at: atRaw != null ? DateTime.tryParse(atRaw) ?? DateTime.now() : DateTime.now(),
     );
   }
@@ -182,15 +199,16 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
       }
     });
 
+    final l10n = AppLocalizations.of(context);
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(notice.message),
+        content: Text(notice.localizedMessage(l10n)),
         backgroundColor:
             notice.isEnter ? AppColors.tealDeep : AppColors.inkSoft,
         duration: const Duration(seconds: 6),
         action: SnackBarAction(
-          label: 'OK',
+          label: l10n.okAction,
           textColor: Colors.white,
           onPressed: () {},
         ),
@@ -253,7 +271,8 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
 
     final childId = payload['childId'] as String? ?? '';
     final children = ref.read(childrenControllerProvider).items;
-    var name = 'Anak';
+    final l10n = AppLocalizations.of(context);
+    var name = l10n.childFallbackName;
     for (final c in children) {
       if (c.id == childId) {
         name = c.name;
@@ -287,13 +306,15 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
     try {
       await ref.read(apiClientProvider).post('/api/v1/panic/$alertId/ack');
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Peringatan direspons. Cascade dihentikan.')),
+        SnackBar(content: Text(l10n.alertAcknowledgedCascadeStopped)),
       );
     } catch (_) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal mengirim respons. Coba lagi.')),
+        SnackBar(content: Text(l10n.sendResponseFailed)),
       );
     } finally {
       _panicBusy = false;
@@ -305,19 +326,21 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
     if (alertId == null || _panicBusy) return;
     _panicBusy = true;
     try {
+      final l10n = AppLocalizations.of(context);
       await ref.read(apiClientProvider).post(
         '/api/v1/panic/$alertId/resolve',
-        body: {'notes': 'Diselesaikan orang tua'},
+        body: {'notes': l10n.resolvedByParentNote},
       );
       if (!mounted) return;
       _clearPanicUi();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Panik ditandai selesai / aman.')),
+        SnackBar(content: Text(l10n.panicResolvedSafe)),
       );
     } catch (_) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal menyelesaikan panik. Coba lagi.')),
+        SnackBar(content: Text(l10n.resolvePanicFailed)),
       );
     } finally {
       _panicBusy = false;
@@ -344,6 +367,7 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
   Future<void> _showPanicDialog(String childName, String message) async {
     if (_dialogOpen || !mounted) return;
     _dialogOpen = true;
+    final l10n = AppLocalizations.of(context);
     try {
       await showDialog<void>(
         context: context,
@@ -353,17 +377,17 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            title: const Row(
+            title: Row(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   backgroundColor: Color(0xFFFFE8E6),
                   child: Icon(Icons.warning_amber_rounded, color: AppColors.danger),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'PANIK',
-                    style: TextStyle(
+                    l10n.panicBadge,
+                    style: const TextStyle(
                       fontWeight: FontWeight.w900,
                       color: AppColors.danger,
                     ),
@@ -382,14 +406,14 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                   Navigator.pop(ctx);
                   _openPanicMap();
                 },
-                child: const Text('Buka lokasi'),
+                child: Text(l10n.openLocationAction),
               ),
               TextButton(
                 onPressed: () async {
                   await _ackPanic();
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
-                child: const Text(AppStrings.ackAlert),
+                child: Text(l10n.ackAlert),
               ),
               FilledButton(
                 onPressed: () async {
@@ -397,7 +421,7 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                   if (ctx.mounted) Navigator.pop(ctx);
                 },
                 style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-                child: const Text(AppStrings.resolveAlert),
+                child: Text(l10n.resolveAlert),
               ),
             ],
           );
@@ -411,6 +435,7 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
   Future<void> _showArriveDialog(ZoneArrivalNotice notice) async {
     if (_dialogOpen || !mounted) return;
     _dialogOpen = true;
+    final l10n = AppLocalizations.of(context);
     try {
       await showDialog<void>(
         context: context,
@@ -427,23 +452,23 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                   child: Icon(notice.icon, color: AppColors.tealDeep),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Anak di zona aman',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                    l10n.childInSafeZoneTitle,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
               ],
             ),
             content: Text(
-              notice.message,
+              notice.localizedMessage(l10n),
               style: const TextStyle(height: 1.35, fontSize: 16),
             ),
             actions: [
               FilledButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-                child: const Text('Mengerti'),
+                child: Text(l10n.understood),
               ),
             ],
           );
@@ -456,6 +481,7 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     ref.listen(childrenControllerProvider, (_, next) {
       if (next.items.isNotEmpty) _syncSubscriptions();
     });
@@ -489,9 +515,9 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                             Icons.warning_amber_rounded,
                             color: AppColors.danger,
                           ),
-                          title: const Text(
-                            'PANIK',
-                            style: TextStyle(
+                          title: Text(
+                            l10n.panicBadge,
+                            style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               color: AppColors.danger,
                             ),
@@ -504,18 +530,18 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                           children: [
                             TextButton(
                               onPressed: _openPanicMap,
-                              child: const Text('Buka lokasi'),
+                              child: Text(l10n.openLocationAction),
                             ),
                             TextButton(
                               onPressed: () => unawaited(_ackPanic()),
-                              child: const Text(AppStrings.ackAlert),
+                              child: Text(l10n.ackAlert),
                             ),
                             FilledButton(
                               onPressed: () => unawaited(_resolvePanic()),
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.danger,
                               ),
-                              child: const Text(AppStrings.resolveAlert),
+                              child: Text(l10n.resolveAlert),
                             ),
                           ],
                         ),
@@ -545,10 +571,12 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                           : AppColors.amber,
                     ),
                     title: Text(
-                      _banner!.isEnter ? 'Zona aman' : 'Update zona',
+                      _banner!.isEnter
+                          ? l10n.safeZoneFeatureTitle
+                          : l10n.zoneUpdateTitle,
                       style: const TextStyle(fontWeight: FontWeight.w900),
                     ),
-                    subtitle: Text(_banner!.message),
+                    subtitle: Text(_banner!.localizedMessage(l10n)),
                     trailing: IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => setState(() => _banner = null),
@@ -563,16 +591,16 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
   }
 }
 
-String commuteStatusLabel(String? status) {
+String commuteStatusLabel(AppLocalizations l10n, String? status) {
   switch (status) {
     case 'home':
-      return 'Di rumah';
+      return l10n.statusHomeLabel;
     case 'school':
-      return 'Di sekolah';
+      return l10n.statusSchoolLabel;
     case 'safe_zone':
-      return 'Di zona aman';
+      return l10n.statusSafeZoneLabel;
     case 'commuting':
-      return 'Dalam perjalanan';
+      return l10n.statusCommutingLabel;
     default:
       return '';
   }

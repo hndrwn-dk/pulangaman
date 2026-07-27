@@ -20,15 +20,23 @@ class ReminderChannel {
     await _channel.invokeMethod<void>('openFullScreenIntentSettings');
   }
 
+  /// Mirrors Flutter Visual Refresh onto Android SharedPreferences so
+  /// [ReminderFullScreenActivity] can style scheduled alarms correctly.
+  Future<void> setVisualRefresh(bool enabled) async {
+    await _channel.invokeMethod<void>('setVisualRefresh', {'enabled': enabled});
+  }
+
   Future<void> previewNow({
     required String title,
     required String body,
     String style = 'fullscreen',
+    bool? visualRefresh,
   }) async {
     await _channel.invokeMethod<void>('previewNow', {
       'title': title,
       'body': body,
       'style': style,
+      if (visualRefresh != null) 'visualRefresh': visualRefresh,
     });
   }
 

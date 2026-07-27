@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../parent/child_avatar.dart';
 import '../parent/children_controller.dart';
-import '../parent/zone_alert_host.dart';
 
 /// Ringkasan di mana anak berada hari ini (rumah / sekolah / perjalanan / zona aman).
 class AttendanceScreen extends ConsumerStatefulWidget {
@@ -43,22 +43,37 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     });
   }
 
-  String _statusTitle(String? status) {
-    final label = commuteStatusLabel(status);
-    if (label.isNotEmpty) return label;
-    return 'Lokasi belum jelas';
-  }
-
-  String _statusHint(String? status) {
+  String _statusLabel(AppLocalizations l10n, String? status) {
     switch (status) {
       case 'home':
-        return 'Di zona rumah yang kamu atur';
+        return l10n.statusHomeLabel;
       case 'school':
-        return 'Di zona sekolah yang kamu atur';
+        return l10n.statusSchoolLabel;
+      case 'safe_zone':
+        return l10n.statusSafeZoneLabel;
       case 'commuting':
-        return 'Sedang di perjalanan';
+        return l10n.statusCommutingLabel;
       default:
-        return 'Pastikan lokasi anak aktif & lokasi penting sudah diisi';
+        return '';
+    }
+  }
+
+  String _statusTitle(AppLocalizations l10n, String? status) {
+    final label = _statusLabel(l10n, status);
+    if (label.isNotEmpty) return label;
+    return l10n.locationUnclear;
+  }
+
+  String _statusHint(AppLocalizations l10n, String? status) {
+    switch (status) {
+      case 'home':
+        return l10n.inHomeZoneHint;
+      case 'school':
+        return l10n.inSchoolZoneHint;
+      case 'commuting':
+        return l10n.commutingHint;
+      default:
+        return l10n.locationHintDefault;
     }
   }
 
@@ -90,6 +105,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final children = ref.watch(childrenControllerProvider);
     if (children.items.isNotEmpty && _genders.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadGenders());
@@ -100,10 +116,10 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         leadingWidth: PaScreenHeader.appBarLeadingWidth,
         titleSpacing: PaScreenHeader.appBarTitleSpacing,
         leading: paAppBarLeading(context),
-        title: const Text('Di mana'),
+        title: Text(l10n.whereTitle),
         actions: [
           IconButton(
-            tooltip: 'Muat ulang',
+            tooltip: l10n.reloadTooltip,
             onPressed: () =>
                 ref.read(childrenControllerProvider.notifier).refresh(),
             icon: const Icon(Icons.refresh),
@@ -116,23 +132,22 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
             Text(
-              'Posisi anak hari ini',
+              l10n.childPositionsTodayTitle,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Bukan cuma sekolah — rumah, perjalanan, dan zona aman lain ikut terlihat. '
-              'Ketuk anak untuk lihat catatan masuk/pulang sekolah.',
-              style: TextStyle(color: AppColors.inkSoft, height: 1.35),
+            Text(
+              l10n.whereScreenIntro,
+              style: const TextStyle(color: AppColors.inkSoft, height: 1.35),
             ),
             const SizedBox(height: AppSpacing.lg),
             if (children.items.isEmpty)
-              const PaEmptyState(
+              PaEmptyState(
                 icon: Icons.place_outlined,
-                title: 'Belum ada anak',
-                message: 'Tambah anak dulu di tab Anak.',
+                title: l10n.noChildrenTitle,
+                message: l10n.addChildFirstMessage,
               )
             else
               ...children.items.map((child) {
@@ -187,7 +202,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                                       const SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
-                                          _statusTitle(status),
+                                          _statusTitle(l10n, status),
                                           style: TextStyle(
                                             color: color,
                                             fontWeight: FontWeight.w800,
@@ -197,7 +212,7 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                                     ],
                                   ),
                                   Text(
-                                    _statusHint(status),
+                                    _statusHint(l10n, status),
                                     style: const TextStyle(
                                       color: AppColors.inkSoft,
                                       fontSize: 12,
@@ -261,15 +276,32 @@ class _ChildWhereDetailScreenState
     }
   }
 
+  String _statusLabel(AppLocalizations l10n, String? status) {
+    switch (status) {
+      case 'home':
+        return l10n.statusHomeLabel;
+      case 'school':
+        return l10n.statusSchoolLabel;
+      case 'safe_zone':
+        return l10n.statusSafeZoneLabel;
+      case 'commuting':
+        return l10n.statusCommutingLabel;
+      default:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final status = widget.child.commuteStatus;
+    final statusLabel = _statusLabel(l10n, status);
     return Scaffold(
       appBar: AppBar(
         leadingWidth: PaScreenHeader.appBarLeadingWidth,
         titleSpacing: PaScreenHeader.appBarTitleSpacing,
         leading: paAppBarLeading(context),
-        title: Text('Di mana · ${widget.child.name}'),
+        title: Text(l10n.whereDetailTitle(widget.child.name)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -280,16 +312,14 @@ class _ChildWhereDetailScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  commuteStatusLabel(status).isEmpty
-                      ? 'Lokasi belum jelas'
-                      : commuteStatusLabel(status),
+                  statusLabel.isEmpty ? l10n.locationUnclear : statusLabel,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Status dari zona aman yang kamu atur (rumah, sekolah, atau lainnya).',
+                  l10n.zoneStatusExplain,
                   style: const TextStyle(color: AppColors.inkSoft, height: 1.35),
                 ),
               ],
@@ -297,26 +327,24 @@ class _ChildWhereDetailScreenState
           ),
           const SizedBox(height: AppSpacing.lg),
           Text(
-            'Catatan sekolah hari ini',
+            l10n.schoolNotesToday,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            'Muncul otomatis saat anak masuk/keluar zona sekolah.',
-            style: TextStyle(color: AppColors.inkSoft, fontSize: 13),
+          Text(
+            l10n.schoolNotesHint,
+            style: const TextStyle(color: AppColors.inkSoft, fontSize: 13),
           ),
           const SizedBox(height: 12),
           if (_loading)
             const Center(child: CircularProgressIndicator())
           else if (_events.isEmpty)
-            const PaEmptyState(
+            PaEmptyState(
               icon: Icons.event_available_outlined,
-              title: 'Belum ada catatan sekolah',
-              message:
-                  'Kalau zona sekolah sudah diatur dan lokasi anak aktif, '
-                  'catatan tiba/pulang akan muncul di sini.',
+              title: l10n.noSchoolNotesTitle,
+              message: l10n.noSchoolNotesMessage,
             )
           else
             ..._events.map((event) {
@@ -348,7 +376,9 @@ class _ChildWhereDetailScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              checkIn ? 'Tiba di sekolah' : 'Pulang dari sekolah',
+                              checkIn
+                                  ? l10n.arrivedAtSchool
+                                  : l10n.departedFromSchool,
                               style: const TextStyle(fontWeight: FontWeight.w800),
                             ),
                             Text(

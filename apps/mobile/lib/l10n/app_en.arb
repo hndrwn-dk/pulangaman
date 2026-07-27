@@ -29,7 +29,8 @@
   "homeBySaved": "Safe home time settings saved",
   "homeBySeeAll": "See all",
   "homeBySummaryOff": "Not enabled yet",
-  "homeBySummaryMaghrib": "Follow Maghrib · {status}",
+  "homeBySummaryNotTurnedOn": "Not turned on",
+  "homeBySummaryMaghrib": "Maghrib mode selected · {status}",
   "homeBySummaryCustom": "{time} · {status}",
   "homeByChildAckButton": "I'm on my way home",
   "homeByChildAckSent": "Sent to parent",
@@ -85,6 +86,7 @@
   "empActivateNoteHint": "Short note (optional)",
   "empActivateContinue": "Activate now",
   "empActivateCancel": "Cancel",
+  "listAnd": "and",
   "empActivateCaption": "Applies to {names}, and their guardians",
   "empSummarySent": "Sent to {count} children",
   "empSummarySkipped": "{childName} has no meeting point yet",
@@ -108,5 +110,992 @@
   "empDeactivated": "Meeting point turned off",
   "empMenuHint": "Meet here in an emergency",
   "empPickPlace": "Search for a meeting place",
-  "empNoChildren": "No child linked yet"
+  "empNoChildren": "No child linked yet",
+  "settingsSectionApp": "App",
+  "settingsSectionAccount": "Account",
+  "settingsLanguage": "Language",
+  "settingsLanguageHint": "Choose your preferred language",
+  "settingsLanguageId": "Bahasa Indonesia",
+  "settingsLanguageEn": "English",
+  "settingsAbout": "About",
+  "settingsAboutHint": "Share, rate, and app information",
+  "settingsVersion": "Version",
+  "settingsVersionValue": "{version} ({build})",
+  "@settingsVersionValue": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsShare": "Share this app",
+  "settingsShareHint": "Tell family about PulangAman",
+  "settingsShareMessage": "Try PulangAman — a safety network for parents and kids.\nhttps://www.tursinalabs.com",
+  "settingsRate": "Rate this app",
+  "settingsRateHint": "Leave a review on Google Play",
+  "settingsPrivacy": "Privacy Policy",
+  "settingsPrivacyHint": "Read our privacy policy",
+  "settingsTerms": "Terms of Service",
+  "settingsTermsHint": "Read our terms of service",
+  "settingsNotifications": "Notifications",
+  "settingsNotificationsHint": "Updates, SOS, and safe zones",
+  "brand": "Pulang Aman",
+  "tagline": "Go home calmly, arrive safely.",
+  "roleParent": "I am a parent",
+  "roleChild": "I am a child",
+  "roleGuardian": "I am a trusted guardian",
+  "roleLabel": "Role",
+  "roleParentShort": "Parent",
+  "roleChildShort": "Child",
+  "roleGuardianShort": "Guardian",
+  "continueLabel": "Continue",
+  "loginTitle": "Sign in",
+  "phoneLabel": "Phone number",
+  "nameLabel": "Name",
+  "nameHint": "Enter full name",
+  "phoneHint": "+62812...",
+  "loginAction": "Sign in",
+  "otpLabel": "OTP code",
+  "otpHint": "6 digits from SMS",
+  "otpSentHint": "Verification code sent to your number",
+  "verifyOtpAction": "Verify",
+  "otpVerifyingHint": "Verifying code. Please wait a moment.",
+  "otpSendingHint": "Sending verification code. Please wait…",
+  "resendOtp": "Resend code",
+  "changeNumber": "Change number",
+  "sendOtpAction": "Send OTP code",
+  "inviteCodeHintChild": "Ask your parent for a 6-digit code",
+  "connecting": "Connecting...",
+  "sending": "Sending...",
+  "featureCheckIn": "Check-in",
+  "featureRewards": "Rewards",
+  "featureScreenTime": "Screen Time",
+  "childrenTitle": "My children",
+  "addChild": "Invite child",
+  "inviteCodeLabel": "Invite code",
+  "createInvite": "Create invite code",
+  "inviteShareHint": "Give this code to the child's phone. Valid 24 hours.",
+  "liveMap": "Live map",
+  "zonesTitle": "Safe Zones",
+  "guardiansTitle": "Trusted guardians",
+  "panicButton": "PANIC BUTTON",
+  "panicConfirm": "Tap 3 times to send an alert",
+  "panicHoldConfirm": "Press & hold 3 seconds to send an alert",
+  "panicSent": "Panic alert sent",
+  "trackingOn": "Tracking on",
+  "trackingOff": "Tracking off",
+  "staleLocation": "Child location not updated",
+  "ackAlert": "I have responded",
+  "resolveAlert": "Resolved / safe",
+  "inviteGuardian": "Invite guardian",
+  "acceptInvite": "Accept invite",
+  "shareLocation": "Share my location",
+  "needBackup": "Need backup help",
+  "guardianGuidance": "Contact a parent or emergency services. Do not chase strangers.",
+  "offlineQueued": "Saved offline — will send when online",
+  "homeZone": "Home",
+  "schoolZone": "School",
+  "save": "Save",
+  "logout": "Sign out",
+  "cancel": "Cancel",
+  "emergencyContacts": "Emergency contacts",
+  "noChildren": "No child linked yet",
+  "noInvites": "No invites",
+  "activeAlerts": "Active alerts",
+  "mapKeyMissing": "Google Maps is not configured. Add GOOGLE_MAPS_API_KEY in android/local.properties then rebuild.",
+  "lastKnownCoords": "Last known coordinates",
+  "childTabHome": "Home",
+  "childTabScreen": "Screen",
+  "childTabMessages": "Updates",
+  "childMessageSent": "Update sent",
+  "childMessageFailed": "Failed to send update. Try again.",
+  "errorWithDetail": "Failed: {error}",
+  "@errorWithDetail": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "panicAckedByParent": "Your parent has already responded to the panic alert",
+  "panicResolvedSafe": "Panic marked as resolved and safe",
+  "panicConfirmCount": "Tap 3 times to send an alert ({count}/3)",
+  "panicSendFailedRetrying": "Failed to send panic alert. Retrying automatically.",
+  "smsFallbackPanicBody": "PulangAman PANIC — need help now.",
+  "empDefaultPlaceName": "Meeting point",
+  "empAlertBodyWithNote": "{note} — heading to {place}",
+  "empAlertBodyPlain": "Head to the meeting point now: {place}",
+  "homeByPreviewTitle": "Time to head home",
+  "homeByPreviewBody": "{name}, it's almost time to head home",
+  "greetingDefaultName": "Friend",
+  "homeByDefaultChildName": "Child",
+  "tripNotEnoughPlaces": "Not enough saved places yet",
+  "zoneGenericLabel": "Place",
+  "startAction": "Start",
+  "tripArrivedNotified": "Arrived at {place} — parent notified",
+  "destinationFallback": "destination",
+  "locationSendFailed": "Failed to send location",
+  "locationPermissionDenied": "Location permission denied",
+  "sessionNotReady": "Session not ready",
+  "allowExactAlarmMessage": "Allow exact alarms so your parent's reminders show up.",
+  "openAction": "Open",
+  "refreshTooltip": "Refresh (send app list & rules)",
+  "refreshSentWithApps": "Location & app list sent to your parent",
+  "refreshSentNoApps": "Location sent. App list is empty — check Usage Access permission.",
+  "logoutConfirmTitle": "Sign out of child account?",
+  "logoutConfirmBody": "To sign in again, ask your parent for a new invite code from their phone.",
+  "childMessageSentWithLabel": "Update sent: {label}",
+  "trackingOnNeedsAlways": "Location active — allow \"Always\" so it keeps running in the background",
+  "homeSubtitleTagline": "Stay safe, earn points, and keep your family posted.",
+  "pillLocationOn": "Location on",
+  "pillLocationOff": "Location off",
+  "pointsStreakLabel": "{points} points · {streak}-day streak",
+  "screenRulesActive": "Screen rules active",
+  "screenPermissionIncomplete": "Screen permission incomplete",
+  "alarmPermissionIncomplete": "Alarm permission incomplete",
+  "reminderActiveCount": "Reminders active ({count})",
+  "noRemindersYet": "No reminders yet",
+  "sendingAlert": "Sending alert...",
+  "panicCooldownMessage": "Panic alert sent. Wait a moment before you can send again.",
+  "panicModeActiveWaiting": "Panic mode active — waiting for parent response",
+  "enableScreenProtectionTitle": "Turn on screen time protection",
+  "neverBlockedAppsNote": "PulangAman, Phone, and Messages are never blocked.",
+  "allowUsageAccess": "Allow usage access",
+  "enableAppBlocking": "Turn on app blocking",
+  "restrictedSettingsHelp": "Button locked (\"Restricted setting\")? Open App info, tap the three-dot menu in the top right, then choose \"Allow restricted setting\". Then try again.",
+  "openAppInfo": "Open app info",
+  "empActiveNowLabel": "Emergency — go now",
+  "empFamilyMeetingPoint": "Family meeting point",
+  "followParentInstructions": "Follow your parent's instructions",
+  "memorizeEmpPlace": "Memorize this place for emergencies",
+  "tripArrivedAt": "Arrived at {place}",
+  "tripRouteReady": "Route ready",
+  "tripGenericLabel": "Trip",
+  "tripParentNotified": "Parent has been notified",
+  "tripReadyToStart": "Ready to start",
+  "tripInProgress": "In progress",
+  "tripChooseSafeDestination": "Choose a safe destination from saved places",
+  "screenTimeToday": "Screen time today",
+  "yourPoints": "Your points",
+  "kabarTitle": "Update to parent",
+  "kabarSubtitle": "Tap once — the message is sent right away.",
+  "kabarInfoNote": "Messages go to your linked parent. For emergencies, use the panic button on Home.",
+  "kabarHeroTitle": "Send a quick update",
+  "kabarHeroSubtitle": "No need to type. Just pick one of the messages below.",
+  "presetAtSchoolLabel": "Arrived at school",
+  "presetAtSchoolSubtitle": "Let your parent know you're safe at school",
+  "presetAtHomeLabel": "Home now",
+  "presetAtHomeSubtitle": "Let them know you're home",
+  "presetNeedHelpLabel": "Need help",
+  "presetNeedHelpSubtitle": "Ask your parent to call you right away",
+  "screenTimeTitle": "Screen time",
+  "screenTimeSubtitle": "See how long you've used your phone today.",
+  "screenTimeOverTargetStatus": "{period} · over target",
+  "@screenTimeOverTargetStatus": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "appsLabel": "Apps",
+  "appCountLabel": "{count} apps",
+  "usageAccessInactiveTitle": "Usage access not active",
+  "usageAccessInactiveBody": "Allow PulangAman to see your screen usage so stats can show up here.",
+  "openPermissionSettings": "Open permission settings",
+  "totalLabel": "Total",
+  "targetLabel": "Target",
+  "noDataYet": "No data yet",
+  "useAsUsualStatsAppear": "Use your phone as usual — stats will appear here.",
+  "delete": "Delete",
+  "add": "Add",
+  "understood": "Got it",
+  "editAction": "Edit",
+  "retryAction": "Try again",
+  "okAction": "OK",
+  "closeAction": "Close",
+  "viewAllAction": "View all ›",
+  "noChildrenTitle": "No children yet",
+  "addChildFirstMessage": "Add a child first from the Children tab.",
+  "reloadTooltip": "Reload",
+  "deleteFailedWithDetail": "Failed to delete: {error}",
+  "saveFailedWithDetail": "Failed to save: {error}",
+  "markAllReadAction": "Mark all as read",
+  "markReadAction": "Mark as read",
+  "allFilterLabel": "All",
+  "parentFallbackName": "Parent",
+  "weekdayMonShort": "Mon",
+  "weekdayTueShort": "Tue",
+  "weekdayWedShort": "Wed",
+  "weekdayThuShort": "Thu",
+  "weekdayFriShort": "Fri",
+  "weekdaySatShort": "Sat",
+  "weekdaySunShort": "Sun",
+  "durationHoursLabel": "{hours}h",
+  "durationMinutesLabel": "{minutes}m",
+  "durationHoursMinutesLabel": "{hours}h {minutes}m",
+  "settingsAccountTitle": "Account Settings",
+  "parentAccountSubtitle": "PulangAman parent account",
+  "notificationsSheetTitle": "PulangAman Notifications",
+  "notificationsSheetBody": "Notifications are used for Updates, SOS, and safe zones. Manage permissions in phone Settings (Apps > PulangAman > Notifications).",
+  "remindersTitle": "Reminder Schedule",
+  "remindersLoadError": "Couldn't load reminders. Check your connection and try again.",
+  "reminderPresetSaved": "Reminder \"{title}\" saved.\nOpen PulangAman on your child's phone so the schedule turns on.",
+  "reminderEditTitle": "Edit reminder",
+  "reminderCustomTitle": "Custom reminder",
+  "reminderTitleFieldLabel": "Title",
+  "reminderMessageFieldLabel": "Message",
+  "reminderTimeQuestion": "What time?",
+  "reminderPickTimeHelp": "Choose reminder time",
+  "reminderUseThisTime": "Use this time",
+  "reminderHourLabel": "Hour",
+  "reminderMinuteLabel": "Minute",
+  "reminderStyleFullscreen": "Fullscreen",
+  "reminderStyleNotification": "Notification",
+  "reminderEveryDay": "Every day",
+  "reminderSaveChanges": "Save changes",
+  "reminderTitleBodyRequired": "Title and message are required",
+  "reminderInfoBanner": "Your child's phone will show a big message at the set time. They just tap \"Got it\" to close it.",
+  "reminderNoChildrenMessage": "Link a child first before creating reminders.",
+  "sectionForChild": "FOR CHILD",
+  "sectionQuickAdd": "QUICK ADD",
+  "reminderActiveScheduleTitle": "Active Schedule",
+  "reminderAddShort": "+ Add",
+  "reminderEmptyMessage": "No reminders yet. Use quick add above.",
+  "reminderStudyChipLabel": "Study 19:00",
+  "reminderSleepChipLabel": "Sleep 21:00",
+  "reminderStudyPresetTitle": "Study Time",
+  "reminderStudyPresetBody": "It's study time now. Turn off games first.",
+  "reminderSleepPresetTitle": "Bedtime",
+  "reminderSleepPresetBody": "It's getting late. Time to rest so you're refreshed tomorrow.",
+  "parentHomeNoChildrenMessage": "Tap \"Add child\" below to create a code, then enter it on your child's phone. If you're switching sign-in methods, recover from the old number first.",
+  "recoverChildrenButton": "Recover children from old number",
+  "childLocationSectionTitle": "Child Location",
+  "viewMapAction": "View map ›",
+  "todaySummaryTitle": "Today's Summary",
+  "placesVisitedLabel": "Places visited",
+  "totalTripDistanceLabel": "Total distance",
+  "pendingCodesTitle": "Pending codes",
+  "relinkReplaceConfirmBody": "There's already a pending code for {name}. Generate a new one? The old code will stop working.",
+  "@relinkReplaceConfirmBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "generateNewCodeAction": "Generate new",
+  "recoverChildrenTitle": "Recover children",
+  "recoverChildrenPrompt": "Enter the number the parent account used before.",
+  "oldPhoneNumberLabel": "Old number",
+  "recoverAction": "Recover",
+  "recoverChildrenSuccess": "Recovered {count} children. Now create a new sign-in code from the child menu.",
+  "recoverChildrenNone": "No children were moved. Check the old number.",
+  "recoverChildrenFailed": "Failed to recover: {error}",
+  "relinkCodeTitle": "New sign-in code for {name}",
+  "createCodeFailed": "Failed to create code: {error}",
+  "removeChildConfirmTitle": "Remove {name}?",
+  "@removeChildConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeChildConfirmBody": "{name} will be removed from your list. Location sharing stops until you add them again with a new sign-in code.",
+  "@removeChildConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "childRemoved": "{name} removed",
+  "addChildTitle": "Add child",
+  "createCodeAction": "Create code",
+  "codeTitle": "Code",
+  "tapToViewStatus": "Tap to view status",
+  "allChildrenArrived": "All children have arrived",
+  "arrivedWaitingSummary": "{arrived}/{total} arrived - waiting for {names}",
+  "empBannerActiveTitle": "Emergency meeting point active",
+  "childNeedsHelp": "{name} needs help",
+  "withTapDetail": "{time} · Tap for details",
+  "navChildrenLabel": "Children",
+  "navZonesLabel": "Zones",
+  "navMoreLabel": "More",
+  "moreScreenTitle": "More Features",
+  "moreScreenSubtitle": "Manage settings & extras",
+  "activeRemindersStatLabel": "Active Reminders",
+  "totalPointsStatLabel": "Total Points",
+  "sectionScheduleActivity": "SCHEDULE & ACTIVITY",
+  "sectionSafety": "SAFETY",
+  "sectionSettings": "SETTINGS",
+  "noPointsNoStreak": "0 points · No streak yet",
+  "pointsCountLabel": "{points} points",
+  "noGuardiansYet": "No guardians yet",
+  "guardiansCountLabel": "{count} guardians",
+  "noReportsYet": "No reports yet",
+  "reportsCountLabel": "{count} reports",
+  "emergencyMeetingMenuSubtitle": "Where to meet in an emergency",
+  "accountSettingsMenuSubtitle": "Notifications, privacy, sign out",
+  "allKabarMarkedRead": "All updates marked as read",
+  "kabarHistoryTitle": "Update History",
+  "noKabarYet": "No updates yet",
+  "kabarSummaryUnread": "{unread} unread · {total} updates · last 24h",
+  "kabarSummaryAll": "{total} updates · last 24h",
+  "noKabarForFilter": "No updates for this filter.",
+  "giveRewardTitle": "Give praise",
+  "rewardReasonLabel": "Reason (optional)",
+  "rewardReasonHint": "e.g. Studied hard today",
+  "addFivePointsAction": "Add +5",
+  "defaultPraiseReason": "Praise from parent",
+  "pointsAddedSnackbar": "+5 points added",
+  "pickChildTitle": "Choose child",
+  "rewardsTitle": "Rewards & Points",
+  "givePraiseFabLabel": "Give Praise (+5)",
+  "rewardsIntro": "Points are earned when a child arrives at school on time. You can also add them manually as praise.",
+  "howToEarnPointsTitle": "How to Earn Points",
+  "howToEarnPointsReferenceTitle": "How points are earned (reference)",
+  "earnSchoolOnTimeTitle": "Arrive at School on Time",
+  "earnSchoolOnTimeSubtitle": "+10 points per day",
+  "earnHomeOnTimeTitle": "Home on Time",
+  "earnHomeOnTimeSubtitle": "+5 points per day",
+  "earnParentPraiseTitle": "Praise from Parent",
+  "earnParentPraiseSubtitle": "+5 points manual",
+  "earnPerDayLabel": "per day",
+  "earnManualLabel": "manual",
+  "pointsHistoryTitle": "Points History",
+  "noPointsHistoryTitle": "No points history yet",
+  "noPointsHistoryMessage": "After your child checks in at school, points will appear here.",
+  "totalPointsForChild": "{name}'s Total Points",
+  "noStreakYet": "No daily streak yet",
+  "streakDaysLabel": "{streak}-day streak going strong",
+  "earnExampleHint": "Example: arriving at school +10 points",
+  "weeklyStreakTitle": "This Week's Streak",
+  "screenTimeMonitorSubtitle": "Monitor daily usage",
+  "noAppDataToday": "No app data yet today.",
+  "appUsageTitle": "App Usage",
+  "thisWeekTitle": "This Week",
+  "limitScheduleTitle": "Limit Schedule",
+  "editInRulesHint": "Edit in Rules",
+  "todayLabel": "Today",
+  "limitOffLabel": "Limit turned off",
+  "outOfLimitLabel": "of {limit} limit",
+  "remainingTimeLabel": "{remaining} left",
+  "overLimitLegend": "Over limit ({limit})",
+  "safeLegendLabel": "Safe",
+  "noActiveScheduleLabel": "No active schedule",
+  "screenTimeRulesTitle": "Rules · {name}",
+  "limitScreenUsageLabel": "Limit phone use",
+  "noLimitLabel": "No limit",
+  "schoolDaysTitle": "School Days",
+  "schoolDaysRangeLabel": "Mon–Fri",
+  "weekendDaysTitle": "Weekend",
+  "weekendDaysRangeLabel": "Sat–Sun",
+  "maxLimitLabel": "Max {limit}",
+  "blockedAppsTitle": "Blocked Apps",
+  "noAppListYet": "No app list yet.",
+  "notUsedTodayLabel": "Not used today",
+  "usedDurationLabel": "Used {duration}",
+  "schoolLimitPickerTitle": "School days limit",
+  "weekendLimitPickerTitle": "Weekend limit",
+  "savingLabel": "Saving...",
+  "rulesSavedMessage": "Rules saved for {name}. Open PulangAman on your child's phone to activate.",
+  "limitsDisabledMessage": "Screen time limit turned off for {name}.",
+  "whereTitle": "Where",
+  "childPositionsTodayTitle": "Children's Location Today",
+  "whereScreenIntro": "Not just school — home, commutes, and other safe zones show up too. Tap a child to see school check-in/out records.",
+  "locationUnclear": "Location unclear",
+  "inHomeZoneHint": "In the home zone you set",
+  "inSchoolZoneHint": "In the school zone you set",
+  "commutingHint": "Currently commuting",
+  "locationHintDefault": "Make sure your child's location is on and important places are set",
+  "whereDetailTitle": "Where · {name}",
+  "zoneStatusExplain": "Status based on the safe zones you've set (home, school, or others).",
+  "schoolNotesToday": "Today's School Notes",
+  "schoolNotesHint": "Appears automatically when your child enters/leaves the school zone.",
+  "noSchoolNotesTitle": "No school notes yet",
+  "noSchoolNotesMessage": "Once the school zone is set and your child's location is on, arrival/departure notes will appear here.",
+  "arrivedAtSchool": "Arrived at school",
+  "departedFromSchool": "Left school",
+  "statusHomeLabel": "Home",
+  "statusSchoolLabel": "At school",
+  "statusSafeZoneLabel": "In safe zone",
+  "statusCommutingLabel": "Commuting",
+  "categoryHazardTitle": "Hazard / Damaged Road",
+  "categoryTrafficTitle": "Traffic",
+  "categoryCrowdTitle": "Crowd",
+  "categoryOtherTitle": "Other Report",
+  "categoryHazardShort": "Hazard",
+  "categoryTrafficShort": "Traffic",
+  "categoryCrowdShort": "Crowd",
+  "categoryOtherShort": "Other",
+  "addPinTitle": "Add Pin",
+  "reportTypeLabel": "Type",
+  "reportTypeHazard": "Hazard / Damaged road",
+  "reportNoteLabel": "Note",
+  "reportNoteHint": "e.g. Damaged road",
+  "reportNoteHintVr": "e.g. Pothole near the crossing",
+  "reportLocationDefault": "Location: using default point (GPS permission not granted)",
+  "reportLocationCoords": "Location: {lat}, {lng}",
+  "savePinAction": "Save Pin",
+  "pinAddedSnackbar": "Pin added",
+  "reportVerifiedSnackbar": "Report verified",
+  "verifyFailed": "Failed to verify: {error}",
+  "alreadyVerifiedThanks": "Already verified. Thank you.",
+  "fixedSuggestionNoted": "Thanks. Your \"fixed\" suggestion has been logged for review.",
+  "communityReportsTitle": "Community Reports",
+  "reportsInfoBanner": "Pins expire after 72 hours unless verified. No marketplace or contact with strangers.",
+  "totalReportsLabel": "Total Reports",
+  "verifiedLabel": "Verified",
+  "expiredLabel": "Expired",
+  "areaMapTitle": "Area Map",
+  "reportsListTitle": "Report List",
+  "activeLabel": "Active",
+  "filterLabel": "Filter",
+  "noActiveReports": "No active reports",
+  "noCoordinatesLabel": "No coordinates",
+  "coordinatesAvailableLabel": "Coordinates available",
+  "expiresAtLabel": "Expires {date}",
+  "stillThereAction": "Still There",
+  "fixedAction": "Fixed",
+  "pinLocationLabel": "Location",
+  "usingCurrentLocation": "Using your current location",
+  "changeLocationAction": "Change",
+  "whatAreYouReporting": "What are you reporting?",
+  "shortNoteOptional": "Short note (optional)",
+  "verifiedBadge": "VERIFIED",
+  "nearPlaceLabel": "near {place}",
+  "@nearPlaceLabel": {
+    "placeholders": {
+      "place": { "type": "String" }
+    }
+  },
+  "approxMetersFromPlace": "~{meters}m from {place}",
+  "@approxMetersFromPlace": {
+    "placeholders": {
+      "meters": { "type": "int" },
+      "place": { "type": "String" }
+    }
+  },
+  "pickPinLocationTitle": "Pick pin location",
+  "resolvingLocation": "Resolving location...",
+  "locationUnknown": "Location unavailable",
+  "presetAtSchoolText": "Arrived at school!",
+  "presetAtHomeText": "Arrived home.",
+  "presetNeedHelpText": "Need help — please contact me.",
+  "homeArrivedStatus": "At home · Arrived",
+  "hereAtTime": "Here · {time}",
+  "@hereAtTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "waitingGpsSignal": "Waiting for location signal...",
+  "atHomeTrackingStopped": "At home · tracking paused",
+  "locationNotUpdatedRecently": "Location has not updated recently",
+  "movingNow": "On the move",
+  "liveJustNow": "Live · just now",
+  "liveSecondsAgo": "Live · {seconds}s ago",
+  "@liveSecondsAgo": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "liveMinutesAgo": "Live · {minutes}m ago",
+  "@liveMinutesAgo": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "zoneNameActive": "{name} · active",
+  "@zoneNameActive": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "zoneNameWithCount": "{name} · {count} zones",
+  "@zoneNameWithCount": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "safeZonesCount": "{count} safe zones",
+  "@safeZonesCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "zonesSummaryActiveCount": "{count} zones · {active} active now",
+  "@zonesSummaryActiveCount": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "active": { "type": "int" }
+    }
+  },
+  "noZonesYet": "No zones yet",
+  "addHomeOrSchoolHint": "Add home or school",
+  "remindersNoneActive": "None active",
+  "remindersActiveCount": "{count} active",
+  "@remindersActiveCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "remindersActiveNext": "{count} active · next {title} {time}",
+  "@remindersActiveNext": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "title": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "chargingShortSuffix": " · charging",
+  "batteryPercentLabel": "Battery {value}%",
+  "@batteryPercentLabel": {
+    "placeholders": {
+      "value": { "type": "int" }
+    }
+  },
+  "batteryPercentCharging": "Battery {value}% · charging",
+  "@batteryPercentCharging": {
+    "placeholders": {
+      "value": { "type": "int" }
+    }
+  },
+  "batteryUnknown": "Battery unknown",
+  "weakSignalRoute": "Weak signal — route may be less accurate.",
+  "beingMonitored": "Being monitored",
+  "locationCannotUpdate": "Location could not be updated",
+  "adminAllChildren": "Admin · All children",
+  "waitingWithNames": "Pending · {names}",
+  "@waitingWithNames": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
+  "activeWithNames": "Active · {names}",
+  "@activeWithNames": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
+  "zeroGuardiansAdd": "0 guardians · Add guardian",
+  "guardiansCountNamed": "{count} guardians · {names}",
+  "@guardiansCountNamed": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "names": { "type": "String" }
+    }
+  },
+  "guardiansCountOnly": "{count} guardians",
+  "@guardiansCountOnly": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "guardiansForChildTitle": "Guardians · {name}",
+  "@guardiansForChildTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "noGuardiansForChild": "No guardians for this child yet.",
+  "youBadge": "YOU",
+  "doneAction": "Done",
+  "editChevron": "Edit ›",
+  "notConfiguredTapSearch": "Not set — tap to search",
+  "noPlacesYetAddHomeSchool": "No places yet. Add home or school.",
+  "noPlacesMatch": "No matching places.",
+  "homePlaceLabel": "Home",
+  "schoolPlaceLabel": "School",
+  "parentRoleFallback": "Parent",
+  "hereNowLabel": "Here",
+  "waitingLocationDots": "Waiting for location...",
+  "seenOnMap": "Visible on map",
+  "signalStrong": "Strong",
+  "signalMedium": "Fair",
+  "signalWeak": "Weak",
+  "signalLost": "Lost",
+  "activeBadgeShort": "LIVE",
+  "staleBadgeShort": "STALE",
+  "batteryMetricLabel": "Battery",
+  "signalMetricLabel": "Signal",
+  "timeMetricLabel": "Time",
+  "optionsTooltip": "Options",
+  "removeFromList": "Remove from list",
+  "relinkCodeMenu": "Relink code for {name}",
+  "@relinkCodeMenu": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "noSignalYet": "No signal yet",
+  "updatedAtTime": "Updated {time}",
+  "@updatedAtTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "batteryDeadBanner": "Child's phone is nearly empty / off. Location may not update.",
+  "batteryLowBanner": "Child's phone battery is low ({level}%).",
+  "@batteryLowBanner": {
+    "placeholders": {
+      "level": { "type": "String" }
+    }
+  },
+  "locationStaleBanner": "Location signal is stale. Phone may be off or offline.",
+  "screenLimitsOff": "Limits turned off",
+  "screenUsedToday": "{used} / {limit} today",
+  "@screenUsedToday": {
+    "placeholders": {
+      "used": { "type": "String" },
+      "limit": { "type": "String" }
+    }
+  },
+  "limitCaptionShort": "limit {limit}",
+  "@limitCaptionShort": {
+    "placeholders": {
+      "limit": { "type": "String" }
+    }
+  },
+  "unreadKabarCount": "{count} unread",
+  "@unreadKabarCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noTrailToday": "No trail yet today.",
+  "safeZoneFeatureTitle": "Safe zones",
+  "parentKabarFeatureTitle": "Updates",
+  "remindersFeatureTitle": "Reminders",
+  "todaySectionTitle": "Today",
+  "safePlaceLabel": "Safe place",
+  "placesCountLabel": "places",
+  "girlChildLabel": "Girl",
+  "boyChildLabel": "Boy",
+  "noActiveAlerts": "No active alerts",
+  "invitesSectionTitle": "Invites",
+  "childIdLabel": "Child: {id}",
+  "@childIdLabel": {
+    "placeholders": {
+      "id": { "type": "String" }
+    }
+  },
+  "childFallbackName": "Child",
+  "guardianFallbackName": "Guardian",
+  "needExtraHelpNote": "Needs additional help",
+  "resolvedByParentNote": "Resolved by parent",
+  "sendResponseFailed": "Failed to send response. Try again.",
+  "resolvePanicFailed": "Failed to resolve panic. Try again.",
+  "panicBadge": "PANIC",
+  "childInSafeZoneTitle": "Child in safe zone",
+  "zoneUpdateTitle": "Zone update",
+  "arrivedAtZoneMsg": "{childName} arrived at {zoneLabel}",
+  "@arrivedAtZoneMsg": {
+    "placeholders": {
+      "childName": { "type": "String" },
+      "zoneLabel": { "type": "String" }
+    }
+  },
+  "childInSafeZoneMsg": "{childName} is in a safe zone",
+  "@childInSafeZoneMsg": {
+    "placeholders": {
+      "childName": { "type": "String" }
+    }
+  },
+  "leftSafeZoneMsg": "{childName} left a safe zone",
+  "@leftSafeZoneMsg": {
+    "placeholders": {
+      "childName": { "type": "String" }
+    }
+  },
+  "newKabarBanner": "New update",
+  "shortTrailLabel": "Short trail",
+  "importantPlacesLabel": "Safe Zones",
+  "zonesHubTitle": "Safe Zones",
+  "zonesHubSubtitle": "Home, school, and frequently visited places",
+  "searchPlaceHint": "Search places...",
+  "addNewPlaceLabel": "Add new place",
+  "estimateMinutes": "About {minutes} min",
+  "@estimateMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "noAddressYet": "No address yet",
+  "extraSafePlace": "Additional safe place",
+  "searchHomeAddress": "Search home address",
+  "searchSchoolName": "Search school name",
+  "searchCustomPlace": "Search place: {label}",
+  "@searchCustomPlace": {
+    "placeholders": {
+      "label": { "type": "String" }
+    }
+  },
+  "homeSearchHint": "e.g. Marine Parade, postal code, complex name",
+  "schoolSearchHint": "e.g. Tao Nan School, school name",
+  "customSearchHint": "e.g. tuition, mall, park, address",
+  "placeSavedSnack": "Saved: {name}",
+  "@placeSavedSnack": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "failedSavePlace": "Failed to save place: {error}",
+  "@failedSavePlace": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "placeLessonSuggestion": "Tuition place",
+  "placeGrandmaSuggestion": "Grandparent's house",
+  "newPlaceDefault": "New place",
+  "addSafePlaceTitle": "Add safe place",
+  "customPlaceHint": "e.g. Piano lesson Blok M",
+  "continueSearchAddress": "Continue to search address",
+  "otherPlaceLabel": "Other place",
+  "deletePlaceTitle": "Delete place?",
+  "deletePlaceConfirm": "Delete \"{name}\"? Associated safe routes using this place will also be deleted.",
+  "@deletePlaceConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "deletePlaceCascadeNote": "Associated safe routes using this place will also be deleted.",
+  "placeDeletedSnack": "Place deleted",
+  "failedDeletePlace": "Failed to delete: {error}",
+  "@failedDeletePlace": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "placesForChildLabel": "Places · {name}",
+  "@placesForChildLabel": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "addChildBeforeInvite": "Add a child before inviting a guardian",
+  "inviteViaWhatsApp": "Invite via WhatsApp",
+  "inviteViaEmail": "Invite via Email",
+  "inviteViaLink": "Invite via Link",
+  "guardianNameLabel": "Guardian name",
+  "phoneWhatsAppLabel": "WhatsApp / phone number",
+  "emailOptionalLabel": "Email (optional)",
+  "namePhoneRequired": "Name and phone are required",
+  "inviteLinkCopied": "Invite link copied",
+  "inviteFailedDetail": "Invite failed: {error}",
+  "@inviteFailedDetail": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "failedGenericDetail": "Failed: {error}",
+  "@failedGenericDetail": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "guardiansInviteHint": "Invite guardians you already know. No stranger search — only people you trust.",
+  "activeGuardiansSection": "ACTIVE GUARDIANS",
+  "inviteNewSection": "INVITE NEW GUARDIAN",
+  "addTrustedGuardian": "Add Trusted Guardian",
+  "guardianInviteChannelHint": "Guardian will receive an invite via WhatsApp or email",
+  "guardianInviteBody": "Hi {name}, you are invited as a Trusted Guardian for {children} on PulangAman. Open invite: {link}",
+  "@guardianInviteBody": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "children": { "type": "String" },
+      "link": { "type": "String" }
+    }
+  },
+  "guardianInviteSubject": "PulangAman Trusted Guardian Invite",
+  "activeGuardiansCount": "{count} active guardians",
+  "@activeGuardiansCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "channelWhatsApp": "WhatsApp",
+  "channelEmail": "Email",
+  "channelLink": "Link",
+  "justNowRelative": "just now",
+  "minutesAgoRelative": "{minutes}m ago",
+  "@minutesAgoRelative": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "noLocationYet": "No location yet",
+  "sessionTokenFailed": "Failed to get session token. Try again.",
+  "phoneNotFoundRelogin": "Phone number not found. Sign out and sign in again.",
+  "phoneInvalidFormat": "Invalid phone number. Use format +62...",
+  "placesApiKeyHint": "Needs a separate server key: enable Places API + Geocoding.",
+  "forChildLabel": "For child",
+  "phoneCountryCode": "+62",
+  "accessPerChildSection": "ACCESS PER CHILD",
+  "revokeAccessTooltip": "Revoke access",
+  "alertAcknowledged": "Alert acknowledged",
+  "alertAcknowledgedCascadeStopped": "Alert acknowledged. Cascade stopped.",
+  "alertLabelWithId": "Alert {id}",
+  "@alertLabelWithId": {
+    "placeholders": {
+      "id": { "type": "String" }
+    }
+  },
+  "fromParentLabel": "From {name}",
+  "@fromParentLabel": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pickAvatarTitle": "Choose avatar for {name}",
+  "@pickAvatarTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pickAvatarHint": "Choose boy or girl. Child photos are not used for privacy.",
+  "changeAvatarAction": "Change avatar",
+  "placeFriendSuggestion": "Friend",
+  "placeMallSuggestion": "Mall / play place",
+  "customPlaceDialogHint": "Pick a type, or type your own. Then search the address.",
+  "routeBadge": "ROUTE",
+  "trailPointsCount": "{count} trail points",
+  "@trailPointsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "hoursAgoRelative": "{hours}h ago",
+  "@hoursAgoRelative": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "daysAgoRelative": "{days}d ago",
+  "@daysAgoRelative": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "yesterdayLabel": "Yesterday",
+  "lastSeenLabel": "Last seen: {when}",
+  "@lastSeenLabel": {
+    "placeholders": {
+      "when": { "type": "String" }
+    }
+  },
+  "tooManyAttempts": "Too many attempts. Try again later.",
+  "invalidOtpCode": "Incorrect OTP code.",
+  "otpExpiredResend": "OTP expired. Request a new one.",
+  "appConfigIncomplete": "App configuration incomplete. Contact the developer.",
+  "serverMissingCustomToken": "Server did not return customToken. Deploy the latest API first.",
+  "startMonitoringAction": "Start monitoring",
+  "openLocationAction": "Open location",
+  "orTypeOwnNameLabel": "Or type your own name",
+  "todayShortLabel": "Today",
+  "thisWeekLabel": "This week",
+  "thisMonthLabel": "This month",
+  "weekShortLabel": "Week",
+  "monthShortLabel": "Month",
+  "dayShortLabel": "Day",
+  "durationMinutesOnly": "{minutes} min",
+  "@durationMinutesOnly": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "durationHoursMinutes": "{hours}h {minutes}m",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "otpSendTimedOut": "Sending the code took too long. Try again.",
+  "recoverParentsOnly": "Only a signed-in parent can recover.",
+  "activityLoadFailed": "Could not load today's history",
+  "greetingMorning": "Good morning",
+  "greetingMidday": "Good afternoon",
+  "greetingAfternoon": "Good evening",
+  "greetingNight": "Good night",
+  "periodMorningShort": "Morning",
+  "periodMiddayShort": "Afternoon",
+  "periodAfternoonShort": "Evening",
+  "periodNightShort": "Night",
+  "menuLabel": "Menu",
+  "brandNameUpper": "PULANGAMAN",
+  "premiumFamilyMapTitle": "FAMILY MAP",
+  "premiumLiveLabel": "Live",
+  "premiumFamilyMapHint": "One stage — all children",
+  "premiumStatusSection": "STATUS",
+  "premiumGreetingWithName": "{greeting}, {name}",
+  "@premiumGreetingWithName": {
+    "placeholders": {
+      "greeting": { "type": "String" },
+      "name": { "type": "String" }
+    }
+  },
+  "premiumAllChildrenSafe": "{count, plural, =1{One child within safe reach.} other{All children within safe reach.}}",
+  "@premiumAllChildrenSafe": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "premiumChildrenTracked": "{count, plural, =1{1 child being watched.} other{{count} children being watched.}}",
+  "@premiumChildrenTracked": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "premiumBatteryLowDetail": "Battery {percent}%",
+  "@premiumBatteryLowDetail": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "premiumChargeSoonMeta": "charge soon",
+  "settingsPremiumHomeShell": "Editorial home (Alt A)",
+  "settingsPremiumHomeShellHint": "No bottom navigation bar. Turn off to restore the classic tabs.",
+  "settingsVisualRefresh": "Visual refresh",
+  "settingsVisualRefreshHint": "Cream canvas, editorial type, and softer home styling. Turn off for classic look.",
+  "updatedJustNowBadge": "Updated just now",
+  "updatedMinutesAgoBadge": "Updated {minutes}m ago",
+  "@updatedMinutesAgoBadge": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "updatedHoursAgoBadge": "Updated {hours}h ago",
+  "@updatedHoursAgoBadge": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "relinkCodeShort": "Relink code",
+  "newSignInCodeTitle": "New sign-in code for {name}",
+  "@newSignInCodeTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "newSignInCodeBody": "Enter this code in {name}'s app when choosing \"Already have a code\" on the sign-in screen.",
+  "@newSignInCodeBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "copyCodeAction": "Copy code",
+  "codeCopiedSnack": "Code copied",
+  "codeValid24Hours": "Valid for 24 hours",
+  "codeValidForHours": "Valid for {hours} hours",
+  "@codeValidForHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  }
 }

@@ -6,8 +6,8 @@ import 'package:geolocator/geolocator.dart';
 
 import '../../core/network/ws_client.dart';
 import '../../core/parse_coord.dart';
-import '../../core/strings.dart';
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../parent/emergency_meeting_alert_screen.dart';
 
@@ -117,9 +117,10 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
 
   Future<void> _needBackup() async {
     if (_alertId == null) return;
+    final l10n = AppLocalizations.of(context);
     final api = ref.read(apiClientProvider);
     await api.post('/api/v1/panic/$_alertId/need-backup', body: {
-      'notes': 'Memerlukan bantuan tambahan',
+      'notes': l10n.needExtraHelpNote,
     });
   }
 
@@ -132,11 +133,12 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${AppStrings.brand} · ${auth.name ?? ''}'),
+        title: Text('${l10n.brand} · ${auth.name ?? ''}'),
         actions: [
           IconButton(
             onPressed: () => ref.read(authControllerProvider.notifier).logout(),
@@ -148,17 +150,17 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            AppStrings.guardianGuidance,
+            l10n.guardianGuidance,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: AppColors.ink.withValues(alpha: 0.85),
                 ),
           ),
           const SizedBox(height: 24),
-          Text(AppStrings.activeAlerts,
+          Text(l10n.activeAlerts,
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           if (_alertId == null)
-            const Text('Tidak ada peringatan aktif')
+            Text(l10n.noActiveAlerts)
           else ...[
             Card(
               color: const Color(0xFFFEE4E2),
@@ -167,22 +169,22 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('Peringatan $_alertId'),
-                    if (_childId != null) Text('Anak: $_childId'),
+                    Text(l10n.alertLabelWithId(_alertId!)),
+                    if (_childId != null) Text(l10n.childIdLabel(_childId!)),
                     const SizedBox(height: 12),
                     FilledButton(
                       onPressed: _ack,
-                      child: const Text(AppStrings.ackAlert),
+                      child: Text(l10n.ackAlert),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: _shareLocation,
-                      child: const Text(AppStrings.shareLocation),
+                      child: Text(l10n.shareLocation),
                     ),
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: _needBackup,
-                      child: const Text(AppStrings.needBackup),
+                      child: Text(l10n.needBackup),
                     ),
                   ],
                 ),
@@ -190,19 +192,22 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
             ),
           ],
           const SizedBox(height: 24),
-          Text('Undangan', style: Theme.of(context).textTheme.titleLarge),
+          Text(l10n.invitesSectionTitle,
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           if (_invites.isEmpty)
-            const Text(AppStrings.noInvites)
+            Text(l10n.noInvites)
           else
             ..._invites.map(
               (invite) => ListTile(
                 title: Text('${invite['child_name']}'),
-                subtitle: Text('Dari ${invite['parent_name']}'),
+                subtitle: Text(
+                  l10n.fromParentLabel('${invite['parent_name']}'),
+                ),
                 trailing: FilledButton(
                   onPressed: () => _accept(invite['child_id'] as String),
                   style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-                  child: const Text(AppStrings.acceptInvite),
+                  child: Text(l10n.acceptInvite),
                 ),
               ),
             ),

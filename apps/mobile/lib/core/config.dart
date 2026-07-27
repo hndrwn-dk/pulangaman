@@ -26,4 +26,16 @@ abstract final class AppConfig {
     'USE_DEV_AUTH',
     defaultValue: false,
   );
+
+  /// Compile-time default for Visual Refresh (Approach A — in-place polish).
+  ///
+  /// Default **false** — classic colors/typography remain the default.
+  /// Enable without a rebuild preference:
+  ///   `--dart-define=VISUAL_REFRESH=true`
+  /// Runtime override (parent Account settings) wins when set; see
+  /// [VisualRefreshController] / SessionStore key `visual_refresh`.
+  static const visualRefresh = bool.fromEnvironment(
+    'VISUAL_REFRESH',
+    defaultValue: false,
+  );
 }

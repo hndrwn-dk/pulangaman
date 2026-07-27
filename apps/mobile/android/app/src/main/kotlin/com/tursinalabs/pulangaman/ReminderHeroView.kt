@@ -13,16 +13,46 @@ import kotlin.math.sin
 
 /**
  * Soft hero illustration for reminder full-screen — mood from title keywords
- * (tidur / belajar / default), drawn without bitmap assets.
+ * (tidur / belajar / emp / default), drawn without bitmap assets.
+ *
+ * Accent colors come from [momentAccent] so Visual Refresh templates can swap
+ * gold / vivid green / sage / terracotta without hardcoding per draw path.
  */
 class ReminderHeroView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {
 
-    enum class Mood { SLEEP, STUDY, DEFAULT }
+    enum class Mood { SLEEP, STUDY, EMP, DEFAULT }
 
     var mood: Mood = Mood.DEFAULT
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /** Moment accent fill (illustration + rings). */
+    var momentAccent: Int = 0xFFFFC857.toInt()
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /** Soft circular backdrop behind the glyph. */
+    var illustrationBg: Int = 0xFF2C4C41.toInt()
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /** Screen background used to cut crescent / pin hole. */
+    var canvasBg: Int = 0xFF16362C.toInt()
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    var visualRefresh: Boolean = false
         set(value) {
             field = value
             invalidate()
@@ -32,6 +62,7 @@ class ReminderHeroView @JvmOverloads constructor(
     private val accent = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val soft = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val star = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val path = Path()
 
     override fun onDraw(canvas: Canvas) {
@@ -46,25 +77,26 @@ class ReminderHeroView @JvmOverloads constructor(
         when (mood) {
             Mood.SLEEP -> drawSleep(canvas, cx, cy, r)
             Mood.STUDY -> drawStudy(canvas, cx, cy, r)
+            Mood.EMP -> drawEmp(canvas, cx, cy, r)
             Mood.DEFAULT -> drawDefault(canvas, cx, cy, r)
         }
     }
 
     private fun drawSleep(canvas: Canvas, cx: Float, cy: Float, r: Float) {
-        soft.color = 0x33FFFFFF
+        soft.color = if (visualRefresh) illustrationBg else 0x33FFFFFF
+        soft.alpha = if (visualRefresh) 220 else 51
         canvas.drawCircle(cx, cy, r * 1.15f, soft)
 
-        accent.color = 0xFFFFC857.toInt()
+        accent.color = momentAccent
         canvas.drawCircle(cx - r * 0.15f, cy - r * 0.05f, r * 0.72f, accent)
 
-        disc.color = 0xFF0B2E28.toInt()
+        disc.color = canvasBg
         canvas.drawCircle(cx + r * 0.22f, cy - r * 0.18f, r * 0.58f, disc)
 
         star.color = 0xFFFFF4C8.toInt()
         drawStar(canvas, cx + r * 0.72f, cy - r * 0.55f, r * 0.08f)
         drawStar(canvas, cx - r * 0.78f, cy + r * 0.15f, r * 0.055f)
         drawStar(canvas, cx + r * 0.55f, cy + r * 0.62f, r * 0.045f)
-        drawStar(canvas, cx - r * 0.35f, cy - r * 0.78f, r * 0.04f)
 
         soft.color = 0x55FFFFFF
         canvas.drawOval(
@@ -74,11 +106,11 @@ class ReminderHeroView @JvmOverloads constructor(
     }
 
     private fun drawStudy(canvas: Canvas, cx: Float, cy: Float, r: Float) {
-        soft.color = 0x28FFFFFF
+        soft.color = if (visualRefresh) illustrationBg else 0x28FFFFFF
+        soft.alpha = if (visualRefresh) 220 else 40
         canvas.drawCircle(cx, cy, r * 1.1f, soft)
 
-        // Open book base
-        accent.color = 0xFFFFC857.toInt()
+        accent.color = momentAccent
         path.reset()
         path.moveTo(cx - r * 0.7f, cy + r * 0.15f)
         path.quadTo(cx - r * 0.35f, cy - r * 0.35f, cx, cy + r * 0.05f)
@@ -88,51 +120,91 @@ class ReminderHeroView @JvmOverloads constructor(
         path.close()
         canvas.drawPath(path, accent)
 
-        disc.color = 0xFF18332D.toInt()
         val spine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF18332D.toInt()
+            color = canvasBg
             style = Paint.Style.STROKE
             strokeWidth = r * 0.04f
             strokeCap = Paint.Cap.ROUND
         }
         canvas.drawLine(cx, cy - r * 0.05f, cx, cy + r * 0.45f, spine)
 
-        // Soft lamp glow
-        soft.color = 0x66FFC857
-        canvas.drawCircle(cx, cy - r * 0.55f, r * 0.22f, soft)
-        accent.color = 0xFFFFE08A.toInt()
-        canvas.drawCircle(cx, cy - r * 0.55f, r * 0.12f, accent)
+        soft.color = 0x55FFFFFF
+        canvas.drawOval(
+            RectF(cx - r * 0.5f, cy + r * 0.58f, cx + r * 0.5f, cy + r * 0.92f),
+            soft,
+        )
+    }
 
-        star.color = 0xCCFFFFFF.toInt()
-        drawStar(canvas, cx + r * 0.65f, cy - r * 0.4f, r * 0.05f)
-        drawStar(canvas, cx - r * 0.7f, cy - r * 0.25f, r * 0.04f)
+    private fun drawEmp(canvas: Canvas, cx: Float, cy: Float, r: Float) {
+        soft.color = illustrationBg
+        soft.alpha = 220
+        canvas.drawCircle(cx, cy, r * 1.15f, soft)
+
+        stroke.color = 0x38B9CFC5
+        stroke.strokeWidth = 2f
+        canvas.drawCircle(cx, cy, r * 0.95f, stroke)
+        canvas.drawCircle(cx, cy, r * 0.72f, stroke)
+        canvas.drawCircle(cx, cy, r * 0.48f, stroke)
+
+        soft.color = 0x55000000
+        canvas.drawOval(
+            RectF(cx - r * 0.45f, cy + r * 0.48f, cx + r * 0.45f, cy + r * 0.78f),
+            soft,
+        )
+
+        accent.color = momentAccent
+        path.reset()
+        path.moveTo(cx, cy - r * 0.55f)
+        path.cubicTo(
+            cx + r * 0.42f, cy - r * 0.55f,
+            cx + r * 0.42f, cy + r * 0.05f,
+            cx, cy + r * 0.42f,
+        )
+        path.cubicTo(
+            cx - r * 0.42f, cy + r * 0.05f,
+            cx - r * 0.42f, cy - r * 0.55f,
+            cx, cy - r * 0.55f,
+        )
+        path.close()
+        canvas.drawPath(path, accent)
+
+        disc.color = canvasBg
+        canvas.drawCircle(cx, cy - r * 0.18f, r * 0.14f, disc)
     }
 
     private fun drawDefault(canvas: Canvas, cx: Float, cy: Float, r: Float) {
-        soft.color = 0x28FFFFFF
+        soft.color = if (visualRefresh) illustrationBg else 0x28FFFFFF
+        soft.alpha = if (visualRefresh) 220 else 40
         canvas.drawCircle(cx, cy, r * 1.1f, soft)
 
-        accent.color = 0xFFFFC857.toInt()
-        canvas.drawCircle(cx, cy - r * 0.05f, r * 0.42f, accent)
-
-        disc.color = 0xFF18332D.toInt()
-        canvas.drawCircle(cx, cy - r * 0.05f, r * 0.28f, disc)
-
-        soft.color = 0xFFFFC857.toInt()
+        // Bell body
+        accent.color = momentAccent
+        canvas.drawCircle(cx, cy - r * 0.08f, r * 0.38f, accent)
         canvas.drawRoundRect(
-            RectF(cx - r * 0.12f, cy + r * 0.32f, cx + r * 0.12f, cy + r * 0.48f),
-            r * 0.06f,
-            r * 0.06f,
-            soft,
+            RectF(cx - r * 0.42f, cy + r * 0.12f, cx + r * 0.42f, cy + r * 0.32f),
+            r * 0.08f,
+            r * 0.08f,
+            accent,
         )
-        canvas.drawOval(
-            RectF(cx - r * 0.22f, cy + r * 0.45f, cx + r * 0.22f, cy + r * 0.58f),
-            soft,
+        // Clapper
+        canvas.drawCircle(cx, cy + r * 0.42f, r * 0.1f, accent)
+        // Handle
+        stroke.color = momentAccent
+        stroke.strokeWidth = r * 0.07f
+        stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawArc(
+            RectF(cx - r * 0.18f, cy - r * 0.55f, cx + r * 0.18f, cy - r * 0.2f),
+            200f,
+            140f,
+            false,
+            stroke,
         )
 
-        star.color = 0xAAFFFFFF.toInt()
-        drawStar(canvas, cx + r * 0.7f, cy - r * 0.5f, r * 0.055f)
-        drawStar(canvas, cx - r * 0.75f, cy + r * 0.1f, r * 0.045f)
+        soft.color = 0x55FFFFFF
+        canvas.drawOval(
+            RectF(cx - r * 0.5f, cy + r * 0.58f, cx + r * 0.5f, cy + r * 0.92f),
+            soft,
+        )
     }
 
     private fun drawStar(canvas: Canvas, x: Float, y: Float, size: Float) {

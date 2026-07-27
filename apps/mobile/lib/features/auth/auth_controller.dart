@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config.dart';
 import '../../core/network/api_client.dart';
 import '../../core/storage/session_store.dart';
+import '../../l10n/app_localizations.dart';
 
 enum AppRole { parent, child, guardian }
 
@@ -60,7 +62,6 @@ class AuthState {
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
-final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
 
 final authControllerProvider =
     StateNotifierProvider<AuthController, AuthState>((ref) {
@@ -282,14 +283,14 @@ class AuthController extends StateNotifier<AuthState> {
         final customToken = joined['customToken'] as String?;
         if (customToken == null || customToken.isEmpty) {
           throw StateError(
-            'Server tidak mengembalikan customToken. Deploy API terbaru dulu.',
+            _authL10n().serverMissingCustomToken,
           );
         }
         final cred =
             await FirebaseAuth.instance.signInWithCustomToken(customToken);
         final idToken = await cred.user?.getIdToken();
         if (idToken == null) {
-          throw StateError('Gagal mengambil token sesi. Coba lagi.');
+          throw StateError(_authL10n().sessionTokenFailed);
         }
         token = idToken;
       }
@@ -437,7 +438,7 @@ class AuthController extends StateNotifier<AuthState> {
         const Duration(seconds: 45),
         onTimeout: () {
           throw TimeoutException(
-            'Pengiriman kode terlalu lama. Coba lagi.',
+            _authL10n().otpSendTimedOut,
           );
         },
       );
@@ -445,7 +446,7 @@ class AuthController extends StateNotifier<AuthState> {
       state = state.copyWith(
         loading: false,
         awaitingOtp: false,
-        error: e.message ?? 'Pengiriman kode terlalu lama. Coba lagi.',
+        error: e.message ?? _authL10n().otpSendTimedOut,
       );
       rethrow;
     }
@@ -460,7 +461,7 @@ class AuthController extends StateNotifier<AuthState> {
     final cred = await FirebaseAuth.instance.signInWithCredential(credential);
     final idToken = await cred.user?.getIdToken();
     if (idToken == null) {
-      throw StateError('Gagal mengambil token sesi. Coba lagi.');
+      throw StateError(_authL10n().sessionTokenFailed);
     }
 
     api.setToken(idToken);
@@ -495,7 +496,7 @@ class AuthController extends StateNotifier<AuthState> {
   /// Move children from a legacy parent phone onto the current parent account.
   Future<int> recoverChildrenFromPhone(String previousPhone) async {
     if (state.role != AppRole.parent || state.token == null) {
-      throw StateError('Hanya orang tua yang sedang masuk yang bisa memulihkan.');
+      throw StateError(_authL10n().recoverParentsOnly);
     }
     // Do not flip auth.loading — that rebuilds shells and can crash the dialog route.
     try {
@@ -513,13 +514,11 @@ class AuthController extends StateNotifier<AuthState> {
           _pendingPhone ??
           '';
       if (phone.isEmpty) {
-        throw StateError(
-          'Nomor telepon tidak ditemukan. Keluar lalu masuk ulang.',
-        );
+        throw StateError(_authL10n().phoneNotFoundRelogin);
       }
 
       final session = await api.post('/api/v1/auth/session', body: {
-        'name': state.name ?? 'Orang tua',
+        'name': state.name ?? _authL10n().parentRoleFallback,
         'phone': phone,
         'role': AppRole.parent.name,
         'recoverFromPhone': normalizePhoneE164(previousPhone),
@@ -531,7 +530,7 @@ class AuthController extends StateNotifier<AuthState> {
         token: token,
         userId: userId,
         role: AppRole.parent.name,
-        name: state.name ?? 'Orang tua',
+        name: state.name ?? _authL10n().parentRoleFallback,
       );
       // Preserve existing session fields; only refresh ids after recover.
       state = state.copyWith(
@@ -569,21 +568,28 @@ String normalizePhoneE164(String raw) {
 }
 
 String _friendlyAuthError(Object e) {
+  final l10n = _authL10n();
   if (e is FirebaseAuthException) {
     switch (e.code) {
       case 'invalid-phone-number':
-        return 'Nomor telepon tidak valid. Gunakan format +62...';
+        return l10n.phoneInvalidFormat;
       case 'too-many-requests':
-        return 'Terlalu banyak percobaan. Coba lagi nanti.';
+        return l10n.tooManyAttempts;
       case 'invalid-verification-code':
-        return 'Kode OTP salah.';
+        return l10n.invalidOtpCode;
       case 'session-expired':
-        return 'Kode OTP kedaluwarsa. Kirim ulang.';
+        return l10n.otpExpiredResend;
       case 'missing-client-identifier':
-        return 'Konfigurasi aplikasi belum lengkap. Hubungi pengembang.';
+        return l10n.appConfigIncomplete;
       default:
         return e.message ?? e.code;
     }
   }
   return e.toString();
+}
+
+AppLocalizations _authL10n() {
+  final code = PlatformDispatcher.instance.locale.languageCode;
+  final locale = code == 'en' ? const Locale('en') : const Locale('id');
+  return lookupAppLocalizations(locale);
 }

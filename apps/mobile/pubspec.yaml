@@ -27,6 +27,7 @@ dependencies:
   go_router: ^14.6.2
   uuid: ^4.5.1
   url_launcher: ^6.3.1
+  share_plus: ^10.1.4
   battery_plus: 6.2.1
   firebase_core: ^4.12.1
   firebase_auth: ^6.5.6
@@ -39,12 +40,22 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.6
 
 flutter_launcher_icons:
-  android: ic_launcher
+  image_path: "assets/icon/app_icon_1024.png"
+  android: true
   ios: true
-  image_path: assets/images/app_icon.png
+  adaptive_icon_background: "#16362C"
+  adaptive_icon_foreground: "assets/icon/adaptive_icon_foreground.png"
   remove_alpha_ios: true
+
+flutter_native_splash:
+  color: "#16362C"
+  image: "assets/icon/splash_logo_transparent.png"
+  android_12:
+    color: "#16362C"
+    image: "assets/icon/splash_logo_transparent.png"
 
 flutter:
   generate: true

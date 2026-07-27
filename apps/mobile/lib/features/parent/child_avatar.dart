@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../../core/theme.dart';
+import '../../l10n/app_localizations.dart';
 
 enum ChildGender { girl, boy, unknown }
 
@@ -205,6 +206,7 @@ Future<ChildGender?> showChildGenderPicker({
   return showModalBottomSheet<ChildGender>(
     context: context,
     builder: (ctx) {
+      final l10n = AppLocalizations.of(ctx);
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -213,22 +215,22 @@ Future<ChildGender?> showChildGenderPicker({
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Pilih wajah untuk $childName',
+                l10n.pickAvatarTitle(childName),
                 style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Pilih laki-laki atau perempuan. Foto anak tidak dipakai demi privasi.',
-                style: TextStyle(color: AppColors.inkSoft),
+              Text(
+                l10n.pickAvatarHint,
+                style: const TextStyle(color: AppColors.inkSoft),
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: _GenderChoice(
-                      label: 'Anak perempuan',
+                      label: l10n.girlChildLabel,
                       gender: ChildGender.girl,
                       selected: current == ChildGender.girl,
                       onTap: () => Navigator.pop(ctx, ChildGender.girl),
@@ -237,7 +239,7 @@ Future<ChildGender?> showChildGenderPicker({
                   const SizedBox(width: 12),
                   Expanded(
                     child: _GenderChoice(
-                      label: 'Anak laki-laki',
+                      label: l10n.boyChildLabel,
                       gender: ChildGender.boy,
                       selected: current == ChildGender.boy,
                       onTap: () => Navigator.pop(ctx, ChildGender.boy),

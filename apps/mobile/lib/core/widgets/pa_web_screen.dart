@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../theme.dart';
 import 'pa_widgets.dart';
@@ -25,6 +26,7 @@ class _PaWebScreenState extends State<PaWebScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -38,9 +40,22 @@ class _PaWebScreenState extends State<PaWebScreen> {
         if (mounted) navigator.pop();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor:
+            refresh ? VisualRefreshColors.background : Colors.white,
         appBar: AppBar(
-          title: Text(widget.title),
+          title: Text(
+            widget.title,
+            style: refresh
+                ? GoogleFonts.fraunces(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.4,
+                    color: VisualRefreshColors.textPrimary,
+                  )
+                : null,
+          ),
+          backgroundColor:
+              refresh ? VisualRefreshColors.background : null,
           leadingWidth: PaScreenHeader.appBarLeadingWidth,
           titleSpacing: PaScreenHeader.appBarTitleSpacing,
           leading: paAppBarLeading(
@@ -54,7 +69,9 @@ class _PaWebScreenState extends State<PaWebScreen> {
               LinearProgressIndicator(
                 value: _progress > 0 ? _progress : null,
                 minHeight: 2,
-                color: AppColors.teal,
+                color: refresh
+                    ? VisualRefreshColors.accent
+                    : AppColors.teal,
                 backgroundColor: Colors.transparent,
               ),
             Expanded(

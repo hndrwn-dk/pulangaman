@@ -109,6 +109,9 @@ void main() {
       VoidCallback? onAck,
     }) {
       return MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('id'),
         home: Scaffold(
           body: ChildBerandaTab(
             childName: 'Andi',

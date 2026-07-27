@@ -3,8 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
@@ -14,6 +14,7 @@ import '../auth/auth_controller.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
 import 'trip_route_card.dart';
+import 'vr_sheet_chrome.dart';
 
 class PlaceHit {
   PlaceHit({
@@ -51,7 +52,7 @@ class PlacesEntryScreen extends ConsumerWidget {
   }
 }
 
-/// Detail tempat untuk satu anak (dari child detail).
+/// Detail lokasi untuk satu anak (dari child detail).
 class PlacesScreen extends ConsumerWidget {
   const PlacesScreen({super.key, required this.child});
 
@@ -229,7 +230,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     return null;
   }
 
-  List<Map<String, dynamic>> get _orderedPlaces {
+  List<Map<String, dynamic>> _orderedPlaces(AppLocalizations l10n) {
     final home = _zoneOf('home');
     final school = _zoneOf('school');
     final customs =
@@ -241,8 +242,8 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     ];
     if (_query.isEmpty) return list;
     return list.where((z) {
-      final label = _displayTitle(z).toLowerCase();
-      final sub = _displaySubtitle(z).toLowerCase();
+      final label = _displayTitle(z, l10n).toLowerCase();
+      final sub = _displaySubtitle(z, l10n).toLowerCase();
       return label.contains(_query) || sub.contains(_query);
     }).toList();
   }
@@ -252,35 +253,35 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     return name;
   }
 
-  String _displayTitle(Map<String, dynamic> z) {
+  String _displayTitle(Map<String, dynamic> z, AppLocalizations l10n) {
     final type = z['type']?.toString();
-    if (type == 'home') return 'Rumah';
-    if (type == 'school') return 'Sekolah';
+    if (type == 'home') return l10n.homeZone;
+    if (type == 'school') return l10n.schoolZone;
     final name = _rawName(z);
-    if (name.isEmpty) return 'Tempat aman';
+    if (name.isEmpty) return l10n.safePlaceLabel;
     final parts = name.split(' · ');
     return parts.first.trim().isEmpty ? name : parts.first.trim();
   }
 
-  String _displaySubtitle(Map<String, dynamic> z) {
+  String _displaySubtitle(Map<String, dynamic> z, AppLocalizations l10n) {
     final name = _rawName(z);
     final type = z['type']?.toString();
     if (type == 'home' || type == 'school') {
-      if (name.isEmpty) return 'Belum ada alamat';
+      if (name.isEmpty) return l10n.noAddressYet;
       return name;
     }
     if (name.contains(' · ')) {
       return name.split(' · ').skip(1).join(' · ');
     }
-    return 'Tempat aman tambahan';
+    return l10n.extraSafePlace;
   }
 
-  String _tripPlaceLabel(Map<String, dynamic> zone) {
-    final title = _displayTitle(zone);
-    final subtitle = _displaySubtitle(zone);
+  String _tripPlaceLabel(Map<String, dynamic> zone, AppLocalizations l10n) {
+    final title = _displayTitle(zone, l10n);
+    final subtitle = _displaySubtitle(zone, l10n);
     if (subtitle.isEmpty ||
-        subtitle == 'Belum ada alamat' ||
-        subtitle == 'Tempat aman tambahan') {
+        subtitle == l10n.noAddressYet ||
+        subtitle == l10n.extraSafePlace) {
       return title;
     }
     return '$title — $subtitle';
@@ -292,22 +293,42 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
   }) async {
     final child = _selected;
     if (child == null) return;
-    final selected = await showModalBottomSheet<PlaceHit>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => PlaceSearchSheet(
-        title: type == 'home'
-            ? 'Cari alamat rumah'
-            : type == 'school'
-                ? 'Cari nama sekolah'
-                : 'Cari tempat: ${customLabel ?? 'Tempat lain'}',
-        hint: type == 'home'
-            ? 'Contoh: Marine Parade, kode pos, nama kompleks'
-            : type == 'school'
-                ? 'Contoh: Tao Nan School, nama sekolah'
-                : 'Contoh: nama les, mall, taman, alamat',
-      ),
-    );
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final selected = refresh
+        ? await showVrModalBottomSheet<PlaceHit>(
+            context: context,
+            builder: (ctx) => PlaceSearchSheet(
+              title: type == 'home'
+                  ? l10n.searchHomeAddress
+                  : type == 'school'
+                      ? l10n.searchSchoolName
+                      : l10n.searchCustomPlace(
+                          customLabel ?? l10n.otherPlaceLabel),
+              hint: type == 'home'
+                  ? l10n.homeSearchHint
+                  : type == 'school'
+                      ? l10n.schoolSearchHint
+                      : l10n.customSearchHint,
+            ),
+          )
+        : await showModalBottomSheet<PlaceHit>(
+            context: context,
+            isScrollControlled: true,
+            builder: (ctx) => PlaceSearchSheet(
+              title: type == 'home'
+                  ? l10n.searchHomeAddress
+                  : type == 'school'
+                      ? l10n.searchSchoolName
+                      : l10n.searchCustomPlace(
+                          customLabel ?? l10n.otherPlaceLabel),
+              hint: type == 'home'
+                  ? l10n.homeSearchHint
+                  : type == 'school'
+                      ? l10n.schoolSearchHint
+                      : l10n.customSearchHint,
+            ),
+          );
     if (selected == null || !mounted) return;
 
     final radius = type == 'home'
@@ -330,163 +351,197 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
       });
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Disimpan: $displayName')),
+        SnackBar(content: Text(l10n.placeSavedSnack(displayName))),
       );
       await _reloadForSelected();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal simpan tempat: $e')),
+        SnackBar(content: Text(l10n.failedSavePlace('$e'))),
       );
     }
   }
 
-  Future<void> _addCustomPlace() async {
-    final labelCtrl = TextEditingController();
-    const presets = <String>[
-      'Tempat les',
-      'Rumah nenek',
-      'Teman',
-      'Mall / tempat main',
-      'Tempat baru',
-    ];
-
-    final chosen = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 16,
-            right: 16,
-            top: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Tambah tempat aman',
-                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Pilih jenis, atau tulis sendiri. Lalu cari alamatnya.',
-                style: TextStyle(color: AppColors.inkSoft, height: 1.35),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final p in presets)
-                    ActionChip(
-                      label: Text(p),
-                      onPressed: () => Navigator.pop(ctx, p),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: labelCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Atau tulis nama sendiri',
-                  hintText: 'Contoh: Les piano Blok M',
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () {
-                  final t = labelCtrl.text.trim();
-                  Navigator.pop(ctx, t.isEmpty ? 'Tempat lain' : t);
-                },
-                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-                child: const Text('Lanjut cari alamat'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (chosen == null || !mounted) return;
-    await _addBySearch('custom', customLabel: chosen);
-  }
-
+  /// Single add-place entry (replaces the short Home/School/Other list).
+  /// Offers missing home/school chips plus custom presets, then address search.
   Future<void> _showAddMenu() async {
     final child = _selected;
     if (child == null) return;
-    final choice = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.home_rounded, color: AppColors.teal),
-              title: const Text('Rumah'),
-              onTap: () => Navigator.pop(ctx, 'home'),
+    await _openAddPlaceSheet();
+  }
+
+  Future<void> _openAddPlaceSheet() async {
+    final refresh = visualRefreshOf(context);
+    final missingHome = _zoneOf('home') == null;
+    final missingSchool = _zoneOf('school') == null;
+
+    // Sheet owns its TextEditingController so it is not disposed while the
+    // modal route is still animating out (that caused a red-screen assert).
+    final Future<_AddPlaceChoice?> sheet = refresh
+        ? showVrModalBottomSheet<_AddPlaceChoice>(
+            context: context,
+            builder: (ctx) => _AddPlaceSheet(
+              missingHome: missingHome,
+              missingSchool: missingSchool,
             ),
-            ListTile(
-              leading: const Icon(Icons.school_rounded, color: Color(0xFF3B82F6)),
-              title: const Text('Sekolah'),
-              onTap: () => Navigator.pop(ctx, 'school'),
+          )
+        : showModalBottomSheet<_AddPlaceChoice>(
+            context: context,
+            isScrollControlled: true,
+            builder: (ctx) => _AddPlaceSheet(
+              missingHome: missingHome,
+              missingSchool: missingSchool,
             ),
-            ListTile(
-              leading:
-                  const Icon(Icons.place_rounded, color: Color(0xFFF59E0B)),
-              title: const Text('Tempat lain'),
-              onTap: () => Navigator.pop(ctx, 'custom'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (choice == null || !mounted) return;
-    if (choice == 'custom') {
-      await _addCustomPlace();
+          );
+
+    final chosen = await sheet;
+    if (chosen == null || !mounted) return;
+    if (chosen.type == 'custom') {
+      await _addBySearch('custom', customLabel: chosen.customLabel);
     } else {
-      await _addBySearch(choice);
+      await _addBySearch(chosen.type);
     }
   }
 
   Future<void> _deleteZone(Map<String, dynamic> zone) async {
     final id = zone['id']?.toString();
     if (id == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Hapus tempat?'),
-        content: Text('Hapus "${_displayTitle(zone)}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal'),
+    final l10n = AppLocalizations.of(context);
+    final placeName = _displayTitle(zone, l10n);
+    final refresh = visualRefreshOf(context);
+    final bool? ok;
+    if (refresh) {
+      ok = await showDialog<bool>(
+        context: context,
+        barrierColor: VisualRefreshColors.anchor.withValues(alpha: 0.45),
+        builder: (ctx) => Dialog(
+          backgroundColor: VisualRefreshColors.surface,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
-            child: const Text('Hapus'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.deletePlaceTitle,
+                  style: GoogleFonts.fraunces(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 24,
+                    height: 1.25,
+                    color: VisualRefreshColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text.rich(
+                  TextSpan(
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                      color: VisualRefreshColors.textSecondary,
+                    ),
+                    children: [
+                      TextSpan(text: '${l10n.delete} "'),
+                      TextSpan(
+                        text: placeName,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 15,
+                          height: 1.45,
+                          fontWeight: FontWeight.w700,
+                          color: VisualRefreshColors.textPrimary,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '"? ${l10n.deletePlaceCascadeNote}',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: TextButton.styleFrom(
+                        foregroundColor: VisualRefreshColors.textPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      child: Text(
+                        l10n.cancel,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: VisualRefreshColors.danger,
+                        foregroundColor: VisualRefreshColors.background,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 22,
+                          vertical: 12,
+                        ),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        l10n.delete,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    } else {
+      ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.deletePlaceTitle),
+          content: Text(l10n.deletePlaceConfirm(placeName)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.coral),
+              child: Text(l10n.delete),
+            ),
+          ],
+        ),
+      );
+    }
     if (ok != true || !mounted) return;
     try {
       await ref.read(apiClientProvider).delete('/api/v1/zones/$id');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tempat dihapus')),
+        SnackBar(content: Text(l10n.placeDeletedSnack)),
       );
       await _reloadForSelected();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal hapus: $e')),
+        SnackBar(content: Text(l10n.failedDeletePlace('$e'))),
       );
     }
   }
@@ -603,7 +658,8 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
       );
       return;
     }
-    String? fromId = _zoneOf('school')?['id'] as String? ?? _zones.first['id'] as String?;
+    String? fromId =
+        _zoneOf('school')?['id'] as String? ?? _zones.first['id'] as String?;
     String? toId = _zoneOf('home')?['id'] as String?;
     if (toId == fromId) {
       for (final z in _zones) {
@@ -615,101 +671,175 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
       }
     }
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheet) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                16,
-                16,
-                16 + MediaQuery.of(ctx).viewInsets.bottom,
+    final refresh = visualRefreshOf(context);
+
+    Widget buildSheet(BuildContext ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final body = Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (refresh) ...[
+                const VrSheetDragHandle(),
+                const SizedBox(height: 16),
+                VrSheetTitle(l10n.tripCreateCta),
+              ] else
+                Text(
+                  l10n.tripCreateCta,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Text(
+                l10n.tripPickFrom.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: refresh
+                      ? VisualRefreshColors.textTertiary
+                      : AppColors.inkSoft,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    l10n.tripCreateCta,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(l10n.tripPickFrom, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  DropdownButton<String>(
-                    isExpanded: true,
-                    value: fromId,
-                    items: [
-                      for (final z in _zones)
-                        DropdownMenuItem(
-                          value: z['id'] as String,
-                          child: Text(
-                            _tripPlaceLabel(z),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (v) => setSheet(() => fromId = v),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(l10n.tripPickTo, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  DropdownButton<String>(
-                    isExpanded: true,
-                    value: toId,
-                    items: [
-                      for (final z in _zones)
-                        DropdownMenuItem(
-                          value: z['id'] as String,
-                          child: Text(
-                            _tripPlaceLabel(z),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (v) => setSheet(() => toId = v),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () async {
-                      if (fromId == null || toId == null) return;
-                      if (fromId == toId) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(l10n.tripNeedDistinct)),
-                        );
-                        return;
-                      }
-                      Navigator.of(ctx).pop();
-                      await _createTrip(
-                        fromZoneId: fromId!,
-                        toZoneId: toId!,
+              const SizedBox(height: 8),
+              _TripZoneDropdown(
+                value: fromId,
+                zones: _zones,
+                labelOf: (z) => _tripPlaceLabel(z, l10n),
+                onChanged: (v) => setSheet(() => fromId = v),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                l10n.tripPickTo.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                  color: refresh
+                      ? VisualRefreshColors.textTertiary
+                      : AppColors.inkSoft,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _TripZoneDropdown(
+                value: toId,
+                zones: _zones,
+                labelOf: (z) => _tripPlaceLabel(z, l10n),
+                onChanged: (v) => setSheet(() => toId = v),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: refresh ? 52 : null,
+                child: FilledButton(
+                  onPressed: () async {
+                    if (fromId == null || toId == null) return;
+                    if (fromId == toId) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(l10n.tripNeedDistinct)),
                       );
-                    },
-                    child: Text(l10n.tripCreate),
+                      return;
+                    }
+                    Navigator.of(ctx).pop();
+                    await _createTrip(
+                      fromZoneId: fromId!,
+                      toZoneId: toId!,
+                    );
+                  },
+                  style: refresh
+                      ? FilledButton.styleFrom(
+                          backgroundColor: VisualRefreshColors.anchor,
+                          foregroundColor: VisualRefreshColors.background,
+                          elevation: 0,
+                          shape: const StadiumBorder(),
+                        )
+                      : null,
+                  child: Text(
+                    l10n.tripCreate,
+                    style: refresh
+                        ? GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          )
+                        : null,
                   ),
-                  if (_zoneOf('home') != null && _zoneOf('school') != null) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: () async {
-                        Navigator.of(ctx).pop();
-                        await _suggestSchoolHome();
-                      },
-                      child: Text(l10n.tripSuggestSchoolHome),
-                    ),
-                  ],
-                ],
+                ),
               ),
+              if (_zoneOf('home') != null && _zoneOf('school') != null) ...[
+                const SizedBox(height: 10),
+                if (refresh)
+                  OutlinedButton(
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      await _suggestSchoolHome();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: VisualRefreshColors.textPrimary,
+                      side: const BorderSide(color: VisualRefreshColors.border),
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text(
+                      l10n.tripSuggestSchoolHome,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  )
+                else
+                  OutlinedButton(
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      await _suggestSchoolHome();
+                    },
+                    child: Text(l10n.tripSuggestSchoolHome),
+                  ),
+              ],
+            ],
+          );
+
+          if (refresh) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              ),
+              child: VrSheetShell(child: body),
             );
-          },
-        );
-      },
-    );
+          }
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: body,
+          );
+        },
+      );
+    }
+
+    if (refresh) {
+      await showVrModalBottomSheet<void>(
+        context: context,
+        builder: buildSheet,
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: buildSheet,
+      );
+    }
   }
 
   String _tripDistanceLabel() {
@@ -718,20 +848,20 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     return '${m.round()} m';
   }
 
-  String _tripEtaLabel() {
+  String _tripEtaLabel(AppLocalizations l10n) {
     final sec = (_trip?['durationSec'] as num?)?.toInt();
     if (sec != null && sec > 0) {
       final minutes = (sec / 60).round().clamp(1, 180);
-      return 'Estimasi $minutes menit';
+      return l10n.estimateMinutes(minutes);
     }
     final m = (_trip?['distanceM'] as num?)?.toDouble() ?? 0;
     final minutes = (m / 83.33).round().clamp(1, 180);
-    return 'Estimasi $minutes menit';
+    return l10n.estimateMinutes(minutes);
   }
 
   String _tripMeta(AppLocalizations l10n) {
     final status = _trip?['status'] as String?;
-    final base = l10n.tripProgressMeta(_tripDistanceLabel(), _tripEtaLabel());
+    final base = l10n.tripProgressMeta(_tripDistanceLabel(), _tripEtaLabel(l10n));
     if (status == 'planned') return '${l10n.tripPlanned} · $base';
     if (status == 'arrived') return '${l10n.tripArrived} · $base';
     if (status == 'active') return '${l10n.tripActive} · $base';
@@ -740,8 +870,10 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final children = ref.watch(childrenControllerProvider);
     final items = children.items;
+    final refresh = visualRefreshOf(context);
 
     if (widget.lockedChild == null && items.isNotEmpty) {
       final ids = items.map((c) => c.id).toSet();
@@ -755,7 +887,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
     }
 
     final selected = _selected;
-    final places = _orderedPlaces;
+    final places = _orderedPlaces(l10n);
     final home = _zoneOf('home');
     final school = _zoneOf('school');
     final missingSlots = <String>[
@@ -763,44 +895,73 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
       if (school == null) 'school',
     ];
 
+    final sectionTitleStyle = refresh
+        ? GoogleFonts.fraunces(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            letterSpacing: -0.2,
+            color: VisualRefreshColors.textPrimary,
+          )
+        : const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          );
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
+      backgroundColor:
+          refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
       body: SafeArea(
         child: RefreshIndicator(
-          color: AppColors.teal,
+          color: refresh ? VisualRefreshColors.accent : AppColors.teal,
           onRefresh: _reloadForSelected,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
             children: [
               PaScreenHeader(
-                title: 'Zona Aman',
-                subtitle: 'Rumah, sekolah, dan tempat sering dikunjungi',
+                title: l10n.zonesHubTitle,
+                subtitle: l10n.zonesHubSubtitle,
                 showBack: widget.showBack,
                 padding: EdgeInsets.zero,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                titleStyle: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.4,
-                  color: AppColors.ink,
-                ),
-                subtitleStyle: const TextStyle(
-                  color: AppColors.inkSoft,
+                titleStyle: refresh
+                    ? GoogleFonts.fraunces(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.4,
+                        color: VisualRefreshColors.textPrimary,
+                      )
+                    : const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                        color: AppColors.ink,
+                      ),
+                subtitleStyle: TextStyle(
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
                 trailing: Material(
-                  color: const Color(0xFFD8F5E8),
+                  color: refresh
+                      ? VisualRefreshColors.accentTint
+                      : const Color(0xFFD8F5E8),
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: selected == null ? null : _showAddMenu,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 42,
                       height: 42,
                       child: Icon(
                         Icons.add_rounded,
-                        color: AppColors.tealDeep,
+                        color: refresh
+                            ? VisualRefreshColors.accent
+                            : AppColors.tealDeep,
                       ),
                     ),
                   ),
@@ -810,45 +971,75 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
               TextField(
                 controller: _searchCtrl,
                 decoration: InputDecoration(
-                  hintText: 'Cari tempat...',
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintText: l10n.searchPlaceHint,
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: refresh
+                        ? VisualRefreshColors.textSecondary
+                        : null,
+                  ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor:
+                      refresh ? VisualRefreshColors.surface : Colors.white,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
-                    borderSide: BorderSide.none,
+                    borderSide: refresh
+                        ? const BorderSide(
+                            color: VisualRefreshColors.border,
+                            width: 0.5,
+                          )
+                        : BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
-                    borderSide: BorderSide.none,
+                    borderSide: refresh
+                        ? const BorderSide(
+                            color: VisualRefreshColors.border,
+                            width: 0.5,
+                          )
+                        : BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(999),
-                    borderSide: const BorderSide(color: AppColors.teal, width: 1.5),
+                    borderSide: BorderSide(
+                      color: refresh
+                          ? VisualRefreshColors.accent
+                          : AppColors.teal,
+                      width: 1.5,
+                    ),
                   ),
                 ),
               ),
               if (items.isEmpty) ...[
                 const SizedBox(height: 32),
                 Text(
-                  AppStrings.noChildren,
+                  l10n.noChildren,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.inkSoft),
+                  style: TextStyle(
+                    color: refresh
+                        ? VisualRefreshColors.textSecondary
+                        : AppColors.inkSoft,
+                  ),
                 ),
               ] else ...[
                 if (widget.lockedChild == null) ...[
                   const SizedBox(height: 18),
-                  const Text(
-                    'PILIH ANAK',
+                  Text(
+                    l10n.pickChildTitle.toUpperCase(),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.8,
-                      color: AppColors.inkSoft,
+                      color: refresh
+                          ? VisualRefreshColors.textTertiary
+                          : AppColors.inkSoft,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -878,26 +1069,32 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                     Expanded(
                       child: Text(
                         selected == null
-                            ? 'Tempat'
-                            : 'Tempat ${selected.name}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                        ),
+                            ? l10n.zoneGenericLabel
+                            : l10n.placesForChildLabel(selected.name),
+                        style: sectionTitleStyle,
                       ),
                     ),
                     TextButton(
                       onPressed: () =>
                           setState(() => _editMode = !_editMode),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.teal,
+                        foregroundColor: refresh
+                            ? VisualRefreshColors.accent
+                            : AppColors.teal,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: Text(
-                        _editMode ? 'Selesai' : 'Edit ›',
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        _editMode ? l10n.doneAction : l10n.editChevron,
+                        style: TextStyle(
+                          fontWeight: refresh
+                              ? FontWeight.w600
+                              : FontWeight.w800,
+                          fontFamily: refresh
+                              ? GoogleFonts.plusJakartaSans().fontFamily
+                              : null,
+                        ),
                       ),
                     ),
                   ],
@@ -913,14 +1110,16 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
-                      decoration: _cardDecoration,
+                      decoration: _cardDecoration(context),
                       child: Text(
                         _query.isEmpty
-                            ? 'Belum ada tempat. Tambah rumah atau sekolah.'
-                            : 'Tidak ada tempat yang cocok.',
+                            ? l10n.noPlacesYetAddHomeSchool
+                            : l10n.noPlacesMatch,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.inkSoft,
+                        style: TextStyle(
+                          color: refresh
+                              ? VisualRefreshColors.textSecondary
+                              : AppColors.inkSoft,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -931,8 +1130,8 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
                         child: _PlaceListCard(
-                          title: _displayTitle(z),
-                          subtitle: _displaySubtitle(z),
+                          title: _displayTitle(z, l10n),
+                          subtitle: _displaySubtitle(z, l10n),
                           type: type,
                           editMode: _editMode,
                           onTap: () {
@@ -953,10 +1152,10 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _PlaceListCard(
-                            title: isHome ? 'Rumah' : 'Sekolah',
-                            subtitle: isHome
-                                ? 'Belum diatur — ketuk untuk cari'
-                                : 'Belum diatur — ketuk untuk cari',
+                            title: isHome
+                                ? l10n.homePlaceLabel
+                                : l10n.schoolPlaceLabel,
+                            subtitle: l10n.notConfiguredTapSearch,
                             type: slot,
                             empty: true,
                             onTap: () => _addBySearch(slot),
@@ -966,26 +1165,26 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                   ],
                   const SizedBox(height: 18),
                   Text(
-                    AppLocalizations.of(context).tripSectionTitle,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    l10n.tripSectionTitle,
+                    style: sectionTitleStyle,
                   ),
                   const SizedBox(height: 10),
                   if (_tripLoading)
                     Container(
                       height: 96,
                       alignment: Alignment.center,
-                      decoration: _cardDecoration,
+                      decoration: _cardDecoration(context),
                       child: const CircularProgressIndicator(),
                     )
                   else if (_trip != null)
                     TripRouteCard(
-                      fromLabel: _trip!['fromLabel'] as String? ?? 'Dari',
-                      toLabel: _trip!['toLabel'] as String? ?? 'Ke',
-                      meta: _tripMeta(AppLocalizations.of(context)),
-                      progress: (_trip!['progress'] as num?)?.toDouble() ?? 0,
+                      fromLabel:
+                          _trip!['fromLabel'] as String? ?? l10n.tripPickFrom,
+                      toLabel:
+                          _trip!['toLabel'] as String? ?? l10n.tripPickTo,
+                      meta: _tripMeta(l10n),
+                      progress:
+                          (_trip!['progress'] as num?)?.toDouble() ?? 0,
                       status: _trip!['status'] as String?,
                       onStart: _trip!['status'] == 'planned'
                           ? () => unawaited(_startTrip())
@@ -994,29 +1193,47 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                     )
                   else
                     Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.transparent,
                       child: InkWell(
                         onTap: _openCreateTripSheet,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(
+                          refresh ? AppRadius.vrCard : 20,
+                        ),
                         child: Ink(
-                          decoration: _cardDecoration,
+                          decoration: _cardDecoration(context),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                const Icon(Icons.route_rounded, color: AppColors.teal),
+                                Icon(
+                                  Icons.route_rounded,
+                                  color: refresh
+                                      ? VisualRefreshColors.accent
+                                      : AppColors.teal,
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    AppLocalizations.of(context).tripCreateCta,
-                                    style: const TextStyle(
+                                    l10n.tripCreateCta,
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w800,
                                       fontSize: 15,
+                                      color: refresh
+                                          ? VisualRefreshColors.textPrimary
+                                          : null,
+                                      fontFamily: refresh
+                                          ? GoogleFonts.plusJakartaSans()
+                                              .fontFamily
+                                          : null,
                                     ),
                                   ),
                                 ),
-                                const Icon(Icons.chevron_right_rounded),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: refresh
+                                      ? VisualRefreshColors.textSecondary
+                                      : null,
+                                ),
                               ],
                             ),
                           ),
@@ -1026,7 +1243,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                 ],
                 const SizedBox(height: 18),
                 _DashedAddButton(
-                  label: 'Tambah tempat baru',
+                  label: l10n.addNewPlaceLabel,
                   onTap: selected == null ? () {} : _showAddMenu,
                 ),
               ],
@@ -1038,17 +1255,351 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
   }
 }
 
-final BoxDecoration _cardDecoration = BoxDecoration(
-  color: Colors.white,
-  borderRadius: BorderRadius.circular(18),
-  boxShadow: [
-    BoxShadow(
-      color: Colors.black.withValues(alpha: 0.06),
-      blurRadius: 16,
-      offset: const Offset(0, 6),
-    ),
-  ],
-);
+BoxDecoration _cardDecoration(BuildContext context) {
+  final refresh = visualRefreshOf(context);
+  if (refresh) {
+    return BoxDecoration(
+      color: VisualRefreshColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.vrCard),
+      border: Border.all(color: VisualRefreshColors.border, width: 0.5),
+    );
+  }
+  return BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(18),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.06),
+        blurRadius: 16,
+        offset: const Offset(0, 6),
+      ),
+    ],
+  );
+}
+
+class _AddPlaceChoice {
+  const _AddPlaceChoice({required this.type, this.customLabel});
+
+  final String type;
+  final String? customLabel;
+}
+
+/// Owns the label [TextEditingController] for the add-place sheet lifetime.
+class _AddPlaceSheet extends StatefulWidget {
+  const _AddPlaceSheet({
+    required this.missingHome,
+    required this.missingSchool,
+  });
+
+  final bool missingHome;
+  final bool missingSchool;
+
+  @override
+  State<_AddPlaceSheet> createState() => _AddPlaceSheetState();
+}
+
+class _AddPlaceSheetState extends State<_AddPlaceSheet> {
+  final _labelCtrl = TextEditingController();
+  String? _selectedPreset;
+  String? _selectedSlot; // 'home' | 'school' | null (custom)
+
+  @override
+  void dispose() {
+    _labelCtrl.dispose();
+    super.dispose();
+  }
+
+  void _selectPreset(String p) {
+    setState(() {
+      _selectedPreset = p;
+      _selectedSlot = null;
+      _labelCtrl.text = p;
+      _labelCtrl.selection = TextSelection.collapsed(offset: p.length);
+    });
+  }
+
+  void _selectSlot(String slot, String label) {
+    setState(() {
+      _selectedSlot = slot;
+      _selectedPreset = null;
+      _labelCtrl.text = label;
+      _labelCtrl.selection = TextSelection.collapsed(offset: label.length);
+    });
+  }
+
+  void _continue(AppLocalizations l10n) {
+    if (_selectedSlot == 'home' || _selectedSlot == 'school') {
+      Navigator.pop(context, _AddPlaceChoice(type: _selectedSlot!));
+      return;
+    }
+    final t = _labelCtrl.text.trim();
+    Navigator.pop(
+      context,
+      _AddPlaceChoice(
+        type: 'custom',
+        customLabel: t.isEmpty ? l10n.otherPlaceLabel : t,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final customPresets = <String>[
+      l10n.placeLessonSuggestion,
+      l10n.placeGrandmaSuggestion,
+      l10n.placeFriendSuggestion,
+      l10n.placeMallSuggestion,
+      l10n.newPlaceDefault,
+    ];
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (refresh) ...[
+          const VrSheetDragHandle(),
+          const SizedBox(height: 16),
+          VrSheetTitle(l10n.addSafePlaceTitle),
+          const SizedBox(height: 6),
+          VrSheetBody(l10n.customPlaceDialogHint),
+        ] else ...[
+          Text(
+            l10n.addSafePlaceTitle,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.customPlaceDialogHint,
+            style: const TextStyle(
+              color: AppColors.inkSoft,
+              height: 1.35,
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (widget.missingHome)
+              _AddPlacePresetChip(
+                label: l10n.homeZone,
+                selected: _selectedSlot == 'home',
+                onTap: () => _selectSlot('home', l10n.homeZone),
+              ),
+            if (widget.missingSchool)
+              _AddPlacePresetChip(
+                label: l10n.schoolZone,
+                selected: _selectedSlot == 'school',
+                onTap: () => _selectSlot('school', l10n.schoolZone),
+              ),
+            for (final p in customPresets)
+              _AddPlacePresetChip(
+                label: p,
+                selected: _selectedPreset == p && _selectedSlot == null,
+                onTap: () => _selectPreset(p),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _labelCtrl,
+          textCapitalization: TextCapitalization.words,
+          onChanged: (_) {
+            setState(() {
+              _selectedPreset = null;
+              _selectedSlot = null;
+            });
+          },
+          decoration: InputDecoration(
+            labelText: l10n.orTypeOwnNameLabel,
+            hintText: l10n.customPlaceHint,
+            filled: refresh,
+            fillColor: refresh ? VisualRefreshColors.surface : null,
+            enabledBorder: refresh
+                ? OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.border,
+                    ),
+                  )
+                : null,
+            focusedBorder: refresh
+                ? OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.accent,
+                      width: 1.5,
+                    ),
+                  )
+                : null,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: refresh ? 52 : null,
+          child: FilledButton(
+            onPressed: () => _continue(l10n),
+            style: FilledButton.styleFrom(
+              backgroundColor:
+                  refresh ? VisualRefreshColors.anchor : AppColors.teal,
+              foregroundColor:
+                  refresh ? VisualRefreshColors.background : null,
+              elevation: 0,
+              shape: refresh ? const StadiumBorder() : null,
+            ),
+            child: Text(
+              l10n.continueSearchAddress,
+              style: refresh
+                  ? GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (refresh) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: VrSheetShell(child: content),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: content,
+    );
+  }
+}
+
+class _AddPlacePresetChip extends StatelessWidget {
+  const _AddPlacePresetChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    if (!refresh) {
+      return ActionChip(
+        label: Text(label),
+        onPressed: onTap,
+        backgroundColor: selected ? AppColors.mint : null,
+      );
+    }
+    return Material(
+      color: selected
+          ? VisualRefreshColors.accentTint
+          : VisualRefreshColors.surface,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(
+              color: selected
+                  ? VisualRefreshColors.accent
+                  : VisualRefreshColors.border,
+              width: selected ? 1.2 : 0.5,
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: selected
+                  ? VisualRefreshColors.accent
+                  : VisualRefreshColors.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TripZoneDropdown extends StatelessWidget {
+  const _TripZoneDropdown({
+    required this.value,
+    required this.zones,
+    required this.labelOf,
+    required this.onChanged,
+  });
+
+  final String? value;
+  final List<Map<String, dynamic>> zones;
+  final String Function(Map<String, dynamic>) labelOf;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    final dropdown = DropdownButton<String>(
+      isExpanded: true,
+      value: value,
+      underline: refresh ? const SizedBox.shrink() : null,
+      icon: Icon(
+        Icons.expand_more_rounded,
+        color: refresh
+            ? VisualRefreshColors.textSecondary
+            : AppColors.inkSoft,
+      ),
+      items: [
+        for (final z in zones)
+          DropdownMenuItem(
+            value: z['id'] as String,
+            child: Text(
+              labelOf(z),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: refresh
+                  ? GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: VisualRefreshColors.textPrimary,
+                    )
+                  : null,
+            ),
+          ),
+      ],
+      onChanged: onChanged,
+    );
+    if (!refresh) return dropdown;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: VisualRefreshColors.border, width: 0.5),
+      ),
+      child: dropdown,
+    );
+  }
+}
 
 class _ChildChip extends StatelessWidget {
   const _ChildChip({
@@ -1065,8 +1616,17 @@ class _ChildChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    final selectedFill =
+        refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
+    final selectedFg =
+        refresh ? VisualRefreshColors.background : Colors.white;
+    final unselectedFg =
+        refresh ? VisualRefreshColors.anchor : AppColors.ink;
     return Material(
-      color: selected ? AppColors.tealDeep : Colors.white,
+      color: selected
+          ? selectedFill
+          : (refresh ? VisualRefreshColors.surface : Colors.white),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: onTap,
@@ -1077,7 +1637,12 @@ class _ChildChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: selected
                 ? null
-                : Border.all(color: const Color(0xFFE2E6EA)),
+                : Border.all(
+                    color: refresh
+                        ? VisualRefreshColors.border
+                        : const Color(0xFFE2E6EA),
+                    width: refresh ? 0.5 : 1,
+                  ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1089,7 +1654,10 @@ class _ChildChip extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 13.5,
-                  color: selected ? Colors.white : AppColors.ink,
+                  color: selected ? selectedFg : unselectedFg,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
                 ),
               ),
             ],
@@ -1119,7 +1687,17 @@ class _PlaceListCard extends StatelessWidget {
   final bool empty;
   final VoidCallback? onDelete;
 
-  Color get _iconBg {
+  Color _iconBg(bool refresh) {
+    if (refresh) {
+      switch (type) {
+        case 'home':
+          return VisualRefreshColors.accentTint;
+        case 'school':
+          return VisualRefreshColors.tagMuted;
+        default:
+          return VisualRefreshColors.routeTint;
+      }
+    }
     switch (type) {
       case 'home':
         return const Color(0xFFD8F5E8);
@@ -1130,7 +1708,17 @@ class _PlaceListCard extends StatelessWidget {
     }
   }
 
-  Color get _iconFg {
+  Color _iconFg(bool refresh) {
+    if (refresh) {
+      switch (type) {
+        case 'home':
+          return VisualRefreshColors.accent;
+        case 'school':
+          return VisualRefreshColors.anchor;
+        default:
+          return VisualRefreshColors.routeText;
+      }
+    }
     switch (type) {
       case 'home':
         return AppColors.tealDeep;
@@ -1156,13 +1744,16 @@ class _PlaceListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final radius = refresh ? AppRadius.vrCard : 18.0;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(radius),
         child: Ink(
-          decoration: _cardDecoration,
+          decoration: _cardDecoration(context),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
             child: Row(
@@ -1171,10 +1762,10 @@ class _PlaceListCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: _iconBg,
+                    color: _iconBg(refresh),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(_icon, color: _iconFg, size: 26),
+                  child: Icon(_icon, color: _iconFg(refresh), size: 26),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1186,7 +1777,16 @@ class _PlaceListCard extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
-                          color: empty ? AppColors.inkSoft : AppColors.ink,
+                          color: empty
+                              ? (refresh
+                                  ? VisualRefreshColors.textSecondary
+                                  : AppColors.inkSoft)
+                              : (refresh
+                                  ? VisualRefreshColors.textPrimary
+                                  : AppColors.ink),
+                          fontFamily: refresh
+                              ? GoogleFonts.plusJakartaSans().fontFamily
+                              : null,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -1194,10 +1794,15 @@ class _PlaceListCard extends StatelessWidget {
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.inkSoft,
+                        style: TextStyle(
+                          color: refresh
+                              ? VisualRefreshColors.textSecondary
+                              : AppColors.inkSoft,
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
+                          fontFamily: refresh
+                              ? GoogleFonts.plusJakartaSans().fontFamily
+                              : null,
                         ),
                       ),
                     ],
@@ -1206,8 +1811,12 @@ class _PlaceListCard extends StatelessWidget {
                 if (editMode && onDelete != null)
                   IconButton(
                     onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline_rounded,
-                        color: AppColors.coral),
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      color: refresh
+                          ? VisualRefreshColors.danger
+                          : AppColors.coral,
+                    ),
                   )
                 else if (!empty) ...[
                   Container(
@@ -1217,26 +1826,41 @@ class _PlaceListCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: _isRouteTag
-                          ? const Color(0xFFFFE8C8)
-                          : const Color(0xFFD8F5E8),
+                          ? (refresh
+                              ? VisualRefreshColors.routeTint
+                              : const Color(0xFFFFE8C8))
+                          : (refresh
+                              ? VisualRefreshColors.accentTint
+                              : const Color(0xFFD8F5E8)),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      _isRouteTag ? 'RUTE' : 'AMAN',
+                      _isRouteTag
+                          ? l10n.routeBadge
+                          : l10n.safeLegendLabel.toUpperCase(),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.3,
                         color: _isRouteTag
-                            ? const Color(0xFFB45309)
-                            : AppColors.tealDeep,
+                            ? (refresh
+                                ? VisualRefreshColors.routeText
+                                : const Color(0xFFB45309))
+                            : (refresh
+                                ? VisualRefreshColors.accent
+                                : AppColors.tealDeep),
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
                       ),
                     ),
                   ),
                   const SizedBox(width: 2),
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
-                    color: AppColors.inkSoft,
+                    color: refresh
+                        ? VisualRefreshColors.textSecondary
+                        : AppColors.inkSoft,
                   ),
                 ],
               ],
@@ -1256,16 +1880,25 @@ class _DashedAddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    final fill = refresh
+        ? VisualRefreshColors.accentTint
+        : const Color(0xFFE8F6F1);
+    final dash = refresh
+        ? VisualRefreshColors.dashedAction
+        : AppColors.teal.withValues(alpha: 0.55);
+    final fg = refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
+    final radius = refresh ? AppRadius.pill : 16.0;
     return Material(
-      color: const Color(0xFFE8F6F1),
-      borderRadius: BorderRadius.circular(16),
+      color: fill,
+      borderRadius: BorderRadius.circular(radius),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(radius),
         child: CustomPaint(
           painter: _DashedBorderPainter(
-            color: AppColors.teal.withValues(alpha: 0.55),
-            radius: 16,
+            color: dash,
+            radius: radius,
           ),
           child: SizedBox(
             height: 54,
@@ -1273,14 +1906,17 @@ class _DashedAddButton extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.add_rounded, color: AppColors.tealDeep),
+                Icon(Icons.add_rounded, color: fg),
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
-                    color: AppColors.tealDeep,
+                    color: fg,
+                    fontFamily: refresh
+                        ? GoogleFonts.plusJakartaSans().fontFamily
+                        : null,
                   ),
                 ),
               ],
@@ -1392,9 +2028,10 @@ class PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
       });
     } catch (e) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
       final raw = e.toString();
       String msg =
-          'Pencarian gagal. Key Google Maps di server belum bisa dipakai untuk cari tempat.';
+          'Pencarian gagal. Key Google Maps di server belum bisa dipakai untuk cari lokasi.';
       if (raw.contains('maps_key_missing')) {
         msg = 'GOOGLE_MAPS_API_KEY belum diisi di Render.';
       } else if (raw.contains('maps_key_restricted') ||
@@ -1402,7 +2039,7 @@ class PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
           raw.contains('REQUEST_DENIED')) {
         msg =
             'Key Maps di server diblokir Google (biasanya key khusus Android). '
-            'Perlu key server terpisah: aktifkan Places API + Geocoding.';
+            '${l10n.placesApiKeyHint}';
       }
       setState(() {
         _loading = false;
@@ -1415,13 +2052,15 @@ class PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.72,
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
+    final refresh = visualRefreshOf(context);
+    final sheet = SizedBox(
+      height: MediaQuery.of(context).size.height * 0.72,
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          if (refresh)
+            const VrSheetDragHandle()
+          else
             Container(
               width: 40,
               height: 4,
@@ -1430,67 +2069,156 @@ class PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  widget.title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-              ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              refresh ? 24 : 16,
+              refresh ? 16 : 16,
+              refresh ? 24 : 16,
+              8,
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: _ctrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: widget.hint,
-                  prefixIcon: const Icon(Icons.search),
-                  border: const OutlineInputBorder(),
-                ),
-                onChanged: _onQueryChanged,
-              ),
-            ),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: LinearProgressIndicator(),
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: AppColors.inkSoft),
-                ),
-              ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _hits.length,
-                itemBuilder: (context, index) {
-                  final hit = _hits[index];
-                  return ListTile(
-                    leading: const Icon(
-                      Icons.place_outlined,
-                      color: AppColors.teal,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: refresh
+                  ? VrSheetTitle(widget.title)
+                  : Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
-                    title: Text(
-                      hit.name,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    subtitle: Text(hit.address),
-                    onTap: () => Navigator.pop(context, hit),
-                  );
-                },
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: refresh ? 24 : 16),
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: widget.hint,
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: refresh ? VisualRefreshColors.accent : null,
+                ),
+                filled: refresh,
+                fillColor: refresh ? VisualRefreshColors.surface : null,
+                border: refresh
+                    ? OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: VisualRefreshColors.border,
+                        ),
+                      )
+                    : const OutlineInputBorder(),
+                enabledBorder: refresh
+                    ? OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(
+                          color: VisualRefreshColors.border,
+                        ),
+                      )
+                    : null,
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(refresh ? 14 : 4),
+                  borderSide: BorderSide(
+                    color: refresh
+                        ? VisualRefreshColors.accent
+                        : AppColors.teal,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              onChanged: _onQueryChanged,
+            ),
+          ),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: LinearProgressIndicator(),
+            ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                _error!,
+                style: TextStyle(
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
+                ),
               ),
             ),
-          ],
-        ),
+          Expanded(
+            child: ListView.separated(
+              itemCount: _hits.length,
+              separatorBuilder: (_, __) => refresh
+                  ? const Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      indent: 24,
+                      endIndent: 24,
+                      color: VisualRefreshColors.border,
+                    )
+                  : const SizedBox.shrink(),
+              itemBuilder: (context, index) {
+                final hit = _hits[index];
+                return ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: refresh ? 24 : 16,
+                  ),
+                  leading: Icon(
+                    Icons.place_outlined,
+                    color: refresh
+                        ? VisualRefreshColors.accent
+                        : AppColors.teal,
+                  ),
+                  title: Text(
+                    hit.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: refresh
+                          ? VisualRefreshColors.textPrimary
+                          : null,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
+                  ),
+                  subtitle: Text(
+                    hit.address,
+                    style: TextStyle(
+                      color: refresh
+                          ? VisualRefreshColors.textSecondary
+                          : null,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(context, hit),
+                );
+              },
+            ),
+          ),
+        ],
       ),
+    );
+
+    if (refresh) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: VisualRefreshColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            boxShadow: [VisualRefreshColors.dialogShadow],
+          ),
+          child: sheet,
+        ),
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: sheet,
     );
   }
 }

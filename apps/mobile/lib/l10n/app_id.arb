@@ -11,7 +11,9 @@
   "homeByGraceHint": "{minutes} menit setelah jam pulang",
   "@homeByGraceHint": {
     "placeholders": {
-      "minutes": { "type": "int" }
+      "minutes": {
+        "type": "int"
+      }
     }
   },
   "homeByWeekendTitle": "Akhir pekan",
@@ -31,7 +33,9 @@
   "homeByTargetTime": "Jam pulang {time}",
   "@homeByTargetTime": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
   "homeByOnceHomeNote": "Setelah anak tiba di rumah, pantauan hari ini selesai meski anak keluar lagi.",
@@ -39,17 +43,24 @@
   "homeBySaved": "Pengaturan jam pulang disimpan",
   "homeBySeeAll": "Lihat semua",
   "homeBySummaryOff": "Belum diaktifkan",
-  "homeBySummaryMaghrib": "Ikuti Maghrib · {status}",
+  "homeBySummaryNotTurnedOn": "Belum dinyalakan",
+  "homeBySummaryMaghrib": "Mode Maghrib dipilih · {status}",
   "@homeBySummaryMaghrib": {
     "placeholders": {
-      "status": { "type": "String" }
+      "status": {
+        "type": "String"
+      }
     }
   },
   "homeBySummaryCustom": "Jam {time} · {status}",
   "@homeBySummaryCustom": {
     "placeholders": {
-      "time": { "type": "String" },
-      "status": { "type": "String" }
+      "time": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
     }
   },
   "homeByChildAckButton": "Aku otw pulang",
@@ -73,7 +84,7 @@
   "tripActive": "Dalam perjalanan",
   "tripPlanned": "Direncanakan",
   "tripArrived": "Sudah sampai",
-  "tripNeedTwoPlaces": "Tambah minimal dua tempat dulu",
+  "tripNeedTwoPlaces": "Tambah minimal dua lokasi dulu",
   "tripNeedDistinct": "Asal dan tujuan harus berbeda",
   "tripCreated": "Rute aman dibuat",
   "tripChildStart": "Mulai perjalanan",
@@ -81,23 +92,31 @@
   "tripChildActiveTo": "Menuju {place}",
   "@tripChildActiveTo": {
     "placeholders": {
-      "place": { "type": "String" }
+      "place": {
+        "type": "String"
+      }
     }
   },
   "tripChildCancel": "Batalkan perjalanan",
   "tripProgressMeta": "{distance} · {eta}",
   "@tripProgressMeta": {
     "placeholders": {
-      "distance": { "type": "String" },
-      "eta": { "type": "String" }
+      "distance": {
+        "type": "String"
+      },
+      "eta": {
+        "type": "String"
+      }
     }
   },
   "empTitle": "Titik Kumpul Darurat",
-  "empSubtitle": "Tempat bertemu saat kondisi darurat",
+  "empSubtitle": "Lokasi bertemu saat kondisi darurat",
   "empEmpty": "Belum ada titik kumpul untuk {childName}",
   "@empEmpty": {
     "placeholders": {
-      "childName": { "type": "String" }
+      "childName": {
+        "type": "String"
+      }
     }
   },
   "empEmptyGeneric": "Belum ada titik kumpul",
@@ -109,7 +128,7 @@
   "empPrimary": "Utama",
   "empBackup": "Cadangan",
   "empInstructionsHint": "Contoh: Kalau kondisi darurat dan gak bisa saling hubungi, ketemu di sini",
-  "empNameHint": "Nama tempat (mis. Rumah Nenek)",
+  "empNameHint": "Nama lokasi (mis. Rumah Nenek)",
   "empSave": "Simpan",
   "empDelete": "Hapus",
   "empDeleteConfirm": "Hapus titik kumpul untuk semua anak?",
@@ -122,22 +141,29 @@
   "empActivateNoteHint": "Catatan singkat (opsional)",
   "empActivateContinue": "Aktifkan sekarang",
   "empActivateCancel": "Batal",
+  "listAnd": "dan",
   "empActivateCaption": "Berlaku untuk {names}, juga wali mereka",
   "@empActivateCaption": {
     "placeholders": {
-      "names": { "type": "String" }
+      "names": {
+        "type": "String"
+      }
     }
   },
   "empSummarySent": "Terkirim ke {count} anak",
   "@empSummarySent": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "empSummarySkipped": "{childName} belum punya titik kumpul",
   "@empSummarySkipped": {
     "placeholders": {
-      "childName": { "type": "String" }
+      "childName": {
+        "type": "String"
+      }
     }
   },
   "empRateLimited": "Aktivasi dibatasi — coba lagi nanti",
@@ -146,34 +172,46 @@
   "empDistanceLive": "{childName} sekarang {distance} dari sini",
   "@empDistanceLive": {
     "placeholders": {
-      "childName": { "type": "String" },
-      "distance": { "type": "String" }
+      "childName": {
+        "type": "String"
+      },
+      "distance": {
+        "type": "String"
+      }
     }
   },
   "empDistanceFromChild": "Jarak anak: {distance}",
   "@empDistanceFromChild": {
     "placeholders": {
-      "distance": { "type": "String" }
+      "distance": {
+        "type": "String"
+      }
     }
   },
   "empAlertTitle": "Titik Kumpul Darurat",
   "empAlertBody": "Segera menuju {place}",
   "@empAlertBody": {
     "placeholders": {
-      "place": { "type": "String" }
+      "place": {
+        "type": "String"
+      }
     }
   },
   "empMyDistance": "Jarakmu: {distance}",
   "@empMyDistance": {
     "placeholders": {
-      "distance": { "type": "String" }
+      "distance": {
+        "type": "String"
+      }
     }
   },
   "empActiveTitle": "Titik kumpul sedang aktif",
   "empActiveSince": "Diaktifkan {time}",
   "@empActiveSince": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
   "empArrived": "Sudah sampai",
@@ -186,5 +224,1314 @@
   "empDeactivated": "Titik kumpul dinonaktifkan",
   "empMenuHint": "Titik bertemu saat darurat",
   "empPickPlace": "Cari lokasi titik kumpul",
-  "empNoChildren": "Belum ada anak terhubung"
+  "empNoChildren": "Belum ada anak terhubung",
+  "settingsSectionApp": "Aplikasi",
+  "settingsSectionAccount": "Akun",
+  "settingsLanguage": "Bahasa",
+  "settingsLanguageHint": "Pilih bahasa tampilan aplikasi",
+  "settingsLanguageId": "Bahasa Indonesia",
+  "settingsLanguageEn": "English",
+  "settingsAbout": "Tentang",
+  "settingsAboutHint": "Bagikan, nilai, dan info aplikasi",
+  "settingsVersion": "Versi",
+  "settingsVersionValue": "{version} ({build})",
+  "@settingsVersionValue": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsShare": "Bagikan aplikasi ini",
+  "settingsShareHint": "Ajak keluarga mencoba PulangAman",
+  "settingsShareMessage": "Coba PulangAman — jaringan keselamatan untuk orang tua dan anak.\nhttps://www.tursinalabs.com",
+  "settingsRate": "Nilai aplikasi ini",
+  "settingsRateHint": "Tulis ulasan di Google Play",
+  "settingsPrivacy": "Kebijakan Privasi",
+  "settingsPrivacyHint": "Baca kebijakan privasi kami",
+  "settingsTerms": "Syarat & Ketentuan",
+  "settingsTermsHint": "Baca syarat penggunaan kami",
+  "settingsNotifications": "Notifikasi",
+  "settingsNotificationsHint": "Kabar, SOS, dan zona aman",
+  "brand": "Pulang Aman",
+  "tagline": "Pulang dengan tenang, sampai dengan aman.",
+  "roleParent": "Saya orang tua",
+  "roleChild": "Saya anak",
+  "roleGuardian": "Saya wali terpercaya",
+  "roleLabel": "Peran",
+  "roleParentShort": "Orang Tua",
+  "roleChildShort": "Anak",
+  "roleGuardianShort": "Wali",
+  "continueLabel": "Lanjut",
+  "loginTitle": "Masuk",
+  "phoneLabel": "Nomor telepon",
+  "nameLabel": "Nama",
+  "nameHint": "Masukkan nama lengkap",
+  "phoneHint": "+62812...",
+  "loginAction": "Masuk",
+  "otpLabel": "Kode OTP",
+  "otpHint": "6 digit dari SMS",
+  "otpSentHint": "Kode verifikasi dikirim ke nomor Anda",
+  "verifyOtpAction": "Verifikasi",
+  "otpVerifyingHint": "Memverifikasi kode. Mohon tunggu sebentar.",
+  "otpSendingHint": "Mengirim kode verifikasi. Mohon tunggu…",
+  "resendOtp": "Kirim ulang kode",
+  "changeNumber": "Ubah nomor",
+  "sendOtpAction": "Kirim kode OTP",
+  "inviteCodeHintChild": "Minta kode 6 digit dari orang tua",
+  "connecting": "Menghubungkan...",
+  "sending": "Mengirim...",
+  "featureCheckIn": "Check-in",
+  "featureRewards": "Hadiah",
+  "featureScreenTime": "Waktu Layar",
+  "childrenTitle": "Anak saya",
+  "addChild": "Undang anak",
+  "inviteCodeLabel": "Kode undangan",
+  "createInvite": "Buat kode undangan",
+  "inviteShareHint": "Bagikan kode ini ke HP anak. Berlaku 24 jam.",
+  "liveMap": "Peta langsung",
+  "zonesTitle": "Zona Aman",
+  "guardiansTitle": "Wali terpercaya",
+  "panicButton": "TOMBOL PANIK",
+  "panicConfirm": "Ketuk 3 kali untuk mengirim peringatan",
+  "panicHoldConfirm": "Tekan & tahan 3 detik untuk kirim peringatan",
+  "panicSent": "Peringatan panik terkirim",
+  "trackingOn": "Pelacakan aktif",
+  "trackingOff": "Pelacakan berhenti",
+  "staleLocation": "Lokasi anak tidak diperbarui",
+  "ackAlert": "Saya sudah merespons",
+  "resolveAlert": "Selesai / aman",
+  "inviteGuardian": "Undang wali",
+  "acceptInvite": "Terima undangan",
+  "shareLocation": "Bagikan lokasi saya",
+  "needBackup": "Butuh bantuan cadangan",
+  "guardianGuidance": "Hubungi orang tua atau layanan darurat. Jangan mengejar orang asing.",
+  "offlineQueued": "Tersimpan offline — akan dikirim saat online",
+  "homeZone": "Rumah",
+  "schoolZone": "Sekolah",
+  "save": "Simpan",
+  "logout": "Keluar",
+  "cancel": "Batal",
+  "emergencyContacts": "Kontak darurat",
+  "noChildren": "Belum ada anak terhubung",
+  "noInvites": "Tidak ada undangan",
+  "activeAlerts": "Peringatan aktif",
+  "mapKeyMissing": "Peta Google belum dikonfigurasi. Tambahkan GOOGLE_MAPS_API_KEY di android/local.properties lalu rebuild.",
+  "lastKnownCoords": "Koordinat terakhir",
+  "childTabHome": "Beranda",
+  "childTabScreen": "Layar",
+  "childTabMessages": "Kabar",
+  "childMessageSent": "Kabar terkirim",
+  "childMessageFailed": "Gagal mengirim kabar. Coba lagi.",
+  "errorWithDetail": "Gagal: {error}",
+  "@errorWithDetail": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "panicAckedByParent": "Orang tua sudah merespons panik",
+  "panicResolvedSafe": "Panik ditandai selesai / aman",
+  "panicConfirmCount": "Ketuk 3 kali untuk mengirim peringatan ({count}/3)",
+  "@panicConfirmCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "panicSendFailedRetrying": "Gagal kirim panik. Dicoba lagi otomatis.",
+  "smsFallbackPanicBody": "PulangAman PANIK — butuh bantuan sekarang.",
+  "empDefaultPlaceName": "Titik kumpul",
+  "empAlertBodyWithNote": "{note} — menuju {place}",
+  "@empAlertBodyWithNote": {
+    "placeholders": {
+      "note": {
+        "type": "String"
+      },
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "empAlertBodyPlain": "Segera menuju titik kumpul: {place}",
+  "@empAlertBodyPlain": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "homeByPreviewTitle": "Waktunya pulang",
+  "homeByPreviewBody": "{name}, sebentar lagi waktu pulang ya",
+  "@homeByPreviewBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "greetingDefaultName": "Sahabat",
+  "homeByDefaultChildName": "Anak",
+  "tripNotEnoughPlaces": "Belum ada cukup lokasi tersimpan",
+  "zoneGenericLabel": "Lokasi",
+  "startAction": "Mulai",
+  "tripArrivedNotified": "Tiba di {place} — ortu sudah diberitahu",
+  "@tripArrivedNotified": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "destinationFallback": "tujuan",
+  "locationSendFailed": "Gagal kirim lokasi",
+  "locationPermissionDenied": "Izin lokasi ditolak",
+  "sessionNotReady": "Sesi belum siap",
+  "allowExactAlarmMessage": "Izinkan alarm tepat waktu agar pengingat ortu muncul.",
+  "openAction": "Buka",
+  "trackingOnNeedsAlways": "Lokasi aktif — izinkan \"Selalu\" agar tetap jalan di background",
+  "refreshTooltip": "Segarkan (kirim daftar app & aturan)",
+  "refreshSentWithApps": "Lokasi & daftar app dikirim ke ortu",
+  "refreshSentNoApps": "Lokasi dikirim. Daftar app kosong — cek izin Usage Access.",
+  "logoutConfirmTitle": "Keluar dari akun anak?",
+  "logoutConfirmBody": "Untuk masuk lagi, minta kode masuk ulang dari HP ortu.",
+  "childMessageSentWithLabel": "Kabar terkirim: {label}",
+  "@childMessageSentWithLabel": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "homeSubtitleTagline": "Tetap aman, kumpulkan poin, dan beri kabar keluarga.",
+  "pillLocationOn": "Lokasi aktif",
+  "pillLocationOff": "Lokasi mati",
+  "pointsStreakLabel": "{points} poin · {streak} hari",
+  "@pointsStreakLabel": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      },
+      "streak": {
+        "type": "int"
+      }
+    }
+  },
+  "screenRulesActive": "Aturan layar aktif",
+  "screenPermissionIncomplete": "Izin layar belum lengkap",
+  "alarmPermissionIncomplete": "Izin alarm belum lengkap",
+  "reminderActiveCount": "Pengingat aktif ({count})",
+  "@reminderActiveCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noRemindersYet": "Belum ada pengingat",
+  "sendingAlert": "Mengirim peringatan...",
+  "panicCooldownMessage": "Panik terkirim. Tunggu sebentar sebelum bisa dikirim lagi.",
+  "panicModeActiveWaiting": "Mode panik aktif — menunggu respons orang tua",
+  "enableScreenProtectionTitle": "Aktifkan perlindungan waktu layar",
+  "neverBlockedAppsNote": "PulangAman, Telepon, dan Pesan tidak pernah diblokir.",
+  "allowUsageAccess": "Izinkan akses pemakaian",
+  "enableAppBlocking": "Aktifkan pemblokiran aplikasi",
+  "restrictedSettingsHelp": "Tombolnya terkunci (\"Setelan dibatasi\")? Buka Info aplikasi, ketuk menu titik tiga di kanan atas, lalu pilih \"Izinkan setelan yang dibatasi\". Setelah itu coba lagi.",
+  "openAppInfo": "Buka Info aplikasi",
+  "empActiveNowLabel": "Darurat — segera ke sini",
+  "empFamilyMeetingPoint": "Titik kumpul keluarga",
+  "followParentInstructions": "Ikuti arahan orang tua",
+  "memorizeEmpPlace": "Hafalkan lokasi ini untuk kondisi darurat",
+  "tripArrivedAt": "Tiba di {place}",
+  "@tripArrivedAt": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "tripRouteReady": "Rute siap",
+  "tripGenericLabel": "Perjalanan",
+  "tripParentNotified": "Orang tua sudah diberi tahu",
+  "tripReadyToStart": "Siap dimulai",
+  "tripInProgress": "Sedang berjalan",
+  "tripChooseSafeDestination": "Pilih tujuan aman ke lokasi tersimpan",
+  "screenTimeToday": "Layar hari ini",
+  "yourPoints": "Poin kamu",
+  "kabarTitle": "Kabar ke ortu",
+  "kabarSubtitle": "Ketuk sekali — pesan langsung terkirim.",
+  "kabarInfoNote": "Pesan dikirim ke orang tua yang terhubung. Untuk darurat, gunakan tombol panik di Beranda.",
+  "kabarHeroTitle": "Kirim kabar cepat",
+  "kabarHeroSubtitle": "Tidak perlu mengetik. Pilih salah satu pesan di bawah.",
+  "presetAtSchoolLabel": "Sudah sampai sekolah",
+  "presetAtSchoolSubtitle": "Beri tahu ortu kamu sudah aman di sekolah",
+  "presetAtHomeLabel": "Sudah di rumah",
+  "presetAtHomeSubtitle": "Kabari kalau kamu sudah pulang",
+  "presetNeedHelpLabel": "Butuh bantuan",
+  "presetNeedHelpSubtitle": "Minta ortu segera menghubungi kamu",
+  "screenTimeTitle": "Waktu layar",
+  "screenTimeSubtitle": "Lihat berapa lama kamu main HP hari ini.",
+  "screenTimeOverTargetStatus": "{period} · lewat target",
+  "@screenTimeOverTargetStatus": {
+    "placeholders": {
+      "period": {
+        "type": "String"
+      }
+    }
+  },
+  "appsLabel": "Aplikasi",
+  "appCountLabel": "{count} app",
+  "@appCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "usageAccessInactiveTitle": "Akses pemakaian belum aktif",
+  "usageAccessInactiveBody": "Izinkan PulangAman melihat pemakaian layar agar statistik muncul di sini.",
+  "openPermissionSettings": "Buka pengaturan izin",
+  "totalLabel": "Total",
+  "targetLabel": "Target",
+  "noDataYet": "Belum ada data",
+  "useAsUsualStatsAppear": "Gunakan HP seperti biasa — statistik akan muncul di sini.",
+  "delete": "Hapus",
+  "add": "Tambah",
+  "understood": "Mengerti",
+  "editAction": "Ubah",
+  "retryAction": "Coba lagi",
+  "okAction": "OK",
+  "closeAction": "Tutup",
+  "viewAllAction": "Lihat semua ›",
+  "noChildrenTitle": "Belum ada anak",
+  "addChildFirstMessage": "Tambah anak dulu di tab Anak.",
+  "reloadTooltip": "Muat ulang",
+  "deleteFailedWithDetail": "Gagal hapus: {error}",
+  "@deleteFailedWithDetail": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "saveFailedWithDetail": "Gagal menyimpan: {error}",
+  "@saveFailedWithDetail": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "markAllReadAction": "Tandai semua dibaca",
+  "markReadAction": "Tandai dibaca",
+  "allFilterLabel": "Semua",
+  "parentFallbackName": "Orang tua",
+  "weekdayMonShort": "Sen",
+  "weekdayTueShort": "Sel",
+  "weekdayWedShort": "Rab",
+  "weekdayThuShort": "Kam",
+  "weekdayFriShort": "Jum",
+  "weekdaySatShort": "Sab",
+  "weekdaySunShort": "Min",
+  "durationHoursLabel": "{hours} jam",
+  "@durationHoursLabel": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutesLabel": "{minutes} menit",
+  "@durationMinutesLabel": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationHoursMinutesLabel": "{hours}j {minutes}m",
+  "@durationHoursMinutesLabel": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsAccountTitle": "Pengaturan Akun",
+  "parentAccountSubtitle": "Akun orang tua PulangAman",
+  "notificationsSheetTitle": "Notifikasi PulangAman",
+  "notificationsSheetBody": "Notifikasi dipakai untuk Kabar, SOS, dan zona aman. Atur izinnya di Pengaturan sistem HP (Aplikasi > PulangAman > Notifikasi).",
+  "remindersTitle": "Pengingat Jadwal",
+  "remindersLoadError": "Gagal memuat jadwal. Periksa koneksi, lalu coba lagi.",
+  "reminderPresetSaved": "Pengingat \"{title}\" disimpan.\nBuka PulangAman di HP anak supaya jadwal aktif.",
+  "@reminderPresetSaved": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderEditTitle": "Ubah pengingat",
+  "reminderCustomTitle": "Pengingat kustom",
+  "reminderTitleFieldLabel": "Judul",
+  "reminderMessageFieldLabel": "Pesan",
+  "reminderTimeQuestion": "Jam berapa?",
+  "reminderPickTimeHelp": "Pilih jam pengingat",
+  "reminderUseThisTime": "Pakai jam ini",
+  "reminderHourLabel": "Jam",
+  "reminderMinuteLabel": "Menit",
+  "reminderStyleFullscreen": "Layar penuh",
+  "reminderStyleNotification": "Notifikasi",
+  "reminderEveryDay": "Setiap hari",
+  "reminderSaveChanges": "Simpan perubahan",
+  "reminderTitleBodyRequired": "Judul dan pesan wajib diisi",
+  "reminderInfoBanner": "HP anak akan menampilkan pesan besar di jam tertentu. Anak cukup tekan “Mengerti” untuk menutup.",
+  "reminderNoChildrenMessage": "Hubungkan anak dulu sebelum membuat pengingat.",
+  "sectionForChild": "UNTUK ANAK",
+  "sectionQuickAdd": "TAMBAH CEPAT",
+  "reminderActiveScheduleTitle": "Jadwal Aktif",
+  "reminderAddShort": "+ Tambah",
+  "reminderEmptyMessage": "Belum ada pengingat. Pakai tambah cepat di atas.",
+  "reminderStudyChipLabel": "Belajar 19:00",
+  "reminderSleepChipLabel": "Tidur 21:00",
+  "reminderStudyPresetTitle": "Waktunya Belajar",
+  "reminderStudyPresetBody": "Sekarang jam belajar. Matikan game dulu ya.",
+  "reminderSleepPresetTitle": "Waktunya Tidur",
+  "reminderSleepPresetBody": "Sudah malam. Waktunya istirahat agar besok semangat.",
+  "parentHomeNoChildrenMessage": "Ketuk “Tambah anak” di bawah untuk buat kode, lalu masukkan di HP anak. Jika ganti cara masuk, pulihkan dulu dari nomor lama.",
+  "recoverChildrenButton": "Pulihkan anak dari nomor lama",
+  "childLocationSectionTitle": "Lokasi Anak",
+  "viewMapAction": "Lihat peta ›",
+  "todaySummaryTitle": "Ringkasan Hari Ini",
+  "placesVisitedLabel": "Lokasi dikunjungi",
+  "totalTripDistanceLabel": "Total perjalanan",
+  "pendingCodesTitle": "Kode menunggu",
+  "relinkReplaceConfirmBody": "Sudah ada kode menunggu untuk {name}. Buat kode baru? Kode lama tidak akan berlaku lagi.",
+  "@relinkReplaceConfirmBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "generateNewCodeAction": "Buat baru",
+  "recoverChildrenTitle": "Pulihkan anak",
+  "recoverChildrenPrompt": "Masukkan nomor yang dipakai akun orang tua sebelumnya.",
+  "oldPhoneNumberLabel": "Nomor lama",
+  "recoverAction": "Pulihkan",
+  "recoverChildrenSuccess": "Berhasil memulihkan {count} anak. Lalu buat kode masuk ulang di menu anak.",
+  "@recoverChildrenSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "recoverChildrenNone": "Tidak ada anak yang dipindahkan. Cek nomor lama.",
+  "recoverChildrenFailed": "Gagal memulihkan: {error}",
+  "@recoverChildrenFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "relinkCodeTitle": "Kode masuk ulang {name}",
+  "@relinkCodeTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "createCodeFailed": "Gagal buat kode: {error}",
+  "@createCodeFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "removeChildConfirmTitle": "Hapus {name}?",
+  "@removeChildConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeChildConfirmBody": "{name} akan dihapus dari daftar Anda. Berbagi lokasi berhenti sampai Anda menambahkannya lagi dengan kode masuk baru.",
+  "@removeChildConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "childRemoved": "{name} dihapus",
+  "@childRemoved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "addChildTitle": "Tambah anak",
+  "createCodeAction": "Buat kode",
+  "codeTitle": "Kode",
+  "tapToViewStatus": "Ketuk untuk lihat status",
+  "allChildrenArrived": "Semua anak sudah sampai",
+  "arrivedWaitingSummary": "{arrived}/{total} sudah sampai - menunggu {names}",
+  "@arrivedWaitingSummary": {
+    "placeholders": {
+      "arrived": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "empBannerActiveTitle": "Titik kumpul darurat aktif",
+  "childNeedsHelp": "{name} butuh bantuan",
+  "@childNeedsHelp": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "withTapDetail": "{time} · Tap untuk detail",
+  "@withTapDetail": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "navChildrenLabel": "Anak",
+  "navZonesLabel": "Zona",
+  "navMoreLabel": "Lainnya",
+  "moreScreenTitle": "Fitur Lainnya",
+  "moreScreenSubtitle": "Kelola pengaturan & tambahan",
+  "activeRemindersStatLabel": "Pengingat Aktif",
+  "totalPointsStatLabel": "Total Poin",
+  "sectionScheduleActivity": "JADWAL & AKTIVITAS",
+  "sectionSafety": "KEAMANAN",
+  "sectionSettings": "PENGATURAN",
+  "noPointsNoStreak": "0 poin · Belum ada streak",
+  "pointsCountLabel": "{points} poin",
+  "@pointsCountLabel": {
+    "placeholders": {
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "noGuardiansYet": "Belum ada wali",
+  "guardiansCountLabel": "{count} wali",
+  "@guardiansCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noReportsYet": "Belum ada laporan",
+  "reportsCountLabel": "{count} laporan",
+  "@reportsCountLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "emergencyMeetingMenuSubtitle": "Lokasi bertemu saat darurat",
+  "accountSettingsMenuSubtitle": "Notifikasi, privasi, keluar",
+  "allKabarMarkedRead": "Semua kabar ditandai sudah dibaca",
+  "kabarHistoryTitle": "Riwayat Kabar",
+  "noKabarYet": "Belum ada kabar",
+  "kabarSummaryUnread": "{unread} belum dibaca · {total} kabar · 24 jam terakhir",
+  "@kabarSummaryUnread": {
+    "placeholders": {
+      "unread": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "kabarSummaryAll": "{total} kabar · 24 jam terakhir",
+  "@kabarSummaryAll": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "noKabarForFilter": "Belum ada kabar untuk filter ini.",
+  "giveRewardTitle": "Kasih pujian",
+  "rewardReasonLabel": "Alasan (opsional)",
+  "rewardReasonHint": "Contoh: Rajin belajar hari ini",
+  "addFivePointsAction": "Tambah +5",
+  "defaultPraiseReason": "Pujian dari orang tua",
+  "pointsAddedSnackbar": "+5 poin ditambahkan",
+  "pickChildTitle": "Pilih anak",
+  "rewardsTitle": "Hadiah & Poin",
+  "givePraiseFabLabel": "Kasih Pujian (+5)",
+  "rewardsIntro": "Poin dikumpulkan saat anak tiba di sekolah tepat waktu. Bisa juga ditambah manual sebagai pujian.",
+  "howToEarnPointsTitle": "Cara Mendapat Poin",
+  "howToEarnPointsReferenceTitle": "Cara poin didapat (referensi)",
+  "earnSchoolOnTimeTitle": "Tiba di Sekolah Tepat Waktu",
+  "earnSchoolOnTimeSubtitle": "+10 poin per hari",
+  "earnHomeOnTimeTitle": "Pulang Tepat Waktu",
+  "earnHomeOnTimeSubtitle": "+5 poin per hari",
+  "earnParentPraiseTitle": "Pujian dari Orang Tua",
+  "earnParentPraiseSubtitle": "+5 poin manual",
+  "earnPerDayLabel": "per hari",
+  "earnManualLabel": "manual",
+  "pointsHistoryTitle": "Riwayat Poin",
+  "noPointsHistoryTitle": "Belum ada riwayat poin",
+  "noPointsHistoryMessage": "Setelah anak check-in sekolah, poin muncul di sini.",
+  "totalPointsForChild": "Total Poin {name}",
+  "@totalPointsForChild": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "noStreakYet": "Belum ada streak harian",
+  "streakDaysLabel": "Rajin {streak} hari berturut-turut",
+  "@streakDaysLabel": {
+    "placeholders": {
+      "streak": {
+        "type": "int"
+      }
+    }
+  },
+  "earnExampleHint": "Contoh: tiba di sekolah +10 poin",
+  "weeklyStreakTitle": "Streak Minggu Ini",
+  "screenTimeMonitorSubtitle": "Pantau penggunaan harian",
+  "noAppDataToday": "Belum ada data app hari ini.",
+  "appUsageTitle": "Penggunaan Aplikasi",
+  "thisWeekTitle": "Minggu Ini",
+  "limitScheduleTitle": "Jadwal Batasan",
+  "editInRulesHint": "Ubah di Aturan",
+  "todayLabel": "Hari ini",
+  "limitOffLabel": "Batas dimatikan",
+  "outOfLimitLabel": "dari batas {limit}",
+  "@outOfLimitLabel": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "remainingTimeLabel": "Sisa {remaining}",
+  "@remainingTimeLabel": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "overLimitLegend": "Melebihi batas ({limit})",
+  "@overLimitLegend": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "safeLegendLabel": "Aman",
+  "noActiveScheduleLabel": "Tidak ada jadwal aktif",
+  "screenTimeRulesTitle": "Aturan · {name}",
+  "@screenTimeRulesTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "limitScreenUsageLabel": "Batasi main HP",
+  "noLimitLabel": "Tanpa batas",
+  "schoolDaysTitle": "Hari Sekolah",
+  "schoolDaysRangeLabel": "Sen–Jum",
+  "weekendDaysTitle": "Akhir Pekan",
+  "weekendDaysRangeLabel": "Sab–Min",
+  "maxLimitLabel": "Maks {limit}",
+  "@maxLimitLabel": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  },
+  "blockedAppsTitle": "App yang ditahan",
+  "noAppListYet": "Belum ada daftar app.",
+  "notUsedTodayLabel": "Belum dipakai hari ini",
+  "usedDurationLabel": "Dipakai {duration}",
+  "@usedDurationLabel": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "schoolLimitPickerTitle": "Batas hari sekolah",
+  "weekendLimitPickerTitle": "Batas akhir pekan",
+  "savingLabel": "Menyimpan...",
+  "rulesSavedMessage": "Aturan tersimpan untuk {name}. Buka PulangAman di HP anak supaya aktif.",
+  "@rulesSavedMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "limitsDisabledMessage": "Batas waktu dimatikan untuk {name}.",
+  "@limitsDisabledMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "whereTitle": "Di mana",
+  "childPositionsTodayTitle": "Posisi anak hari ini",
+  "whereScreenIntro": "Bukan cuma sekolah — rumah, perjalanan, dan zona aman lain ikut terlihat. Ketuk anak untuk lihat catatan masuk/pulang sekolah.",
+  "locationUnclear": "Lokasi belum jelas",
+  "inHomeZoneHint": "Di zona rumah yang kamu atur",
+  "inSchoolZoneHint": "Di zona sekolah yang kamu atur",
+  "commutingHint": "Sedang di perjalanan",
+  "locationHintDefault": "Pastikan lokasi anak aktif & lokasi penting sudah diisi",
+  "whereDetailTitle": "Di mana · {name}",
+  "@whereDetailTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "zoneStatusExplain": "Status dari zona aman yang kamu atur (rumah, sekolah, atau lainnya).",
+  "schoolNotesToday": "Catatan sekolah hari ini",
+  "schoolNotesHint": "Muncul otomatis saat anak masuk/keluar zona sekolah.",
+  "noSchoolNotesTitle": "Belum ada catatan sekolah",
+  "noSchoolNotesMessage": "Kalau zona sekolah sudah diatur dan lokasi anak aktif, catatan tiba/pulang akan muncul di sini.",
+  "arrivedAtSchool": "Tiba di sekolah",
+  "departedFromSchool": "Pulang dari sekolah",
+  "statusHomeLabel": "Di rumah",
+  "statusSchoolLabel": "Di sekolah",
+  "statusSafeZoneLabel": "Di zona aman",
+  "statusCommutingLabel": "Dalam perjalanan",
+  "categoryHazardTitle": "Bahaya / Jalan Rusak",
+  "categoryTrafficTitle": "Lalu Lintas",
+  "categoryCrowdTitle": "Kerumunan",
+  "categoryOtherTitle": "Laporan Lain",
+  "categoryHazardShort": "Hazard",
+  "categoryTrafficShort": "Lalu lintas",
+  "categoryCrowdShort": "Kerumunan",
+  "categoryOtherShort": "Lainnya",
+  "addPinTitle": "Tambah Pin",
+  "reportTypeLabel": "Jenis",
+  "reportTypeHazard": "Bahaya / Jalan rusak",
+  "reportNoteLabel": "Catatan",
+  "reportNoteHint": "Contoh: Jalan rusak",
+  "reportNoteHintVr": "cth. Lubang di dekat zebra cross",
+  "reportLocationDefault": "Lokasi: memakai titik default (izin GPS belum ada)",
+  "reportLocationCoords": "Lokasi: {lat}, {lng}",
+  "@reportLocationCoords": {
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lng": {
+        "type": "String"
+      }
+    }
+  },
+  "savePinAction": "Simpan Pin",
+  "pinAddedSnackbar": "Pin ditambahkan",
+  "reportVerifiedSnackbar": "Laporan diverifikasi",
+  "verifyFailed": "Gagal verifikasi: {error}",
+  "@verifyFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "alreadyVerifiedThanks": "Sudah terverifikasi. Terima kasih.",
+  "fixedSuggestionNoted": "Terima kasih. Saran “sudah diperbaiki” dicatat untuk ditinjau.",
+  "communityReportsTitle": "Laporan Komunitas",
+  "reportsInfoBanner": "Pin kadaluarsa 72 jam kecuali diverifikasi. Tidak ada marketplace orang asing.",
+  "totalReportsLabel": "Total Laporan",
+  "verifiedLabel": "Terverifikasi",
+  "expiredLabel": "Kadaluarsa",
+  "areaMapTitle": "Peta Area",
+  "reportsListTitle": "Daftar Laporan",
+  "activeLabel": "Aktif",
+  "filterLabel": "Filter",
+  "noActiveReports": "Belum ada laporan aktif",
+  "noCoordinatesLabel": "Tanpa koordinat",
+  "coordinatesAvailableLabel": "Koordinat tersedia",
+  "expiresAtLabel": "Kadaluarsa {date}",
+  "@expiresAtLabel": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "stillThereAction": "Masih Ada",
+  "fixedAction": "Sudah Diperbaiki",
+  "pinLocationLabel": "Lokasi",
+  "usingCurrentLocation": "Menggunakan lokasi saat ini",
+  "changeLocationAction": "Ubah",
+  "whatAreYouReporting": "Apa yang kamu laporkan?",
+  "shortNoteOptional": "Catatan singkat (opsional)",
+  "verifiedBadge": "VERIFIED",
+  "nearPlaceLabel": "dekat {place}",
+  "@nearPlaceLabel": {
+    "placeholders": {
+      "place": { "type": "String" }
+    }
+  },
+  "approxMetersFromPlace": "~{meters}m dari {place}",
+  "@approxMetersFromPlace": {
+    "placeholders": {
+      "meters": { "type": "int" },
+      "place": { "type": "String" }
+    }
+  },
+  "pickPinLocationTitle": "Pilih lokasi pin",
+  "resolvingLocation": "Mencari lokasi...",
+  "locationUnknown": "Lokasi tidak tersedia",
+  "presetAtSchoolText": "Sudah sampai sekolah!",
+  "presetAtHomeText": "Sudah sampai di rumah.",
+  "presetNeedHelpText": "Butuh bantuan — tolong hubungi saya.",
+  "homeArrivedStatus": "Di rumah · Sudah sampai",
+  "hereAtTime": "Di sini · {time}",
+  "@hereAtTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "waitingGpsSignal": "Menunggu sinyal lokasi...",
+  "atHomeTrackingStopped": "Di rumah · jejak dihentikan",
+  "locationNotUpdatedRecently": "Lokasi tidak diperbarui baru-baru ini",
+  "movingNow": "Sedang bergerak",
+  "liveJustNow": "Live · baru saja",
+  "liveSecondsAgo": "Live · {seconds} dtk lalu",
+  "@liveSecondsAgo": {
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "liveMinutesAgo": "Live · {minutes} mnt lalu",
+  "@liveMinutesAgo": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "zoneNameActive": "{name} · aktif",
+  "@zoneNameActive": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "zoneNameWithCount": "{name} · {count} zona",
+  "@zoneNameWithCount": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "count": { "type": "int" }
+    }
+  },
+  "safeZonesCount": "{count} zona aman",
+  "@safeZonesCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "zonesSummaryActiveCount": "{count} zona · {active} aktif sekarang",
+  "@zonesSummaryActiveCount": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "active": { "type": "int" }
+    }
+  },
+  "noZonesYet": "Belum ada zona",
+  "addHomeOrSchoolHint": "Tambah rumah atau sekolah",
+  "remindersNoneActive": "Tidak ada yang aktif",
+  "remindersActiveCount": "{count} aktif",
+  "@remindersActiveCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "remindersActiveNext": "{count} aktif · berikutnya {title} {time}",
+  "@remindersActiveNext": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "title": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "chargingShortSuffix": " · cas",
+  "batteryPercentLabel": "Baterai {value}%",
+  "@batteryPercentLabel": {
+    "placeholders": {
+      "value": { "type": "int" }
+    }
+  },
+  "batteryPercentCharging": "Baterai {value}% · di-cas",
+  "@batteryPercentCharging": {
+    "placeholders": {
+      "value": { "type": "int" }
+    }
+  },
+  "batteryUnknown": "Baterai belum diketahui",
+  "weakSignalRoute": "Sinyal lemah — rute kurang akurat.",
+  "beingMonitored": "Sedang dipantau",
+  "locationCannotUpdate": "Lokasi tidak bisa diperbarui",
+  "adminAllChildren": "Admin · Semua anak",
+  "waitingWithNames": "Menunggu · {names}",
+  "@waitingWithNames": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
+  "activeWithNames": "Aktif · {names}",
+  "@activeWithNames": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
+  "zeroGuardiansAdd": "0 wali · Tambah wali",
+  "guardiansCountNamed": "{count} wali · {names}",
+  "@guardiansCountNamed": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "names": { "type": "String" }
+    }
+  },
+  "guardiansCountOnly": "{count} wali",
+  "@guardiansCountOnly": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "guardiansForChildTitle": "Wali · {name}",
+  "@guardiansForChildTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "noGuardiansForChild": "Belum ada wali untuk anak ini.",
+  "youBadge": "ANDA",
+  "doneAction": "Selesai",
+  "editChevron": "Edit ›",
+  "notConfiguredTapSearch": "Belum diatur — ketuk untuk cari",
+  "noPlacesYetAddHomeSchool": "Belum ada lokasi. Tambah rumah atau sekolah.",
+  "noPlacesMatch": "Tidak ada lokasi yang cocok.",
+  "homePlaceLabel": "Rumah",
+  "schoolPlaceLabel": "Sekolah",
+  "parentRoleFallback": "Orang tua",
+  "hereNowLabel": "Di sini",
+  "waitingLocationDots": "Menunggu lokasi...",
+  "seenOnMap": "Terlihat di peta",
+  "signalStrong": "Kuat",
+  "signalMedium": "Sedang",
+  "signalWeak": "Lemah",
+  "signalLost": "Hilang",
+  "activeBadgeShort": "AKTIF",
+  "staleBadgeShort": "LAMA",
+  "batteryMetricLabel": "Baterai",
+  "signalMetricLabel": "Sinyal",
+  "timeMetricLabel": "Waktu",
+  "optionsTooltip": "Opsi",
+  "removeFromList": "Hapus dari daftar",
+  "relinkCodeMenu": "Kode masuk ulang {name}",
+  "@relinkCodeMenu": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "noSignalYet": "Belum ada sinyal",
+  "updatedAtTime": "Update {time}",
+  "@updatedAtTime": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "batteryDeadBanner": "HP anak hampir habis / mati. Lokasi mungkin tidak diperbarui.",
+  "batteryLowBanner": "Baterai HP anak lemah ({level}%).",
+  "@batteryLowBanner": {
+    "placeholders": {
+      "level": { "type": "String" }
+    }
+  },
+  "locationStaleBanner": "Sinyal lokasi lama. HP anak mungkin mati atau tanpa jaringan.",
+  "screenLimitsOff": "Batasan dimatikan",
+  "screenUsedToday": "{used} / {limit} hari ini",
+  "@screenUsedToday": {
+    "placeholders": {
+      "used": { "type": "String" },
+      "limit": { "type": "String" }
+    }
+  },
+  "limitCaptionShort": "batas {limit}",
+  "@limitCaptionShort": {
+    "placeholders": {
+      "limit": { "type": "String" }
+    }
+  },
+  "unreadKabarCount": "{count} belum dibaca",
+  "@unreadKabarCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "noTrailToday": "Belum ada jejak hari ini.",
+  "safeZoneFeatureTitle": "Zona aman",
+  "parentKabarFeatureTitle": "Kabar",
+  "remindersFeatureTitle": "Pengingat",
+  "todaySectionTitle": "Hari ini",
+  "safePlaceLabel": "Lokasi aman",
+  "placesCountLabel": "lokasi",
+  "girlChildLabel": "Anak perempuan",
+  "boyChildLabel": "Anak laki-laki",
+  "noActiveAlerts": "Tidak ada peringatan aktif",
+  "invitesSectionTitle": "Undangan",
+  "childIdLabel": "Anak: {id}",
+  "@childIdLabel": {
+    "placeholders": {
+      "id": { "type": "String" }
+    }
+  },
+  "childFallbackName": "Anak",
+  "guardianFallbackName": "Wali",
+  "needExtraHelpNote": "Memerlukan bantuan tambahan",
+  "resolvedByParentNote": "Diselesaikan orang tua",
+  "sendResponseFailed": "Gagal mengirim respons. Coba lagi.",
+  "resolvePanicFailed": "Gagal menyelesaikan panik. Coba lagi.",
+  "panicBadge": "PANIK",
+  "childInSafeZoneTitle": "Anak di zona aman",
+  "zoneUpdateTitle": "Update zona",
+  "arrivedAtZoneMsg": "{childName} sudah sampai di {zoneLabel}",
+  "@arrivedAtZoneMsg": {
+    "placeholders": {
+      "childName": { "type": "String" },
+      "zoneLabel": { "type": "String" }
+    }
+  },
+  "childInSafeZoneMsg": "{childName} sudah di zona aman",
+  "@childInSafeZoneMsg": {
+    "placeholders": {
+      "childName": { "type": "String" }
+    }
+  },
+  "leftSafeZoneMsg": "{childName} meninggalkan zona aman",
+  "@leftSafeZoneMsg": {
+    "placeholders": {
+      "childName": { "type": "String" }
+    }
+  },
+  "newKabarBanner": "Kabar baru",
+  "shortTrailLabel": "Jejak singkat",
+  "importantPlacesLabel": "Zona Aman",
+  "zonesHubTitle": "Zona Aman",
+  "zonesHubSubtitle": "Rumah, sekolah, dan lokasi sering dikunjungi",
+  "searchPlaceHint": "Cari lokasi...",
+  "addNewPlaceLabel": "Tambah lokasi baru",
+  "estimateMinutes": "Estimasi {minutes} menit",
+  "@estimateMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "noAddressYet": "Belum ada alamat",
+  "extraSafePlace": "Lokasi aman tambahan",
+  "searchHomeAddress": "Cari alamat rumah",
+  "searchSchoolName": "Cari nama sekolah",
+  "searchCustomPlace": "Cari lokasi: {label}",
+  "@searchCustomPlace": {
+    "placeholders": {
+      "label": { "type": "String" }
+    }
+  },
+  "homeSearchHint": "Contoh: Marine Parade, kode pos, nama kompleks",
+  "schoolSearchHint": "Contoh: Tao Nan School, nama sekolah",
+  "customSearchHint": "Contoh: nama les, mall, taman, alamat",
+  "placeSavedSnack": "Disimpan: {name}",
+  "@placeSavedSnack": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "failedSavePlace": "Gagal simpan lokasi: {error}",
+  "@failedSavePlace": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "placeLessonSuggestion": "Lokasi les",
+  "placeGrandmaSuggestion": "Rumah nenek",
+  "newPlaceDefault": "Lokasi baru",
+  "addSafePlaceTitle": "Tambah lokasi aman",
+  "customPlaceHint": "Contoh: Les piano Blok M",
+  "continueSearchAddress": "Lanjut cari alamat",
+  "otherPlaceLabel": "Lokasi lain",
+  "deletePlaceTitle": "Hapus lokasi?",
+  "deletePlaceConfirm": "Hapus \"{name}\"? Rute aman yang terhubung ke lokasi ini juga akan dihapus.",
+  "@deletePlaceConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "deletePlaceCascadeNote": "Rute aman yang terhubung ke lokasi ini juga akan dihapus.",
+  "placeDeletedSnack": "Lokasi dihapus",
+  "failedDeletePlace": "Gagal hapus: {error}",
+  "@failedDeletePlace": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "placesForChildLabel": "Lokasi {name}",
+  "@placesForChildLabel": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "addChildBeforeInvite": "Tambah anak dulu sebelum undang wali",
+  "inviteViaWhatsApp": "Undang via WhatsApp",
+  "inviteViaEmail": "Undang via Email",
+  "inviteViaLink": "Undang via Link",
+  "guardianNameLabel": "Nama wali",
+  "phoneWhatsAppLabel": "Nomor WhatsApp / telepon",
+  "emailOptionalLabel": "Email (opsional)",
+  "namePhoneRequired": "Nama dan nomor wajib diisi",
+  "inviteLinkCopied": "Link undangan disalin",
+  "inviteFailedDetail": "Gagal undang: {error}",
+  "@inviteFailedDetail": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "failedGenericDetail": "Gagal: {error}",
+  "@failedGenericDetail": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "guardiansInviteHint": "Undang wali yang sudah dikenal. Tidak ada pencarian orang asing — hanya orang yang kamu percaya.",
+  "activeGuardiansSection": "WALI AKTIF",
+  "inviteNewSection": "UNDANG WALI BARU",
+  "addTrustedGuardian": "Tambah Wali Terpercaya",
+  "guardianInviteChannelHint": "Wali akan menerima undangan via WhatsApp atau email",
+  "guardianInviteBody": "Halo {name}, kamu diundang jadi Wali Terpercaya untuk {children} di PulangAman. Buka undangan: {link}",
+  "@guardianInviteBody": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "children": { "type": "String" },
+      "link": { "type": "String" }
+    }
+  },
+  "guardianInviteSubject": "Undangan Wali Terpercaya PulangAman",
+  "activeGuardiansCount": "{count} wali aktif",
+  "@activeGuardiansCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "channelWhatsApp": "WhatsApp",
+  "channelEmail": "Email",
+  "channelLink": "Link",
+  "justNowRelative": "baru saja",
+  "minutesAgoRelative": "{minutes} mnt lalu",
+  "@minutesAgoRelative": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "noLocationYet": "Belum ada lokasi",
+  "sessionTokenFailed": "Gagal mengambil token sesi. Coba lagi.",
+  "phoneNotFoundRelogin": "Nomor telepon tidak ditemukan. Keluar lalu masuk ulang.",
+  "phoneInvalidFormat": "Nomor telepon tidak valid. Gunakan format +62...",
+  "placesApiKeyHint": "Perlu key server terpisah: aktifkan Places API + Geocoding.",
+  "forChildLabel": "Untuk anak",
+  "phoneCountryCode": "+62",
+  "accessPerChildSection": "AKSES PER ANAK",
+  "revokeAccessTooltip": "Cabut akses",
+  "alertAcknowledged": "Peringatan direspons",
+  "alertAcknowledgedCascadeStopped": "Peringatan direspons. Cascade dihentikan.",
+  "alertLabelWithId": "Peringatan {id}",
+  "@alertLabelWithId": {
+    "placeholders": {
+      "id": { "type": "String" }
+    }
+  },
+  "fromParentLabel": "Dari {name}",
+  "@fromParentLabel": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pickAvatarTitle": "Pilih wajah untuk {name}",
+  "@pickAvatarTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pickAvatarHint": "Pilih laki-laki atau perempuan. Foto anak tidak dipakai demi privasi.",
+  "changeAvatarAction": "Ubah wajah avatar",
+  "placeFriendSuggestion": "Teman",
+  "placeMallSuggestion": "Mall / lokasi main",
+  "customPlaceDialogHint": "Pilih jenis, atau tulis sendiri. Lalu cari alamatnya.",
+  "routeBadge": "RUTE",
+  "trailPointsCount": "{count} titik jalur",
+  "@trailPointsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "hoursAgoRelative": "{hours} jam lalu",
+  "@hoursAgoRelative": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "daysAgoRelative": "{days} hari lalu",
+  "@daysAgoRelative": {
+    "placeholders": {
+      "days": { "type": "int" }
+    }
+  },
+  "yesterdayLabel": "Kemarin",
+  "lastSeenLabel": "Terakhir terlihat: {when}",
+  "@lastSeenLabel": {
+    "placeholders": {
+      "when": { "type": "String" }
+    }
+  },
+  "tooManyAttempts": "Terlalu banyak percobaan. Coba lagi nanti.",
+  "invalidOtpCode": "Kode OTP salah.",
+  "otpExpiredResend": "Kode OTP kedaluwarsa. Kirim ulang.",
+  "appConfigIncomplete": "Konfigurasi aplikasi belum lengkap. Hubungi pengembang.",
+  "serverMissingCustomToken": "Server tidak mengembalikan customToken. Deploy API terbaru dulu.",
+  "startMonitoringAction": "Mulai pantau",
+  "openLocationAction": "Buka lokasi",
+  "orTypeOwnNameLabel": "Atau tulis nama sendiri",
+  "todayShortLabel": "Hari ini",
+  "thisWeekLabel": "Minggu ini",
+  "thisMonthLabel": "Bulan ini",
+  "weekShortLabel": "Minggu",
+  "monthShortLabel": "Bulan",
+  "dayShortLabel": "Hari",
+  "durationMinutesOnly": "{minutes} mnt",
+  "@durationMinutesOnly": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "durationHoursMinutes": "{hours} jam {minutes} mnt",
+  "@durationHoursMinutes": {
+    "placeholders": {
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "otpSendTimedOut": "Pengiriman kode terlalu lama. Coba lagi.",
+  "recoverParentsOnly": "Hanya orang tua yang sedang masuk yang bisa memulihkan.",
+  "activityLoadFailed": "Riwayat hari ini belum bisa dimuat",
+  "greetingMorning": "Selamat pagi",
+  "greetingMidday": "Selamat siang",
+  "greetingAfternoon": "Selamat sore",
+  "greetingNight": "Selamat malam",
+  "periodMorningShort": "Pagi",
+  "periodMiddayShort": "Siang",
+  "periodAfternoonShort": "Sore",
+  "periodNightShort": "Malam",
+  "menuLabel": "Menu",
+  "brandNameUpper": "PULANGAMAN",
+  "premiumFamilyMapTitle": "PETA KELUARGA",
+  "premiumLiveLabel": "Langsung",
+  "premiumFamilyMapHint": "Satu panggung — semua anak",
+  "premiumStatusSection": "STATUS",
+  "premiumGreetingWithName": "{greeting}, {name}",
+  "@premiumGreetingWithName": {
+    "placeholders": {
+      "greeting": { "type": "String" },
+      "name": { "type": "String" }
+    }
+  },
+  "premiumAllChildrenSafe": "{count, plural, =1{Satu anak dalam jangkauan aman.} other{Semua anak dalam jangkauan aman.}}",
+  "@premiumAllChildrenSafe": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "premiumChildrenTracked": "{count, plural, =1{1 anak dipantau.} other{{count} anak dipantau.}}",
+  "@premiumChildrenTracked": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "premiumBatteryLowDetail": "Baterai {percent}%",
+  "@premiumBatteryLowDetail": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "premiumChargeSoonMeta": "segera dicas",
+  "settingsPremiumHomeShell": "Tampilan editorial (Alt A)",
+  "settingsPremiumHomeShellHint": "Tanpa bilah navigasi bawah. Nonaktifkan untuk kembali ke tampilan biasa.",
+  "settingsVisualRefresh": "Penyegaran tampilan",
+  "settingsVisualRefreshHint": "Kanvas krem, tipografi editorial, dan gaya beranda lebih lembut. Matikan untuk tampilan klasik.",
+  "updatedJustNowBadge": "Baru saja diperbarui",
+  "updatedMinutesAgoBadge": "Diperbarui {minutes} mnt lalu",
+  "@updatedMinutesAgoBadge": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "updatedHoursAgoBadge": "Diperbarui {hours} jam lalu",
+  "@updatedHoursAgoBadge": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "relinkCodeShort": "Kode masuk ulang",
+  "newSignInCodeTitle": "Kode masuk baru untuk {name}",
+  "@newSignInCodeTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "newSignInCodeBody": "Masukkan kode ini di aplikasi {name} saat memilih \"Sudah punya kode\" pada layar masuk.",
+  "@newSignInCodeBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "copyCodeAction": "Salin kode",
+  "codeCopiedSnack": "Kode disalin",
+  "codeValid24Hours": "Berlaku 24 jam",
+  "codeValidForHours": "Berlaku {hours} jam",
+  "@codeValidForHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  }
 }
