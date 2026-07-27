@@ -66,57 +66,99 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
       relinkName = relinkName ?? link.rows[0].name;
     }
 
-    let code = generateInviteCode();
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3_600_000);
-      try {
-        const result = await pool.query<{
-          id: string;
-          code: string;
-          expires_at: Date;
-        }>(
-          `INSERT INTO child_invites
-             (parent_id, code, child_display_name, expires_at, relink_child_id)
-           VALUES ($1, $2, $3, $4, $5)
-           RETURNING id, code, expires_at`,
-          [
-            parentId,
-            code,
-            relinkName,
-            expiresAt.toISOString(),
-            body.relinkChildId ?? null,
-          ],
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE child_invites
+         SET status = 'expired'
+         WHERE parent_id = $1 AND status = 'pending' AND expires_at < now()`,
+        [parentId],
+      );
+
+      // At most one pending code per child (relink) or per new-child display name.
+      if (body.relinkChildId) {
+        await client.query(
+          `UPDATE child_invites
+           SET status = 'revoked'
+           WHERE parent_id = $1
+             AND status = 'pending'
+             AND relink_child_id = $2`,
+          [parentId, body.relinkChildId],
         );
-        await pool.query(
-          `INSERT INTO audit_events (actor_id, action, payload)
-           VALUES ($1, 'child_invite.created', $2::jsonb)`,
-          [
-            parentId,
-            JSON.stringify({
-              inviteId: result.rows[0].id,
-              code,
-              relinkChildId: body.relinkChildId ?? null,
-            }),
-          ],
+      } else if (relinkName) {
+        await client.query(
+          `UPDATE child_invites
+           SET status = 'revoked'
+           WHERE parent_id = $1
+             AND status = 'pending'
+             AND relink_child_id IS NULL
+             AND lower(child_display_name) = lower($2)`,
+          [parentId, relinkName],
         );
-        res.status(201).json({
-          id: result.rows[0].id,
-          code: result.rows[0].code,
-          expiresAt: result.rows[0].expires_at,
-          childDisplayName: relinkName,
-          relinkChildId: body.relinkChildId ?? null,
-        });
-        return;
-      } catch (error) {
-        const pgError = error as { code?: string };
-        if (pgError.code === '23505') {
-          code = generateInviteCode();
-          continue;
-        }
-        throw error;
       }
+
+      let code = generateInviteCode();
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3_600_000);
+        try {
+          const result = await client.query<{
+            id: string;
+            code: string;
+            expires_at: Date;
+          }>(
+            `INSERT INTO child_invites
+               (parent_id, code, child_display_name, expires_at, relink_child_id)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, code, expires_at`,
+            [
+              parentId,
+              code,
+              relinkName,
+              expiresAt.toISOString(),
+              body.relinkChildId ?? null,
+            ],
+          );
+          await client.query(
+            `INSERT INTO audit_events (actor_id, action, payload)
+             VALUES ($1, 'child_invite.created', $2::jsonb)`,
+            [
+              parentId,
+              JSON.stringify({
+                inviteId: result.rows[0].id,
+                code,
+                relinkChildId: body.relinkChildId ?? null,
+                supersededPrior: true,
+              }),
+            ],
+          );
+          await client.query('COMMIT');
+          res.status(201).json({
+            id: result.rows[0].id,
+            code: result.rows[0].code,
+            expiresAt: result.rows[0].expires_at,
+            childDisplayName: relinkName,
+            relinkChildId: body.relinkChildId ?? null,
+          });
+          return;
+        } catch (error) {
+          const pgError = error as { code?: string };
+          if (pgError.code === '23505') {
+            code = generateInviteCode();
+            continue;
+          }
+          throw error;
+        }
+      }
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: 'invite_code_exhausted' });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-    res.status(500).json({ error: 'invite_code_exhausted' });
   } catch (error) {
     next(error);
   }
@@ -139,9 +181,12 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
     );
 
     const result = await pool.query(
-      `SELECT id, code, child_display_name, status, expires_at, redeemed_at, created_at
+      `SELECT id, code, child_display_name, status, expires_at, redeemed_at, created_at,
+              relink_child_id
        FROM child_invites
        WHERE parent_id = $1
+         AND status = 'pending'
+         AND expires_at > now()
        ORDER BY created_at DESC
        LIMIT 20`,
       [parentId],
