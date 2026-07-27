@@ -9,6 +9,7 @@ import {
   getOpenTrip,
   getTripById,
   mapTrip,
+  markTripArrived,
   startTrip,
 } from '../services/tripService.js';
 
@@ -164,6 +165,39 @@ tripsRouter.post('/:id/start', async (req: AuthedRequest, res, next) => {
     }
 
     const result = await startTrip(trip.id);
+    if (!result.ok) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json({ trip: mapTrip(result.trip) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+tripsRouter.post('/:id/arrive', async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const tripId = String(req.params.id);
+    const trip = await getTripById(tripId);
+    if (!trip) {
+      res.status(404).json({ error: 'not_found' });
+      return;
+    }
+
+    const isChild = trip.child_id === userId;
+    const isParent = await assertParentOfChild(userId, trip.child_id);
+    if (!isChild && !isParent) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+
+    const result = await markTripArrived(trip.id, userId);
     if (!result.ok) {
       res.status(400).json({ error: result.error });
       return;

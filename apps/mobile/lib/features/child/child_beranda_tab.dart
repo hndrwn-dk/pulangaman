@@ -31,10 +31,12 @@ class ChildBerandaTab extends StatelessWidget {
     this.homeByAckSent = false,
     this.onHomeByAck,
     this.tripActive = false,
+    this.tripArrived = false,
     this.tripToLabel,
     this.tripProgress = 0,
     this.onStartTrip,
     this.onCancelTrip,
+    this.onArriveTrip,
     this.empActive = false,
     this.empPlaceName,
     this.empNote,
@@ -63,10 +65,12 @@ class ChildBerandaTab extends StatelessWidget {
   final bool homeByAckSent;
   final VoidCallback? onHomeByAck;
   final bool tripActive;
+  final bool tripArrived;
   final String? tripToLabel;
   final double tripProgress;
   final VoidCallback? onStartTrip;
   final VoidCallback? onCancelTrip;
+  final VoidCallback? onArriveTrip;
   final bool empActive;
   final String? empPlaceName;
   final String? empNote;
@@ -251,23 +255,37 @@ class ChildBerandaTab extends StatelessWidget {
             ),
           ),
         ],
-        if (tripActive || onStartTrip != null) ...[
+        if (tripActive || tripArrived || onStartTrip != null) ...[
           const SizedBox(height: AppSpacing.md),
           PaSectionCard(
-            color: AppColors.sky.withValues(alpha: 0.14),
+            color: tripArrived
+                ? AppColors.teal.withValues(alpha: 0.14)
+                : AppColors.sky.withValues(alpha: 0.14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  tripActive
-                      ? (tripProgress <= 0 && onStartTrip != null
-                          ? 'Rute siap · ${tripToLabel ?? 'tujuan'}'
-                          : 'Menuju ${tripToLabel ?? 'tujuan'}')
-                      : 'Mulai perjalanan',
+                  tripArrived
+                      ? 'Tiba di ${tripToLabel ?? 'tujuan'}'
+                      : tripActive
+                          ? (tripProgress <= 0 && onStartTrip != null
+                              ? 'Rute siap · ${tripToLabel ?? 'tujuan'}'
+                              : 'Menuju ${tripToLabel ?? 'tujuan'}')
+                          : 'Mulai perjalanan',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                   textAlign: TextAlign.center,
                 ),
-                if (tripActive) ...[
+                if (tripArrived) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Orang tua sudah diberi tahu. Selamat sampai.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.inkSoft,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ] else if (tripActive) ...[
                   const SizedBox(height: 10),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
@@ -284,6 +302,16 @@ class ChildBerandaTab extends StatelessWidget {
                       onPressed: onStartTrip,
                       child: const Text('Mulai perjalanan'),
                     ),
+                  if (onArriveTrip != null) ...[
+                    FilledButton(
+                      onPressed: onArriveTrip,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.tealDeep,
+                      ),
+                      child: const Text('Sudah sampai'),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   OutlinedButton(
                     onPressed: onCancelTrip,
                     child: const Text('Batalkan perjalanan'),

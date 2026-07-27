@@ -83,5 +83,11 @@ export function hasArrived(params: {
   insideDestZone?: boolean;
 }): boolean {
   if (params.insideDestZone) return true;
-  return haversineM(params.current, params.dest) <= Math.max(params.radiusM, 25);
+  return haversineM(params.current, params.dest) <= arrivalRadiusM(params.radiusM);
+}
+
+/** Floor for GPS jitter / large destinations — zone radius alone is often too tight. */
+export function arrivalRadiusM(zoneRadiusM: number): number {
+  if (!Number.isFinite(zoneRadiusM) || zoneRadiusM <= 0) return 150;
+  return Math.max(zoneRadiusM, 150);
 }

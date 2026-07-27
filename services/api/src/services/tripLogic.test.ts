@@ -112,6 +112,15 @@ describe('hasArrived', () => {
     );
   });
 
+  it('uses a 150 m floor so small zone radii still catch GPS noise', () => {
+    // ~120 m north of dest — outside a 50 m zone, inside the arrival floor.
+    const near = { lat: dest.lat + 0.00108, lng: dest.lng };
+    const dist = haversineM(near, dest);
+    assert.ok(dist > 50 && dist < 150);
+    assert.equal(hasArrived({ current: near, dest, radiusM: 50 }), true);
+    assert.equal(hasArrived({ current: near, dest, radiusM: 50 }), true);
+  });
+
   it('not arrived when far', () => {
     assert.equal(
       hasArrived({

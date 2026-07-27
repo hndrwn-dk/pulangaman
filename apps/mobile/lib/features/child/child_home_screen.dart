@@ -67,6 +67,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   bool _homeByAcked = false;
   bool _homeByPreviewShown = false;
   Map<String, dynamic>? _trip;
+  Timer? _tripArrivedClear;
   Map<String, dynamic>? _empActive;
   String? _empAlertOpenedId;
   bool _empScreenOpen = false;
@@ -203,12 +204,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         event == 'parent:trip_arrived' ||
         event == 'parent:trip_cancelled') {
       if (event == 'parent:trip_cancelled') {
+        _tripArrivedClear?.cancel();
         if (mounted) setState(() => _trip = null);
       } else if (event == 'parent:trip_arrived') {
-        if (mounted) setState(() => _trip = payload);
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) unawaited(_pollTrip());
-        });
+        _showTripArrived(payload);
       } else {
         if (mounted) setState(() => _trip = payload);
       }
@@ -517,11 +516,55 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
 
   Future<void> _pollTrip() async {
     if (!mounted) return;
+    // Keep the "Tiba" celebration visible; /active returns null after arrive.
+    if (_trip?['status'] == 'arrived') return;
     try {
       final data = await ref.read(apiClientProvider).get('/api/v1/trips/active');
       if (!mounted) return;
       setState(() => _trip = data['trip'] as Map<String, dynamic>?);
     } catch (_) {}
+  }
+
+  void _showTripArrived(Map<String, dynamic> payload) {
+    _tripArrivedClear?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _trip = {
+        ...payload,
+        'status': 'arrived',
+        'progress': 1,
+      };
+    });
+    _tripArrivedClear = Timer(const Duration(seconds: 12), () {
+      if (!mounted) return;
+      setState(() => _trip = null);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Tiba di ${payload['toLabel'] as String? ?? 'tujuan'} — ortu sudah diberitahu',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _markTripArrived() async {
+    final id = _trip?['id'] as String?;
+    if (id == null) return;
+    try {
+      final data =
+          await ref.read(apiClientProvider).post('/api/v1/trips/$id/arrive');
+      final trip = data['trip'];
+      if (!mounted) return;
+      if (trip is Map<String, dynamic>) {
+        _showTripArrived(trip);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
+    }
   }
 
   Future<void> _cancelActiveTrip() async {
@@ -530,6 +573,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     try {
       await ref.read(apiClientProvider).post('/api/v1/trips/$id/cancel');
       if (!mounted) return;
+      _tripArrivedClear?.cancel();
       setState(() => _trip = null);
     } catch (e) {
       if (!mounted) return;
@@ -1175,6 +1219,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     _panicStatusPoll?.cancel();
     _homeByPoll?.cancel();
     _tripPoll?.cancel();
+    _tripArrivedClear?.cancel();
     _empPoll?.cancel();
     _ws.removeHandler(_onReminderWs);
     unawaited(_ws.disconnect());
@@ -1278,6 +1323,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             onHomeByAck: () => unawaited(_openHomeByAckSheet()),
             tripActive: _trip != null &&
                 (_trip!['status'] == 'active' || _trip!['status'] == 'planned'),
+            tripArrived: _trip?['status'] == 'arrived',
             tripToLabel: _trip?['toLabel'] as String?,
             tripProgress: (_trip?['progress'] as num?)?.toDouble() ?? 0,
             onStartTrip: _trip == null
@@ -1285,8 +1331,13 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 : _trip!['status'] == 'planned'
                     ? () => unawaited(_startPlannedTrip())
                     : null,
-            onCancelTrip: _trip != null
+            onCancelTrip: _trip != null &&
+                    (_trip!['status'] == 'active' ||
+                        _trip!['status'] == 'planned')
                 ? () => unawaited(_cancelActiveTrip())
+                : null,
+            onArriveTrip: _trip != null && _trip!['status'] == 'active'
+                ? () => unawaited(_markTripArrived())
                 : null,
             empActive: _empActive != null,
             empPlaceName: _empActive?['meetingPointName'] as String?,

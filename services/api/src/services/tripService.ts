@@ -5,6 +5,7 @@ import {
   hasArrived,
   type LatLng,
 } from './tripLogic.js';
+import { sendFcmToUser } from './fcm.js';
 import { broadcastToRoom, childRoom, parentRoom } from '../ws/server.js';
 
 export type TripRow = {
@@ -114,6 +115,76 @@ function broadcastTrip(
   };
   broadcastToRoom(childRoom(trip.child_id), event, payload);
   broadcastToRoom(parentRoom(trip.parent_id), event, payload);
+}
+
+async function childDisplayName(childId: string): Promise<string> {
+  const result = await pool.query<{ name: string | null }>(
+    `SELECT name FROM users WHERE id = $1`,
+    [childId],
+  );
+  const name = result.rows[0]?.name?.trim();
+  return name && name.length > 0 ? name : 'Anak';
+}
+
+async function notifyParentTrip(
+  trip: TripRow,
+  kind: 'started' | 'arrived',
+): Promise<void> {
+  const childName = await childDisplayName(trip.child_id);
+  const toLabel = zoneDisplayName(trip.to_type, trip.to_name);
+  const fromLabel = zoneDisplayName(trip.from_type, trip.from_name);
+  const title = kind === 'started' ? 'Perjalanan dimulai' : 'Sudah sampai';
+  const body =
+    kind === 'started'
+      ? `${childName} menuju ${toLabel}`
+      : `${childName} sudah sampai di ${toLabel}`;
+
+  await sendFcmToUser(
+    trip.parent_id,
+    { title, body },
+    {
+      type: kind === 'started' ? 'trip_started' : 'trip_arrived',
+      tripId: String(trip.id),
+      childId: String(trip.child_id),
+      childName,
+      fromLabel,
+      toLabel,
+    },
+  ).catch((err) => {
+    console.error('trip_fcm_parent_failed', { kind, tripId: trip.id, err });
+  });
+}
+
+async function finalizeArrival(
+  tripId: string,
+  actorId: string,
+): Promise<TripRow | null> {
+  await pool.query(
+    `UPDATE safe_trips
+     SET status = 'arrived', progress = 1, arrived_at = now(), updated_at = now()
+     WHERE id = $1 AND status = 'active'`,
+    [tripId],
+  );
+  const updated = await getTripById(tripId);
+  if (!updated || updated.status !== 'arrived') return null;
+
+  await pool.query(
+    `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+     VALUES ($1, $2, 'trip.arrived', $3::jsonb)`,
+    [
+      actorId,
+      updated.child_id,
+      JSON.stringify({
+        tripId: updated.id,
+        fromLabel: zoneDisplayName(updated.from_type, updated.from_name),
+        toLabel: zoneDisplayName(updated.to_type, updated.to_name),
+      }),
+    ],
+  );
+
+  broadcastTrip('parent:trip_arrived', updated);
+  await notifyParentTrip(updated, 'arrived');
+  return updated;
 }
 
 async function loadZonePair(fromZoneId: string, toZoneId: string, childId: string) {
@@ -233,6 +304,9 @@ export async function createTrip(params: {
   );
 
   broadcastTrip(startNow ? 'parent:trip_started' : 'parent:trip_planned', trip);
+  if (startNow) {
+    await notifyParentTrip(trip, 'started');
+  }
   return { ok: true, trip };
 }
 
@@ -268,6 +342,7 @@ export async function startTrip(
   );
 
   broadcastTrip('parent:trip_started', trip);
+  await notifyParentTrip(trip, 'started');
   return { ok: true, trip };
 }
 
@@ -345,30 +420,7 @@ export async function updateTripFromLocation(params: {
   });
 
   if (arrived) {
-    await pool.query(
-      `UPDATE safe_trips
-       SET status = 'arrived', progress = 1, arrived_at = now(), updated_at = now()
-       WHERE id = $1 AND status = 'active'`,
-      [trip.id],
-    );
-    const updated = await getTripById(trip.id);
-    if (!updated) return;
-
-    await pool.query(
-      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
-       VALUES ($1, $2, 'trip.arrived', $3::jsonb)`,
-      [
-        params.childId,
-        params.childId,
-        JSON.stringify({
-          tripId: updated.id,
-          fromLabel: zoneDisplayName(updated.from_type, updated.from_name),
-          toLabel: zoneDisplayName(updated.to_type, updated.to_name),
-        }),
-      ],
-    );
-
-    broadcastTrip('parent:trip_arrived', updated);
+    await finalizeArrival(trip.id, params.childId);
     return;
   }
 
@@ -386,4 +438,19 @@ export async function updateTripFromLocation(params: {
   const updated = await getTripById(trip.id);
   if (!updated) return;
   broadcastTrip('parent:trip_progress', updated);
+}
+
+/** Child (or parent) manually confirms arrival when GPS auto-detect misses. */
+export async function markTripArrived(
+  tripId: string,
+  actorId: string,
+): Promise<{ ok: true; trip: TripRow } | { ok: false; error: string }> {
+  const current = await getTripById(tripId);
+  if (!current) return { ok: false, error: 'not_found' };
+  if (current.status === 'arrived') return { ok: true, trip: current };
+  if (current.status !== 'active') return { ok: false, error: 'not_active' };
+
+  const updated = await finalizeArrival(tripId, actorId);
+  if (!updated) return { ok: false, error: 'arrive_failed' };
+  return { ok: true, trip: updated };
 }
