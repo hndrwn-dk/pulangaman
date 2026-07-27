@@ -85,6 +85,100 @@ describe('activityTimeline', () => {
     assert.ok(events.some((e) => e.type === 'trip'));
   });
 
+  it('synthesizes a trip when GPS jumps zone-to-zone with no trail', () => {
+    const mall: ActivityZone = {
+      id: 'z-mall',
+      type: 'custom',
+      name: 'Parkway Parade',
+      lat: -6.25,
+      lng: 106.85,
+      radiusM: 150,
+    };
+    const t0 = new Date('2026-07-26T10:00:00.000Z');
+    const points: ActivityPoint[] = [];
+    for (let i = 0; i < 6; i++) {
+      points.push({
+        lat: home.lat,
+        lng: home.lng,
+        recordedAt: new Date(t0.getTime() + i * 60_000),
+        accuracyM: 20,
+      });
+    }
+    // Gap with no samples (tracking paused / stale last-known), then mall.
+    const mallStart = t0.getTime() + 45 * 60_000;
+    for (let i = 0; i < 6; i++) {
+      points.push({
+        lat: mall.lat,
+        lng: mall.lng,
+        recordedAt: new Date(mallStart + i * 60_000),
+        accuracyM: 25,
+      });
+    }
+
+    const { summary, events } = buildActivityTimeline({
+      points,
+      zones: [home, mall],
+    });
+
+    const trips = events.filter((e) => e.type === 'trip');
+    assert.equal(trips.length, 1);
+    const trip = trips[0]!;
+    assert.equal(trip.type, 'trip');
+    if (trip.type === 'trip') {
+      assert.equal(trip.startLabel, 'Rumah');
+      assert.equal(trip.endLabel, 'Parkway Parade');
+      assert.ok(trip.distanceM > 1000);
+      assert.equal(trip.inaccurate, true);
+    }
+    assert.ok(summary.totalDistanceM > 1000);
+    assert.equal(summary.placeCount, 2);
+  });
+
+  it('keeps a short sparse trail that bridges two zones', () => {
+    const t0 = new Date('2026-07-26T02:00:00.000Z');
+    const points: ActivityPoint[] = [
+      {
+        lat: home.lat,
+        lng: home.lng,
+        recordedAt: new Date(t0.getTime()),
+        accuracyM: 15,
+      },
+      {
+        lat: home.lat,
+        lng: home.lng,
+        recordedAt: new Date(t0.getTime() + 5 * 60_000),
+        accuracyM: 15,
+      },
+      // Single midpoint, <90s trip — old logic dropped these entirely.
+      {
+        lat: -6.205,
+        lng: 106.81,
+        recordedAt: new Date(t0.getTime() + 5 * 60_000 + 40_000),
+        accuracyM: 40,
+      },
+      {
+        lat: school.lat,
+        lng: school.lng,
+        recordedAt: new Date(t0.getTime() + 5 * 60_000 + 70_000),
+        accuracyM: 20,
+      },
+      {
+        lat: school.lat,
+        lng: school.lng,
+        recordedAt: new Date(t0.getTime() + 20 * 60_000),
+        accuracyM: 20,
+      },
+    ];
+
+    const { summary, events } = buildActivityTimeline({
+      points,
+      zones: [home, school],
+    });
+
+    assert.ok(events.some((e) => e.type === 'trip'));
+    assert.ok(summary.totalDistanceM > 0);
+  });
+
   it('jakartaDayBounds accepts YYYY-MM-DD', () => {
     const { start, end } = jakartaDayBounds('2026-07-20');
     assert.ok(end.getTime() > start.getTime());

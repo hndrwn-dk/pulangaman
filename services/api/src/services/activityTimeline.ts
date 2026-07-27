@@ -206,12 +206,35 @@ export function buildActivityTimeline(params: {
     merged.push(seg);
   }
 
+  // GPS often resumes only after the next safe zone (battery / Doze / stale
+  // last-known). Without out-of-zone samples the raw pass yields stay→stay and
+  // distance stays 0. Insert a connector trip between different-zone stays.
+  const segments: Seg[] = [];
+  for (const seg of merged) {
+    const prev = segments[segments.length - 1];
+    if (
+      prev?.kind === 'stay' &&
+      seg.kind === 'stay' &&
+      prev.zone.id !== seg.zone.id
+    ) {
+      const from = prev.points[prev.points.length - 1]!;
+      const to = seg.points[0]!;
+      segments.push({
+        kind: 'trip',
+        start: prev.end,
+        end: seg.start.getTime() > prev.end.getTime() ? seg.start : prev.end,
+        points: [from, to],
+      });
+    }
+    segments.push(seg);
+  }
+
   const events: ActivityEvent[] = [];
   const placeDur = new Map<string, { name: string; placeType: string; durationSeconds: number }>();
   let totalDistanceM = 0;
 
-  for (let i = 0; i < merged.length; i++) {
-    const seg = merged[i]!;
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!;
     const durationSeconds = Math.max(
       0,
       Math.round((seg.end.getTime() - seg.start.getTime()) / 1000),
@@ -238,16 +261,40 @@ export function buildActivityTimeline(params: {
       continue;
     }
 
-    if (durationSeconds < MIN_TRIP_SECONDS && seg.points.length < 3) {
+    const prevStay = [...segments.slice(0, i)].reverse().find((s) => s.kind === 'stay');
+    const nextStay = segments.slice(i + 1).find((s) => s.kind === 'stay');
+    const bridgesZones =
+      prevStay?.kind === 'stay' &&
+      nextStay?.kind === 'stay' &&
+      prevStay.zone.id !== nextStay.zone.id;
+
+    // Keep zone-to-zone connectors even when the trail is only 2 endpoints.
+    if (
+      durationSeconds < MIN_TRIP_SECONDS &&
+      seg.points.length < 3 &&
+      !bridgesZones
+    ) {
       continue;
     }
 
     const pathPts = seg.points.map((p) => ({ lat: p.lat, lng: p.lng }));
-    const distanceM = pathDistanceM(pathPts);
+    let distanceM = pathDistanceM(pathPts);
+    if (
+      distanceM < 50 &&
+      bridgesZones &&
+      prevStay?.kind === 'stay' &&
+      nextStay?.kind === 'stay'
+    ) {
+      const from = prevStay.points[prevStay.points.length - 1]!;
+      const to = nextStay.points[0]!;
+      distanceM = Math.round(haversineM(from, to));
+      if (pathPts.length < 2) {
+        pathPts.length = 0;
+        pathPts.push({ lat: from.lat, lng: from.lng }, { lat: to.lat, lng: to.lng });
+      }
+    }
     totalDistanceM += distanceM;
 
-    const prevStay = [...merged.slice(0, i)].reverse().find((s) => s.kind === 'stay');
-    const nextStay = merged.slice(i + 1).find((s) => s.kind === 'stay');
     const startLabel =
       prevStay && prevStay.kind === 'stay' ? zoneLabel(prevStay.zone) : 'Berangkat';
     const endLabel =
@@ -262,7 +309,8 @@ export function buildActivityTimeline(params: {
         : 0;
     const spanMin = durationSeconds / 60;
     const sparse = spanMin > 10 && seg.points.length < 4;
-    const inaccurate = avgAcc > 80 || sparse || distanceM > 80_000;
+    const inaccurate =
+      avgAcc > 80 || sparse || distanceM > 80_000 || seg.points.length < 3;
 
     events.push({
       type: 'trip',
