@@ -37,6 +37,7 @@ class ChildBerandaTab extends StatelessWidget {
     this.onStartTrip,
     this.onCancelTrip,
     this.onArriveTrip,
+    this.empConfigured = false,
     this.empActive = false,
     this.empPlaceName,
     this.empNote,
@@ -71,6 +72,8 @@ class ChildBerandaTab extends StatelessWidget {
   final VoidCallback? onStartTrip;
   final VoidCallback? onCancelTrip;
   final VoidCallback? onArriveTrip;
+  /// Parent has saved a meeting point for this child (show even when not activated).
+  final bool empConfigured;
   final bool empActive;
   final String? empPlaceName;
   final String? empNote;
@@ -146,88 +149,13 @@ class ChildBerandaTab extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.md),
         _QuickStatsRow(todayUsageSeconds: todayUsageSeconds, points: points),
-        if (empActive) ...[
+        if (empConfigured || empActive) ...[
           const SizedBox(height: AppSpacing.md),
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: onOpenEmp,
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(width: 5, color: AppColors.tealDeep),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.teal.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.place_rounded,
-                                color: AppColors.tealDeep,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Titik kumpul aktif',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 12.5,
-                                      color: AppColors.tealDeep,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    empPlaceName ?? 'Titik kumpul',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  if (empNote != null &&
-                                      empNote!.trim().isNotEmpty) ...[
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      empNote!,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: AppColors.inkSoft,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12.5,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              color: AppColors.inkSoft,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _EmpKnowYourPointCard(
+            active: empActive,
+            placeName: empPlaceName ?? 'Titik kumpul',
+            note: empNote,
+            onOpen: onOpenEmp,
           ),
         ],
         if (homeByAckVisible || homeByAckSent) ...[
@@ -257,74 +185,14 @@ class ChildBerandaTab extends StatelessWidget {
         ],
         if (tripActive || tripArrived || onStartTrip != null) ...[
           const SizedBox(height: AppSpacing.md),
-          PaSectionCard(
-            color: tripArrived
-                ? AppColors.teal.withValues(alpha: 0.14)
-                : AppColors.sky.withValues(alpha: 0.14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  tripArrived
-                      ? 'Tiba di ${tripToLabel ?? 'tujuan'}'
-                      : tripActive
-                          ? (tripProgress <= 0 && onStartTrip != null
-                              ? 'Rute siap · ${tripToLabel ?? 'tujuan'}'
-                              : 'Menuju ${tripToLabel ?? 'tujuan'}')
-                          : 'Mulai perjalanan',
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                  textAlign: TextAlign.center,
-                ),
-                if (tripArrived) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Orang tua sudah diberi tahu. Selamat sampai.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.inkSoft,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ] else if (tripActive) ...[
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: tripProgress.clamp(0.0, 1.0),
-                      minHeight: 8,
-                      backgroundColor: const Color(0xFFE2E6EA),
-                      color: AppColors.teal,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  if (onStartTrip != null)
-                    FilledButton(
-                      onPressed: onStartTrip,
-                      child: const Text('Mulai perjalanan'),
-                    ),
-                  if (onArriveTrip != null) ...[
-                    FilledButton(
-                      onPressed: onArriveTrip,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.tealDeep,
-                      ),
-                      child: const Text('Sudah sampai'),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  OutlinedButton(
-                    onPressed: onCancelTrip,
-                    child: const Text('Batalkan perjalanan'),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: onStartTrip,
-                    child: const Text('Pilih tujuan'),
-                  ),
-                ],
-              ],
-            ),
+          _TripActionCard(
+            active: tripActive,
+            arrived: tripArrived,
+            toLabel: tripToLabel,
+            progress: tripProgress,
+            onStart: onStartTrip,
+            onCancel: onCancelTrip,
+            onArrive: onArriveTrip,
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
@@ -427,6 +295,325 @@ class ChildBerandaTab extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _EmpKnowYourPointCard extends StatelessWidget {
+  const _EmpKnowYourPointCard({
+    required this.active,
+    required this.placeName,
+    this.note,
+    this.onOpen,
+  });
+
+  final bool active;
+  final String placeName;
+  final String? note;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = active ? AppColors.danger : AppColors.tealDeep;
+    final wash = active
+        ? const Color(0xFFFFE8E6)
+        : AppColors.teal.withValues(alpha: 0.10);
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Ink(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: active
+                  ? AppColors.danger.withValues(alpha: 0.35)
+                  : const Color(0xFFE2E6EA),
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: accent),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: wash,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            active
+                                ? Icons.notifications_active_rounded
+                                : Icons.place_outlined,
+                            color: accent,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                active
+                                    ? 'Darurat — segera ke sini'
+                                    : 'Titik kumpul keluarga',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                  color: accent,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                placeName,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                active
+                                    ? ((note != null && note!.trim().isNotEmpty)
+                                        ? note!.trim()
+                                        : 'Ikuti arahan orang tua')
+                                    : 'Hafalkan tempat ini untuk kondisi darurat',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.inkSoft,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (onOpen != null)
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.inkSoft.withValues(alpha: 0.8),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact trip control — one row when idle, slim progress when active.
+class _TripActionCard extends StatelessWidget {
+  const _TripActionCard({
+    required this.active,
+    required this.arrived,
+    this.toLabel,
+    required this.progress,
+    this.onStart,
+    this.onCancel,
+    this.onArrive,
+  });
+
+  final bool active;
+  final bool arrived;
+  final String? toLabel;
+  final double progress;
+  final VoidCallback? onStart;
+  final VoidCallback? onCancel;
+  final VoidCallback? onArrive;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = arrived
+        ? 'Tiba di ${toLabel ?? 'tujuan'}'
+        : active
+            ? (progress <= 0 && onStart != null
+                ? 'Rute siap'
+                : 'Menuju ${toLabel ?? 'tujuan'}')
+            : 'Perjalanan';
+    final subtitle = arrived
+        ? 'Orang tua sudah diberi tahu'
+        : active
+            ? (onStart != null ? (toLabel ?? 'Siap dimulai') : 'Sedang berjalan')
+            : 'Pilih tujuan aman ke tempat tersimpan';
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: !active && !arrived ? onStart : null,
+        child: Ink(
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFFE2E6EA)),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: arrived
+                            ? AppColors.teal.withValues(alpha: 0.14)
+                            : const Color(0xFFE8F1FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        arrived
+                            ? Icons.check_circle_rounded
+                            : Icons.directions_walk_rounded,
+                        color: arrived ? AppColors.tealDeep : AppColors.sky,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.inkSoft,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!active && !arrived && onStart != null)
+                      TextButton(
+                        onPressed: onStart,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.tealDeep,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Mulai',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                  ],
+                ),
+                if (active && onStart == null) ...[
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress.clamp(0.0, 1.0),
+                      minHeight: 6,
+                      backgroundColor: const Color(0xFFE2E6EA),
+                      color: AppColors.teal,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (onArrive != null)
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: onArrive,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.tealDeep,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text(
+                              'Sudah sampai',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                      if (onArrive != null && onCancel != null)
+                        const SizedBox(width: 8),
+                      if (onCancel != null)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: onCancel,
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text('Batalkan'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (active && onStart != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: onStart,
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          child: const Text('Mulai perjalanan'),
+                        ),
+                      ),
+                      if (onCancel != null) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: onCancel,
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 10),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            child: const Text('Batalkan'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

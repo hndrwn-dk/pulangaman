@@ -69,6 +69,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   Map<String, dynamic>? _trip;
   Timer? _tripArrivedClear;
   Map<String, dynamic>? _empActive;
+  Map<String, dynamic>? _empPoint;
   String? _empAlertOpenedId;
   bool _empScreenOpen = false;
   /// Activations the child already stood down — ignore late WS/FCM/poll echoes.
@@ -86,6 +87,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     Future.microtask(_pollHomeByStatus);
     Future.microtask(_pollTrip);
     Future.microtask(_pollEmergencyMeeting);
+    Future.microtask(_pollEmpPoint);
     _panicStatusPoll = Timer.periodic(
       const Duration(seconds: 5),
       (_) => unawaited(_pollPanicStatus()),
@@ -100,7 +102,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     );
     _empPoll = Timer.periodic(
       const Duration(seconds: 20),
-      (_) => unawaited(_pollEmergencyMeeting()),
+      (_) {
+        unawaited(_pollEmergencyMeeting());
+        unawaited(_pollEmpPoint());
+      },
     );
     _connectivitySub =
         Connectivity().onConnectivityChanged.listen((_) => _flushQueue());
@@ -117,6 +122,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       // Refresh status only — do not force-open the alert on every resume
       // (closing the native fullscreen also resumes the app).
       unawaited(_pollEmergencyMeeting());
+      unawaited(_pollEmpPoint());
     }
   }
 
@@ -298,6 +304,27 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Titik kumpul darurat sudah dinonaktifkan')),
     );
+  }
+
+  Future<void> _pollEmpPoint() async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/emergency-meeting-points');
+      final points = (data['points'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      Map<String, dynamic>? primary;
+      for (final p in points) {
+        if (p['isPrimary'] == true) {
+          primary = p;
+          break;
+        }
+      }
+      primary ??= points.isEmpty ? null : points.first;
+      if (!mounted) return;
+      setState(() => _empPoint = primary);
+    } catch (_) {}
   }
 
   Future<void> _pollEmergencyMeeting({bool openAlert = false}) async {
@@ -1339,29 +1366,36 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             onArriveTrip: _trip != null && _trip!['status'] == 'active'
                 ? () => unawaited(_markTripArrived())
                 : null,
+            empConfigured: _empPoint != null || _empActive != null,
             empActive: _empActive != null,
-            empPlaceName: _empActive?['meetingPointName'] as String?,
-            empNote: _empActive?['note'] as String?,
-            onOpenEmp: _empActive == null
+            empPlaceName: (_empActive?['meetingPointName'] as String?) ??
+                (_empPoint?['name'] as String?),
+            empNote: (_empActive?['note'] as String?) ??
+                (_empPoint?['instructions'] as String?),
+            onOpenEmp: (_empPoint == null && _empActive == null)
                 ? null
                 : () {
-                    final lat = parseCoord(_empActive!['lat']);
-                    final lng = parseCoord(_empActive!['lng']);
-                    final name = _empActive!['meetingPointName'] as String? ??
+                    final fromActive = _empActive;
+                    final lat = parseCoord(
+                      fromActive?['lat'] ?? _empPoint?['lat'],
+                    );
+                    final lng = parseCoord(
+                      fromActive?['lng'] ?? _empPoint?['lng'],
+                    );
+                    final name = (fromActive?['meetingPointName'] as String?) ??
+                        (_empPoint?['name'] as String?) ??
                         'Titik kumpul';
                     if (lat == null || lng == null) return;
-                    // Allow reopen from the beranda card.
                     _empAlertOpenedId = null;
                     unawaited(
                       _openEmergencyMeetingScreen(
                         placeName: name,
                         lat: lat,
                         lng: lng,
-                        instructions:
-                            _empActive!['instructions'] as String?,
-                        note: _empActive!['note'] as String?,
-                        activationId:
-                            _empActive!['activationId'] as String?,
+                        instructions: (fromActive?['instructions'] as String?) ??
+                            (_empPoint?['instructions'] as String?),
+                        note: fromActive?['note'] as String?,
+                        activationId: fromActive?['activationId'] as String?,
                       ),
                     );
                   },
