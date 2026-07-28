@@ -21,6 +21,7 @@ import { attendanceRouter } from './routes/attendance.js';
 import { rewardsRouter } from './routes/rewards.js';
 import { policiesRouter } from './routes/policies.js';
 import { telemetryRouter } from './routes/telemetry.js';
+import { screentimeRouter } from './routes/screentime.js';
 import { messagesRouter } from './routes/messages.js';
 import { remindersRouter } from './routes/reminders.js';
 import { placesRouter } from './routes/places.js';
@@ -63,6 +64,7 @@ export function createApp() {
   app.use('/api/v1/rewards', rewardsRouter);
   app.use('/api/v1/policies', policiesRouter);
   app.use('/api/v1/telemetry', telemetryRouter);
+  app.use('/api/v1/screentime', screentimeRouter);
   app.use('/api/v1/messages', messagesRouter);
   app.use('/api/v1/reminders', remindersRouter);
   app.use('/api/v1/places', placesRouter);

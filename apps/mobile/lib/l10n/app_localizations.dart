@@ -2750,6 +2750,36 @@ abstract class AppLocalizations {
   /// **'Minggu Ini'**
   String get thisWeekTitle;
 
+  /// No description provided for @insightThisWeekTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Insight minggu ini'**
+  String get insightThisWeekTitle;
+
+  /// No description provided for @insightAddReminderPrompt.
+  ///
+  /// In id, this message translates to:
+  /// **'Tambah pengingat jam {time}?'**
+  String insightAddReminderPrompt(String time);
+
+  /// No description provided for @insightDaysUnderLimit.
+  ///
+  /// In id, this message translates to:
+  /// **'{days} dari {total} hari di bawah limit'**
+  String insightDaysUnderLimit(int days, int total);
+
+  /// No description provided for @insightRewardsAutoHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Rewards menghitung ini otomatis'**
+  String get insightRewardsAutoHint;
+
+  /// No description provided for @insightReminderBodyDefault.
+  ///
+  /// In id, this message translates to:
+  /// **'Saatnya istirahat dari HP dan bersiap istirahat.'**
+  String get insightReminderBodyDefault;
+
   /// No description provided for @limitScheduleTitle.
   ///
   /// In id, this message translates to:

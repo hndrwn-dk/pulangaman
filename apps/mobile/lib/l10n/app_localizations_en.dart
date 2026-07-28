@@ -1486,6 +1486,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get thisWeekTitle => 'This Week';
 
   @override
+  String get insightThisWeekTitle => 'This week\'s insight';
+
+  @override
+  String insightAddReminderPrompt(String time) {
+    return 'Add a reminder at $time?';
+  }
+
+  @override
+  String insightDaysUnderLimit(int days, int total) {
+    return '$days of $total days under limit';
+  }
+
+  @override
+  String get insightRewardsAutoHint => 'Rewards tracks this automatically';
+
+  @override
+  String get insightReminderBodyDefault =>
+      'Time to put the phone down and wind down.';
+
+  @override
   String get limitScheduleTitle => 'Limit Schedule';
 
   @override

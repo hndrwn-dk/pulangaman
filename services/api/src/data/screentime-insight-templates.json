@@ -1,0 +1,280 @@
+{
+  "_readme": "Rule-based phrasing templates for Screen Time insights. No LLM call — pick a category by the deterministic thresholds already computed in code, then pick one template at random (or rotate) from that category's array, then substitute {placeholders}. Re-roll only changes wording, never the underlying numbers. Keep one chosen variant stable for a given child+day (cache the choice, don't re-roll on every screen open, so the same insight doesn't visibly change wording mid-session.",
+
+  "trend": {
+    "_placeholders": ["childName", "projectedValue", "percentChange", "periodLabel"],
+    "_thresholds": "up_significant: >+20% vs prior period. up_slight: +5% to +20%. stable: -5% to +5%. down_slight: -5% to -20%. down_significant: <-20%.",
+
+    "up_significant": {
+      "id": [
+        "Kalau pola ini terus, {periodLabel} diproyeksikan sekitar {projectedValue} — naik {percentChange} dari periode sebelumnya.",
+        "Pemakaian {childName} naik cukup jauh, {percentChange} lebih tinggi dari periode lalu. Proyeksi {periodLabel}: sekitar {projectedValue}.",
+        "Ada lonjakan pemakaian — {percentChange} lebih tinggi dari sebelumnya, mengarah ke sekitar {projectedValue} {periodLabel}.",
+        "Tren naik cukup terasa: {percentChange} dari periode lalu, proyeksi {periodLabel} sekitar {projectedValue}.",
+        "{childName} lebih sering pakai HP belakangan ini — naik {percentChange}, proyeksi {periodLabel} sekitar {projectedValue}."
+      ],
+      "en": [
+        "At this pace, {periodLabel} is projected at around {projectedValue} — up {percentChange} from the previous period.",
+        "{childName}'s usage has climbed noticeably, {percentChange} higher than last period. Projected {periodLabel}: about {projectedValue}.",
+        "There's a clear uptick — {percentChange} higher than before, trending toward {projectedValue} {periodLabel}.",
+        "A fairly strong upward trend: {percentChange} vs the previous period, projecting around {projectedValue} {periodLabel}.",
+        "{childName} has been on the phone more lately — up {percentChange}, projected around {projectedValue} {periodLabel}."
+      ]
+    },
+
+    "up_slight": {
+      "id": [
+        "Sedikit naik dari periode lalu ({percentChange}). Proyeksi {periodLabel}: sekitar {projectedValue}.",
+        "Pemakaian {childName} naik tipis, {percentChange} dari sebelumnya — masih dalam rentang wajar.",
+        "Ada kenaikan kecil ({percentChange}), proyeksi {periodLabel} sekitar {projectedValue}.",
+        "Sedikit lebih tinggi dari biasanya — {percentChange} — tapi belum jauh dari pola normal.",
+        "Naik pelan, {percentChange} dari periode lalu. Proyeksi {periodLabel}: {projectedValue}."
+      ],
+      "en": [
+        "Slightly up from last period ({percentChange}). Projected {periodLabel}: around {projectedValue}.",
+        "{childName}'s usage ticked up a bit, {percentChange} from before — still within a normal range.",
+        "A small increase ({percentChange}), projecting around {projectedValue} {periodLabel}.",
+        "A touch higher than usual — {percentChange} — but not far off the typical pattern.",
+        "Gradually climbing, {percentChange} from the previous period. Projected {periodLabel}: {projectedValue}."
+      ]
+    },
+
+    "stable": {
+      "id": [
+        "Pemakaian {childName} stabil dibanding periode lalu, sekitar {projectedValue} {periodLabel}.",
+        "Gak banyak berubah dari biasanya — proyeksi {periodLabel} tetap di kisaran {projectedValue}.",
+        "Polanya konsisten dari minggu ke minggu, sekitar {projectedValue} {periodLabel}.",
+        "Pemakaian relatif stabil, proyeksi {periodLabel}: {projectedValue}.",
+        "Gak ada perubahan berarti — masih di kisaran {projectedValue} seperti biasanya."
+      ],
+      "en": [
+        "{childName}'s usage is steady compared to last period, around {projectedValue} {periodLabel}.",
+        "Not much has changed from usual — projected {periodLabel} stays around {projectedValue}.",
+        "The pattern's been consistent week to week, around {projectedValue} {periodLabel}.",
+        "Usage is holding steady, projected {periodLabel}: {projectedValue}.",
+        "No real change here — still in the usual range of {projectedValue}."
+      ]
+    },
+
+    "down_slight": {
+      "id": [
+        "Turun tipis dari periode lalu ({percentChange}). Proyeksi {periodLabel}: sekitar {projectedValue}.",
+        "Pemakaian {childName} sedikit berkurang, {percentChange} dari sebelumnya.",
+        "Ada penurunan kecil ({percentChange}) — arah yang bagus.",
+        "Sedikit lebih rendah dari biasanya, {percentChange} dari periode lalu.",
+        "Turun pelan, {percentChange}. Proyeksi {periodLabel}: {projectedValue}."
+      ],
+      "en": [
+        "Slightly down from last period ({percentChange}). Projected {periodLabel}: around {projectedValue}.",
+        "{childName}'s usage eased off a bit, {percentChange} from before.",
+        "A small decrease ({percentChange}) — a good direction.",
+        "A touch lower than usual, {percentChange} from the previous period.",
+        "Gradually easing off, {percentChange}. Projected {periodLabel}: {projectedValue}."
+      ]
+    },
+
+    "down_significant": {
+      "id": [
+        "Turun cukup jauh dari periode lalu — {percentChange}. Proyeksi {periodLabel}: sekitar {projectedValue}.",
+        "Pemakaian {childName} berkurang signifikan, {percentChange} dari sebelumnya. Progres bagus.",
+        "Penurunan yang terasa: {percentChange} lebih rendah dari periode lalu.",
+        "{childName} jauh lebih jarang pakai HP belakangan ini — turun {percentChange}.",
+        "Tren turun cukup kuat, {percentChange} dari sebelumnya. Proyeksi {periodLabel}: {projectedValue}."
+      ],
+      "en": [
+        "Down quite a bit from last period — {percentChange}. Projected {periodLabel}: around {projectedValue}.",
+        "{childName}'s usage dropped noticeably, {percentChange} from before. Good progress.",
+        "A meaningful decrease: {percentChange} lower than the previous period.",
+        "{childName} has been on the phone a lot less lately — down {percentChange}.",
+        "A fairly strong downward trend, {percentChange} from before. Projected {periodLabel}: {projectedValue}."
+      ]
+    }
+  },
+
+  "peakHour": {
+    "_placeholders": ["appName", "startTime", "endTime"],
+    "_thresholds": "lateNight: peak window overlaps 21:00-24:00. evening: overlaps 17:00-21:00. afternoon: overlaps 12:00-17:00. morning: overlaps 05:00-12:00.",
+
+    "lateNight": {
+      "id": [
+        "{appName} paling sering dipakai jam {startTime}–{endTime}, mendekati jam tidur.",
+        "Jam paling sibuk ada di malam hari, {startTime}–{endTime} — waktu yang biasanya buat bersiap tidur.",
+        "Pemakaian {appName} memuncak {startTime}–{endTime}, cukup dekat dengan jam istirahat.",
+        "Kebanyakan waktu di {appName} jatuh di jam {startTime}–{endTime}, menjelang malam.",
+        "{startTime}–{endTime} jadi jam tersibuk untuk {appName} — worth diperhatiin karena mepet jam tidur."
+      ],
+      "en": [
+        "{appName} is used most between {startTime}–{endTime}, close to bedtime.",
+        "The busiest hours are in the evening, {startTime}–{endTime} — usually wind-down time.",
+        "{appName} usage peaks around {startTime}–{endTime}, fairly close to sleep time.",
+        "Most of the time on {appName} falls between {startTime}–{endTime}, heading into night.",
+        "{startTime}–{endTime} is the busiest window for {appName} — worth noting since it's close to bedtime."
+      ]
+    },
+
+    "evening": {
+      "id": [
+        "{appName} paling sering dipakai sore-malam, jam {startTime}–{endTime}.",
+        "Jam tersibuk ada di {startTime}–{endTime}, biasanya waktu santai setelah aktivitas harian.",
+        "Pemakaian {appName} memuncak {startTime}–{endTime}.",
+        "Kebanyakan waktu di {appName} jatuh sore hari, {startTime}–{endTime}.",
+        "{startTime}–{endTime} jadi jam paling aktif buat {appName}."
+      ],
+      "en": [
+        "{appName} is used most in the evening, {startTime}–{endTime}.",
+        "The busiest hours are {startTime}–{endTime}, usually downtime after the day's activities.",
+        "{appName} usage peaks around {startTime}–{endTime}.",
+        "Most of the time on {appName} falls in the evening, {startTime}–{endTime}.",
+        "{startTime}–{endTime} is the most active window for {appName}."
+      ]
+    },
+
+    "afternoon": {
+      "id": [
+        "{appName} paling sering dipakai siang-sore, jam {startTime}–{endTime} — sekitar waktu pulang sekolah.",
+        "Jam tersibuk ada di {startTime}–{endTime}, biasanya setelah pulang sekolah.",
+        "Pemakaian {appName} memuncak {startTime}–{endTime}.",
+        "Kebanyakan waktu di {appName} jatuh siang hari, {startTime}–{endTime}.",
+        "{startTime}–{endTime} jadi jam paling aktif buat {appName}, sekitar jam pulang sekolah."
+      ],
+      "en": [
+        "{appName} is used most in the afternoon, {startTime}–{endTime} — around after-school hours.",
+        "The busiest hours are {startTime}–{endTime}, usually right after school.",
+        "{appName} usage peaks around {startTime}–{endTime}.",
+        "Most of the time on {appName} falls in the afternoon, {startTime}–{endTime}.",
+        "{startTime}–{endTime} is the most active window for {appName}, around after-school time."
+      ]
+    },
+
+    "morning": {
+      "id": [
+        "{appName} paling sering dipakai pagi hari, jam {startTime}–{endTime}.",
+        "Jam tersibuk ada di pagi, {startTime}–{endTime}.",
+        "Pemakaian {appName} memuncak {startTime}–{endTime} pagi.",
+        "Kebanyakan waktu di {appName} jatuh pagi hari, {startTime}–{endTime}.",
+        "{startTime}–{endTime} jadi jam paling aktif buat {appName} di pagi hari."
+      ],
+      "en": [
+        "{appName} is used most in the morning, {startTime}–{endTime}.",
+        "The busiest hours are in the morning, {startTime}–{endTime}.",
+        "{appName} usage peaks around {startTime}–{endTime} in the morning.",
+        "Most of the time on {appName} falls in the morning, {startTime}–{endTime}.",
+        "{startTime}–{endTime} is the most active morning window for {appName}."
+      ]
+    }
+  },
+
+  "weekdayPattern": {
+    "_placeholders": ["dayNames", "weekCount"],
+    "_thresholds": "weekday_high: 1-2 weekdays running >25% above the child's daily average, in >=3 of the last weekCount weeks. weekend_high: same check but for Sat/Sun as a pair. Omit entirely if no weekday clears this bar.",
+
+    "weekday_high": {
+      "id": [
+        "Pola kelihatan: {dayNames} konsisten lebih tinggi {weekCount} minggu terakhir.",
+        "{dayNames} cenderung jadi hari paling sibuk, berulang selama {weekCount} minggu terakhir.",
+        "Ada pola berulang di {dayNames} — pemakaian selalu lebih tinggi dari hari lain, {weekCount} minggu terakhir.",
+        "{dayNames} kelihatan jadi hari dengan pemakaian tertinggi secara konsisten belakangan ini.",
+        "Selama {weekCount} minggu terakhir, {dayNames} selalu jadi hari paling banyak pemakaian."
+      ],
+      "en": [
+        "A pattern is showing: {dayNames} has been consistently higher over the last {weekCount} weeks.",
+        "{dayNames} tends to be the busiest day, repeating over the last {weekCount} weeks.",
+        "There's a recurring pattern on {dayNames} — usage is consistently higher than other days, over {weekCount} weeks.",
+        "{dayNames} has consistently stood out as the highest-usage day lately.",
+        "Over the last {weekCount} weeks, {dayNames} has consistently been the busiest day."
+      ]
+    },
+
+    "weekend_high": {
+      "id": [
+        "Akhir pekan konsisten lebih tinggi dari hari sekolah, {weekCount} minggu terakhir.",
+        "Pola kelihatan: Sabtu-Minggu jadi waktu pemakaian tertinggi secara rutin.",
+        "Pemakaian akhir pekan cenderung jauh lebih tinggi dibanding hari biasa.",
+        "Sabtu & Minggu konsisten jadi hari tersibuk, berulang {weekCount} minggu terakhir.",
+        "Ada pola jelas: akhir pekan selalu lebih tinggi dari rata-rata hari sekolah."
+      ],
+      "en": [
+        "Weekends have been consistently higher than school days over the last {weekCount} weeks.",
+        "A pattern is showing: Saturday-Sunday is regularly the highest-usage time.",
+        "Weekend usage tends to run noticeably higher than weekdays.",
+        "Sat & Sun have consistently been the busiest days, repeating over {weekCount} weeks.",
+        "There's a clear pattern: weekends consistently run above the weekday average."
+      ]
+    }
+  },
+
+  "streak": {
+    "_placeholders": ["daysUnderLimit", "totalDays"],
+    "_thresholds": "high: ratio >= 0.7. moderate: 0.4-0.7. low: <0.4 (consider omitting or keeping tone neutral, not scolding).",
+
+    "high": {
+      "id": [
+        "{daysUnderLimit} dari {totalDays} hari di bawah limit minggu ini — bagus!",
+        "Konsisten di bawah limit {daysUnderLimit} dari {totalDays} hari terakhir.",
+        "{daysUnderLimit}/{totalDays} hari sesuai limit — polanya rapi.",
+        "Sebagian besar hari ({daysUnderLimit} dari {totalDays}) masih di batas aman.",
+        "{daysUnderLimit} dari {totalDays} hari terkendali dengan baik."
+      ],
+      "en": [
+        "{daysUnderLimit} of {totalDays} days under the limit this week — nice.",
+        "Consistently under the limit {daysUnderLimit} of the last {totalDays} days.",
+        "{daysUnderLimit}/{totalDays} days within limit — a solid pattern.",
+        "Most days ({daysUnderLimit} of {totalDays}) stayed within the safe range.",
+        "{daysUnderLimit} of {totalDays} days well within limit."
+      ]
+    },
+
+    "moderate": {
+      "id": [
+        "{daysUnderLimit} dari {totalDays} hari di bawah limit minggu ini.",
+        "Sekitar separuh hari ({daysUnderLimit}/{totalDays}) sesuai limit.",
+        "{daysUnderLimit} dari {totalDays} hari terkendali, sisanya sedikit lebih tinggi.",
+        "Polanya campur — {daysUnderLimit} dari {totalDays} hari di bawah limit.",
+        "{daysUnderLimit}/{totalDays} hari sesuai batas, ada ruang buat lebih konsisten."
+      ],
+      "en": [
+        "{daysUnderLimit} of {totalDays} days under the limit this week.",
+        "Roughly half the days ({daysUnderLimit}/{totalDays}) stayed within limit.",
+        "{daysUnderLimit} of {totalDays} days on track, the rest ran a bit higher.",
+        "A mixed pattern — {daysUnderLimit} of {totalDays} days under limit.",
+        "{daysUnderLimit}/{totalDays} days within limit, some room for more consistency."
+      ]
+    },
+
+    "low": {
+      "id": [
+        "{daysUnderLimit} dari {totalDays} hari di bawah limit minggu ini.",
+        "Minggu ini kebanyakan hari di atas limit — {daysUnderLimit} dari {totalDays} yang sesuai.",
+        "{daysUnderLimit}/{totalDays} hari terkendali; mungkin waktu yang pas buat sesuaikan aturan layar.",
+        "Limit lebih sering terlewati minggu ini ({daysUnderLimit} dari {totalDays} hari sesuai).",
+        "{daysUnderLimit} dari {totalDays} hari di bawah limit — coba lihat Rules kalau batasnya perlu disesuaikan."
+      ],
+      "en": [
+        "{daysUnderLimit} of {totalDays} days under the limit this week.",
+        "Most days ran over the limit this week — {daysUnderLimit} of {totalDays} stayed within it.",
+        "{daysUnderLimit}/{totalDays} days on track; might be worth revisiting the screen time rules.",
+        "The limit was crossed more often this week ({daysUnderLimit} of {totalDays} days within it).",
+        "{daysUnderLimit} of {totalDays} days under limit — worth checking whether the current limit still fits."
+      ]
+    }
+  },
+
+  "reminderLabel": {
+    "_placeholders": [],
+    "_note": "Used to pre-fill the suggested reminder's title when the peakHour category is lateNight/evening (wind-down nudge). Pick one at random, no data-driven branching needed here.",
+    "id": [
+      "Waktunya berhenti main HP",
+      "Siap-siap tidur ya",
+      "Sudah malam, istirahat yuk",
+      "Waktunya rehat dari layar",
+      "Yuk mulai bersiap tidur"
+    ],
+    "en": [
+      "Time to put the phone down",
+      "Getting close to bedtime",
+      "Time to wind down for the night",
+      "Time for a screen break",
+      "Start getting ready for bed"
+    ]
+  }
+}

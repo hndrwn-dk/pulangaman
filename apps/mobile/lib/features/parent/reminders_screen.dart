@@ -89,6 +89,11 @@ class RemindersScreen extends ConsumerStatefulWidget {
     super.key,
     this.initialChildId,
     this.lockChild = false,
+    this.prefillTitle,
+    this.prefillBody,
+    this.prefillHour,
+    this.prefillMinute,
+    this.openCustomOnLoad = false,
   });
 
   /// Prefill / lock the selected child (e.g. from child detail).
@@ -96,6 +101,15 @@ class RemindersScreen extends ConsumerStatefulWidget {
 
   /// When true with [initialChildId], hide the child picker.
   final bool lockChild;
+
+  /// Optional draft values when opening the custom reminder sheet.
+  final String? prefillTitle;
+  final String? prefillBody;
+  final int? prefillHour;
+  final int? prefillMinute;
+
+  /// After first load, open the custom create sheet with [prefill*] values.
+  final bool openCustomOnLoad;
 
   @override
   ConsumerState<RemindersScreen> createState() => _RemindersScreenState();
@@ -112,6 +126,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   /// Per-child list cache — chip switches stay instant; spinner only on cold miss.
   final Map<String, List<ChildReminder>> _cache = {};
   static const _timeout = Duration(seconds: 12);
+  bool _openedPrefillSheet = false;
 
   bool get _childLocked =>
       widget.lockChild && (widget.initialChildId?.isNotEmpty ?? false);
@@ -127,6 +142,16 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
       await _hydrateGenders();
       final id = _childId;
       if (id != null) await _load(id);
+      if (!mounted) return;
+      if (widget.openCustomOnLoad && !_openedPrefillSheet) {
+        _openedPrefillSheet = true;
+        await _showCustomDialog(
+          prefillTitle: widget.prefillTitle,
+          prefillBody: widget.prefillBody,
+          prefillHour: widget.prefillHour,
+          prefillMinute: widget.prefillMinute,
+        );
+      }
     });
   }
 
@@ -311,19 +336,29 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     );
   }
 
-  Future<void> _showCustomDialog({ChildReminder? existing}) async {
+  Future<void> _showCustomDialog({
+    ChildReminder? existing,
+    String? prefillTitle,
+    String? prefillBody,
+    int? prefillHour,
+    int? prefillMinute,
+  }) async {
     final childId = _childId;
     if (childId == null) return;
     final l10n = AppLocalizations.of(context);
     final refresh = visualRefreshOf(context);
     final titleCtrl = TextEditingController(
-      text: existing == null ? '' : existing.displayTitle(l10n),
+      text: existing == null
+          ? (prefillTitle ?? '')
+          : existing.displayTitle(l10n),
     );
     final bodyCtrl = TextEditingController(
-      text: existing == null ? '' : existing.displayBody(l10n),
+      text: existing == null
+          ? (prefillBody ?? '')
+          : existing.displayBody(l10n),
     );
-    var hour = existing?.hour ?? 19;
-    var minute = existing?.minute ?? 0;
+    var hour = existing?.hour ?? prefillHour ?? 19;
+    var minute = existing?.minute ?? prefillMinute ?? 0;
     var style = existing?.style ?? 'fullscreen';
     final days = {...(existing?.daysOfWeek ?? const [1, 2, 3, 4, 5, 6, 7])};
     final editing = existing != null;

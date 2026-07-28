@@ -33,6 +33,17 @@ class ScreenTimeChannel {
         .toList();
   }
 
+  /// Hour-bucketed foreground usage for peak-hour insights (last [days] days).
+  Future<List<Map<String, dynamic>>> getHourlyUsage({int days = 7}) async {
+    final result = await _channel.invokeListMethod<Map<dynamic, dynamic>>(
+      'getHourlyUsage',
+      {'days': days},
+    );
+    return (result ?? [])
+        .map((item) => item.map((key, value) => MapEntry('$key', value)))
+        .toList();
+  }
+
   Future<void> applyPolicy(Map<String, dynamic> policy) {
     return _channel.invokeMethod('applyPolicy', policy);
   }

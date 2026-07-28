@@ -10,7 +10,55 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../child/child_usage_utils.dart';
 import '../parent/children_controller.dart';
+import '../parent/reminders_screen.dart';
 import '../parent/vr_sheet_chrome.dart';
+
+class _ScreenTimeInsight {
+  _ScreenTimeInsight({
+    required this.trendText,
+    this.patternText,
+    this.patternDayText,
+    required this.streakText,
+    this.suggestedReminderTime,
+    this.suggestedReminderLabel,
+    required this.daysUnderLimit,
+    required this.totalDays,
+  });
+
+  final String trendText;
+  final String? patternText;
+  final String? patternDayText;
+  final String streakText;
+  final String? suggestedReminderTime;
+  final String? suggestedReminderLabel;
+  final int daysUnderLimit;
+  final int totalDays;
+
+  bool get hasSuggestedReminder =>
+      suggestedReminderTime != null &&
+      suggestedReminderTime!.isNotEmpty &&
+      suggestedReminderLabel != null &&
+      suggestedReminderLabel!.isNotEmpty;
+
+  factory _ScreenTimeInsight.fromJson(Map<String, dynamic> json) {
+    String? optionalText(dynamic value) {
+      final s = value as String?;
+      if (s == null || s.trim().isEmpty) return null;
+      return s.trim();
+    }
+
+    return _ScreenTimeInsight(
+      trendText: json['trendText'] as String? ?? '',
+      patternText: optionalText(json['patternText']),
+      patternDayText: optionalText(json['patternDayText']),
+      streakText: json['streakText'] as String? ?? '',
+      suggestedReminderTime: optionalText(json['suggestedReminderTime']),
+      suggestedReminderLabel: optionalText(json['suggestedReminderLabel']),
+      daysUnderLimit: (json['daysUnderLimit'] as num?)?.toInt() ?? 0,
+      totalDays: (json['totalDays'] as num?)?.toInt() ?? 7,
+    );
+  }
+}
 
 /// Stable per-child presence-dot colors (Screen Time chips).
 Color _childPresenceDotColor(String childId) {
@@ -113,6 +161,8 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   List<_UsageAppRow> _apps = [];
   List<_DayUsage> _week = [];
   bool _showAllApps = false;
+  _ScreenTimeInsight? _insight;
+  bool _insightLoading = false;
 
   bool get _childLocked => widget.lockedChild != null;
 
@@ -203,7 +253,11 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   }
 
   Future<void> _loadFor(String childId) async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _insightLoading = true;
+      _insight = null;
+    });
     try {
       final api = ref.read(apiClientProvider);
       final policy = await api.get('/api/v1/policies/$childId');
@@ -249,14 +303,114 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
         _week = week;
         _loading = false;
       });
+
+      unawaited(_loadInsight(childId, week: week, apps: apps));
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _apps = [];
         _week = [];
         _loading = false;
+        _insightLoading = false;
+        _insight = null;
       });
     }
+  }
+
+  Future<void> _loadInsight(
+    String childId, {
+    required List<_DayUsage> week,
+    required List<_UsageAppRow> apps,
+  }) async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final lang = Localizations.localeOf(context).languageCode;
+      final raw = await api.get(
+        '/api/v1/screentime/$childId/insights',
+        query: {'lang': lang},
+      );
+      if (!mounted) return;
+      setState(() {
+        _insight = _ScreenTimeInsight.fromJson(raw);
+        _insightLoading = false;
+      });
+    } catch (_) {
+      // API may not be deployed yet — local deterministic fallback so the card
+      // still appears from weekly totals already on screen.
+      if (!mounted) return;
+      setState(() {
+        _insight = _localFallbackInsight(week: week, apps: apps);
+        _insightLoading = false;
+      });
+    }
+  }
+
+  _ScreenTimeInsight _localFallbackInsight({
+    required List<_DayUsage> week,
+    required List<_UsageAppRow> apps,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final isEn = Localizations.localeOf(context).languageCode == 'en';
+    final limitMin = _activeLimitMinutes;
+    final limitSec = limitMin * 60;
+    final days = week.isEmpty
+        ? <_DayUsage>[
+            _DayUsage(
+              day: DateTime.now(),
+              totalSeconds:
+                  apps.fold<int>(0, (s, a) => s + a.durationSeconds),
+            ),
+          ]
+        : week;
+    var under = 0;
+    var sum = 0;
+    for (final d in days) {
+      sum += d.totalSeconds;
+      if (limitSec <= 0 || d.totalSeconds <= limitSec) under += 1;
+    }
+    final totalDays = days.isEmpty ? 1 : days.length;
+    final avgMin = (sum / totalDays / 60).round();
+    final now = DateTime.now();
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final projectedHours = ((avgMin * daysInMonth) / 60).round();
+    final period = isEn ? 'this month' : 'bulan ini';
+    final projected = isEn ? '$projectedHours hours' : '$projectedHours jam';
+    final streak = l10n.insightDaysUnderLimit(under, totalDays);
+    return _ScreenTimeInsight(
+      trendText: isEn
+          ? 'Usage is holding steady, projected $period: $projected.'
+          : 'Pemakaian relatif stabil, proyeksi $period: $projected.',
+      patternText: null,
+      patternDayText: null,
+      streakText: streak,
+      suggestedReminderTime: null,
+      suggestedReminderLabel: null,
+      daysUnderLimit: under,
+      totalDays: totalDays,
+    );
+  }
+
+  void _openSuggestedReminder(ChildSummary child, _ScreenTimeInsight insight) {
+    final time = insight.suggestedReminderTime;
+    final label = insight.suggestedReminderLabel;
+    if (time == null || label == null) return;
+    final parts = time.split(':');
+    final hour = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 20;
+    final minute = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 45;
+    final l10n = AppLocalizations.of(context);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => RemindersScreen(
+          initialChildId: child.id,
+          lockChild: true,
+          openCustomOnLoad: true,
+          prefillTitle: label,
+          prefillBody: l10n.insightReminderBodyDefault,
+          prefillHour: hour,
+          prefillMinute: minute,
+        ),
+      ),
+    );
   }
 
   void _openSettings(ChildSummary child) {
@@ -472,6 +626,24 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                     remainingSeconds: remaining,
                     enabled: _enabled,
                   ),
+                  if (_insightLoading && _insight == null) ...[
+                    const SizedBox(height: 16),
+                    const _InsightSkeleton(),
+                  ] else if (_insight != null) ...[
+                    const SizedBox(height: 16),
+                    _InsightWeekCard(
+                      insight: _insight!,
+                      onAddReminder: selected != null &&
+                              _insight!.hasSuggestedReminder
+                          ? () => _openSuggestedReminder(selected, _insight!)
+                          : null,
+                    ),
+                    const SizedBox(height: 12),
+                    _DaysUnderLimitRow(
+                      daysUnderLimit: _insight!.daysUnderLimit,
+                      totalDays: _insight!.totalDays,
+                    ),
+                  ],
                   const SizedBox(height: 22),
                   Row(
                     children: [
@@ -772,6 +944,288 @@ class _ChildChip extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _InsightSkeleton extends StatelessWidget {
+  const _InsightSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 148,
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.routeTint.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(AppRadius.vrCard),
+        border: Border.all(color: VisualRefreshColors.rewardBorder, width: 0.5),
+      ),
+    );
+  }
+}
+
+class _InsightWeekCard extends StatelessWidget {
+  const _InsightWeekCard({
+    required this.insight,
+    required this.onAddReminder,
+  });
+
+  final _ScreenTimeInsight insight;
+  final VoidCallback? onAddReminder;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final pattern = insight.patternText;
+    final patternDay = insight.patternDayText;
+    final streak = insight.streakText.trim();
+    final showReminder = onAddReminder != null && insight.hasSuggestedReminder;
+    final reminderTime = insight.suggestedReminderTime ?? '';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: refresh
+            ? VisualRefreshColors.routeTint
+            : const Color(0xFFF3E4C6),
+        borderRadius: BorderRadius.circular(
+          refresh ? AppRadius.vrCard : 20,
+        ),
+        border: refresh
+            ? Border.all(color: VisualRefreshColors.rewardBorder, width: 0.5)
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.insightThisWeekTitle.toUpperCase(),
+            style: refresh
+                ? GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                    color: VisualRefreshColors.routeText,
+                  )
+                : const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                    color: Color(0xFFB3722E),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          _InsightBulletRow(
+            icon: Icons.trending_up_rounded,
+            text: insight.trendText,
+          ),
+          if (pattern != null) ...[
+            const SizedBox(height: 10),
+            _InsightBulletRow(
+              icon: Icons.schedule_rounded,
+              text: pattern,
+            ),
+          ],
+          if (patternDay != null) ...[
+            const SizedBox(height: 10),
+            _InsightBulletRow(
+              icon: Icons.calendar_view_week_rounded,
+              text: patternDay,
+            ),
+          ],
+          if (streak.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _InsightBulletRow(
+              icon: Icons.workspace_premium_outlined,
+              text: streak,
+            ),
+          ],
+          if (showReminder) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(
+                  refresh ? AppRadius.vrChip : 14,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.insightAddReminderPrompt(reminderTime),
+                      style: refresh
+                          ? GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                              color: VisualRefreshColors.textPrimary,
+                            )
+                          : const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 36,
+                    child: FilledButton(
+                      onPressed: onAddReminder,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: refresh
+                            ? VisualRefreshColors.anchor
+                            : AppColors.tealDeep,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        l10n.reminderAddShort,
+                        style: refresh
+                            ? GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              )
+                            : const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightBulletRow extends StatelessWidget {
+  const _InsightBulletRow({
+    required this.icon,
+    required this.text,
+  });
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: refresh
+              ? VisualRefreshColors.routeText
+              : const Color(0xFFB3722E),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: refresh
+                ? GoogleFonts.plusJakartaSans(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                    color: VisualRefreshColors.textPrimary,
+                  )
+                : const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DaysUnderLimitRow extends StatelessWidget {
+  const _DaysUnderLimitRow({
+    required this.daysUnderLimit,
+    required this.totalDays,
+  });
+
+  final int daysUnderLimit;
+  final int totalDays;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: refresh ? VisualRefreshColors.surface : Colors.white,
+        borderRadius: BorderRadius.circular(
+          refresh ? AppRadius.vrCard : 16,
+        ),
+        border: refresh
+            ? Border.all(color: VisualRefreshColors.border, width: 0.5)
+            : null,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.workspace_premium_outlined,
+            size: 22,
+            color: refresh
+                ? VisualRefreshColors.rewardAccent
+                : const Color(0xFFB3722E),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.insightDaysUnderLimit(daysUnderLimit, totalDays),
+                  style: refresh
+                      ? GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          color: VisualRefreshColors.textPrimary,
+                        )
+                      : const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.insightRewardsAutoHint,
+                  style: refresh
+                      ? GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                          color: VisualRefreshColors.textSecondary,
+                        )
+                      : const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                          color: AppColors.inkSoft,
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

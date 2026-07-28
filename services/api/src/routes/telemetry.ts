@@ -17,7 +17,7 @@ telemetryRouter.post('/batch', async (req: AuthedRequest, res, next) => {
           .array(
             z.object({
               clientEventId: z.string().min(8).max(200),
-              kind: z.enum(['usage', 'blocked', 'override']),
+              kind: z.enum(['usage', 'blocked', 'override', 'usage_hourly']),
               packageName: z.string().max(200).optional(),
               durationSeconds: z.number().int().min(0).max(86400).optional(),
               recordedAt: z.string().datetime(),

@@ -846,6 +846,28 @@
   "noAppDataToday": "Belum ada data app hari ini.",
   "appUsageTitle": "Penggunaan Aplikasi",
   "thisWeekTitle": "Minggu Ini",
+  "insightThisWeekTitle": "Insight minggu ini",
+  "insightAddReminderPrompt": "Tambah pengingat jam {time}?",
+  "@insightAddReminderPrompt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "insightDaysUnderLimit": "{days} dari {total} hari di bawah limit",
+  "@insightDaysUnderLimit": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "insightRewardsAutoHint": "Rewards menghitung ini otomatis",
+  "insightReminderBodyDefault": "Saatnya istirahat dari HP dan bersiap istirahat.",
   "limitScheduleTitle": "Jadwal Batasan",
   "editInRulesHint": "Ubah di Aturan",
   "todayLabel": "Hari ini",

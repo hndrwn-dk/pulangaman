@@ -167,6 +167,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       });
       if (period == UsagePeriod.today) {
         final ok = await _uploadUsageTelemetry(apps);
+        unawaited(_uploadHourlyUsageTelemetry());
         if (!ok && mounted) {
           // Keep silent on auto-load; refresh button reports status.
         }
@@ -1178,6 +1179,53 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<void> _uploadHourlyUsageTelemetry() async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null || !_usageAccess) return;
+    try {
+      final raw = await _screenTimeChannel.getHourlyUsage(days: 7);
+      if (raw.isEmpty) return;
+      final now = DateTime.now().toUtc().toIso8601String();
+      final installationId = 'android-$userId';
+      final events = raw
+          .where((row) {
+            final pkg = row['packageName'] as String? ?? '';
+            final secs = (row['durationSeconds'] as num?)?.toInt() ?? 0;
+            final hour = (row['hour'] as num?)?.toInt();
+            final day = row['day'] as String? ?? '';
+            return pkg.isNotEmpty && secs > 0 && hour != null && day.length == 10;
+          })
+          .take(400)
+          .map((row) {
+            final pkg = row['packageName'] as String;
+            final day = row['day'] as String;
+            final hour = (row['hour'] as num).toInt();
+            final secs = (row['durationSeconds'] as num).toInt();
+            final label = row['appLabel'] as String?;
+            return {
+              'clientEventId': 'usage-hourly-$day-$hour-$pkg',
+              'kind': 'usage_hourly',
+              'packageName': pkg,
+              'durationSeconds': secs,
+              'recordedAt': now,
+              'payload': {
+                'appLabel': friendlyAppName(pkg, appLabel: label),
+                'hour': hour,
+                'day': day,
+              },
+            };
+          })
+          .toList();
+      if (events.isEmpty) return;
+      await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
+        'installationId': installationId,
+        'events': events,
+      });
+    } catch (_) {
+      // Hourly upload is best-effort; daily totals still power the main UI.
     }
   }
 

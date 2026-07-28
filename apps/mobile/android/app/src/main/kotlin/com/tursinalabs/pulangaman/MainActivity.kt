@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Process
 import android.provider.Settings
 import android.text.TextUtils
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -17,6 +18,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class MainActivity : FlutterActivity() {
     private val screenTimeChannel = "com.tursinalabs.pulangaman/screen_time"
@@ -52,6 +54,10 @@ class MainActivity : FlutterActivity() {
                     "getUsageStats" -> {
                         val period = call.argument<String>("period") ?: "today"
                         result.success(getUsageStats(period))
+                    }
+                    "getHourlyUsage" -> {
+                        val days = call.argument<Int>("days") ?: 7
+                        result.success(getHourlyUsage(days.coerceIn(1, 14)))
                     }
                     "applyPolicy" -> {
                         savePolicy(call.arguments as? Map<*, *> ?: emptyMap<String, Any>())
@@ -352,6 +358,101 @@ class MainActivity : FlutterActivity() {
                     "durationSeconds" to millis / 1000,
                 )
             }
+    }
+
+    /**
+     * Hour-bucketed foreground time from UsageEvents (last [days] local days).
+     * Needed for peak-hour insights — daily UsageStats alone is not enough.
+     */
+    private fun getHourlyUsage(days: Int): List<Map<String, Any>> {
+        if (!hasUsageAccess()) return emptyList()
+        val now = System.currentTimeMillis()
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        calendar.set(java.util.Calendar.MINUTE, 0)
+        calendar.set(java.util.Calendar.SECOND, 0)
+        calendar.set(java.util.Calendar.MILLISECOND, 0)
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, -(days - 1))
+        val startMs = calendar.timeInMillis
+
+        val manager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        val events = manager.queryEvents(startMs, now)
+        val launchers = launcherPackageNames()
+        val foregroundSince = HashMap<String, Long>()
+        // key: "$day|$hour|$package" -> millis
+        val buckets = HashMap<String, Long>()
+        val event = UsageEvents.Event()
+
+        fun flush(pkg: String, endMs: Long) {
+            val start = foregroundSince.remove(pkg) ?: return
+            if (endMs <= start) return
+            if (!isUserFacingApp(pkg, launchers)) return
+            var cursor = start
+            val sliceCal = java.util.Calendar.getInstance()
+            while (cursor < endMs) {
+                sliceCal.timeInMillis = cursor
+                val hour = sliceCal.get(java.util.Calendar.HOUR_OF_DAY)
+                val dayKey = String.format(
+                    "%04d-%02d-%02d",
+                    sliceCal.get(java.util.Calendar.YEAR),
+                    sliceCal.get(java.util.Calendar.MONTH) + 1,
+                    sliceCal.get(java.util.Calendar.DAY_OF_MONTH),
+                )
+                sliceCal.set(java.util.Calendar.MINUTE, 0)
+                sliceCal.set(java.util.Calendar.SECOND, 0)
+                sliceCal.set(java.util.Calendar.MILLISECOND, 0)
+                sliceCal.add(java.util.Calendar.HOUR_OF_DAY, 1)
+                val hourEnd = minOf(sliceCal.timeInMillis, endMs)
+                val key = "$dayKey|$hour|$pkg"
+                buckets[key] = (buckets[key] ?: 0L) + (hourEnd - cursor)
+                cursor = hourEnd
+            }
+        }
+
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            val pkg = event.packageName ?: continue
+            when (event.eventType) {
+                UsageEvents.Event.MOVE_TO_FOREGROUND,
+                UsageEvents.Event.ACTIVITY_RESUMED,
+                -> {
+                    foregroundSince[pkg] = event.timeStamp
+                }
+                UsageEvents.Event.MOVE_TO_BACKGROUND,
+                UsageEvents.Event.ACTIVITY_PAUSED,
+                -> {
+                    flush(pkg, event.timeStamp)
+                }
+            }
+        }
+        for (pkg in foregroundSince.keys.toList()) {
+            flush(pkg, now)
+        }
+
+        val minBucketMs = TimeUnit.SECONDS.toMillis(30)
+        return buckets.entries
+            .asSequence()
+            .filter { it.value >= minBucketMs }
+            .map { (key, millis) ->
+                val parts = key.split('|')
+                val day = parts.getOrElse(0) { "" }
+                val hour = parts.getOrElse(1) { "0" }.toIntOrNull() ?: 0
+                val pkg = parts.getOrElse(2) { "" }
+                mapOf(
+                    "day" to day,
+                    "hour" to hour,
+                    "packageName" to pkg,
+                    "appLabel" to appLabel(pkg),
+                    "durationSeconds" to (millis / 1000).toInt(),
+                )
+            }
+            .sortedWith(
+                compareByDescending<Map<String, Any>> { it["durationSeconds"] as Int }
+                    .thenBy { it["day"] as String }
+                    .thenBy { it["hour"] as Int },
+            )
+            .take(500)
+            .toList()
     }
 
     private fun launcherPackageNames(): Set<String> {

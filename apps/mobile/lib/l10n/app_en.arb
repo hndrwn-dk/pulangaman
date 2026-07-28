@@ -497,6 +497,28 @@
   "noAppDataToday": "No app data yet today.",
   "appUsageTitle": "App Usage",
   "thisWeekTitle": "This Week",
+  "insightThisWeekTitle": "This week's insight",
+  "insightAddReminderPrompt": "Add a reminder at {time}?",
+  "@insightAddReminderPrompt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "insightDaysUnderLimit": "{days} of {total} days under limit",
+  "@insightDaysUnderLimit": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "insightRewardsAutoHint": "Rewards tracks this automatically",
+  "insightReminderBodyDefault": "Time to put the phone down and wind down.",
   "limitScheduleTitle": "Limit Schedule",
   "editInRulesHint": "Edit in Rules",
   "todayLabel": "Today",
