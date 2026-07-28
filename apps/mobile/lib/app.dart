@@ -17,30 +17,23 @@ class PulangAmanApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     final locale = ref.watch(localeControllerProvider);
-    final visualRefresh = ref.watch(visualRefreshEnabledProvider);
-    // Parent Account toggle / dart-define; child uses the same provider
-    // (compile-time VISUAL_REFRESH or SessionStore if set on that device).
-    // Also apply VR theme on the unauthenticated login route so Masuk matches
-    // the rest of the refresh before SessionStore preference finishes loading
-    // (provider already starts from AppConfig.visualRefresh).
-    final useVisualRefreshTheme = visualRefresh &&
-        (!auth.isAuthenticated ||
-            auth.role == AppRole.parent ||
-            auth.role == AppRole.child);
+    // Instantiates provider so native VR prefs sync on startup.
+    ref.watch(visualRefreshEnabledProvider);
+    // Parent/child (and login) always use Visual Refresh. Guardian keeps classic.
+    final useVisualRefreshTheme = !auth.isAuthenticated ||
+        auth.role == AppRole.parent ||
+        auth.role == AppRole.child;
 
     // Key forces a fresh navigator when auth flips, so logout leaves
     // pushed routes (e.g. Pengaturan Akun) and shows LoginScreen cleanly.
     // Locale is included so chrome (bottom nav / headers) never sticks on a
     // stale Localizations snapshot after a language switch.
-    // Visual-refresh flag included so classic <-> refresh swaps rebuild cleanly.
     final homeKey = ValueKey<String>(
       auth.restoring
           ? 'restoring'
           : !auth.isAuthenticated
               ? 'login-${locale.languageCode}'
-                  '-${visualRefresh ? 'vr' : 'classic'}'
-              : 'role-${auth.role!.name}-${locale.languageCode}'
-                  '-${visualRefresh ? 'vr' : 'classic'}',
+              : 'role-${auth.role!.name}-${locale.languageCode}',
     );
 
     return MaterialApp(

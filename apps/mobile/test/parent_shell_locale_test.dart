@@ -8,7 +8,6 @@ import 'package:pulangaman/core/locale_controller.dart';
 import 'package:pulangaman/core/network/api_client.dart';
 import 'package:pulangaman/core/storage/session_store.dart';
 import 'package:pulangaman/features/auth/auth_controller.dart';
-import 'package:pulangaman/features/parent/children_controller.dart';
 import 'package:pulangaman/features/parent/parent_home_screen.dart';
 import 'package:pulangaman/l10n/app_localizations.dart';
 
@@ -32,20 +31,6 @@ class _MemorySessionStore extends SessionStore {
   Future<void> saveLocale(String languageCode) async => _data['locale_override'] = languageCode;
   @override
   Future<String?> locale() async => _data['locale_override'];
-  @override
-  Future<void> saveVisualRefresh(bool enabled) async {
-    _data['visual_refresh'] = enabled ? '1' : '0';
-  }
-  @override
-  Future<bool?> visualRefresh() async {
-    final raw = _data['visual_refresh'];
-    if (raw == null) return null;
-    return raw == '1';
-  }
-  @override
-  Future<void> clearVisualRefresh() async {
-    _data.remove('visual_refresh');
-  }
 }
 
 void main() {

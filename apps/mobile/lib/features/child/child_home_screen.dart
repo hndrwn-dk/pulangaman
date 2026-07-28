@@ -22,9 +22,11 @@ import 'child_beranda_tab.dart';
 import 'child_kabar_tab.dart';
 import 'child_layar_tab.dart';
 import 'child_usage_utils.dart';
+import 'background_location_disclosure_screen.dart';
 import 'location_tracking_channel.dart';
 import 'panic_tap_counter.dart';
 import 'reminder_channel.dart';
+import '../../core/storage/session_store.dart';
 
 final offlineQueueProvider = Provider<OfflineQueue>((ref) => OfflineQueue());
 
@@ -117,6 +119,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshScreenTimeAndRewards());
       unawaited(_ensureNativeTracking());
+      unawaited(_syncZoneGeofences());
       unawaited(_syncReminders());
       unawaited(_connectReminderWs(force: true));
       unawaited(_pollPanicStatus());
@@ -946,12 +949,27 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
       if (!mounted) return;
-      setState(() => _status = AppLocalizations.of(context).locationPermissionDenied);
+      setState(() =>
+          _status = AppLocalizations.of(context).locationPermissionDenied);
       return;
     }
 
-    // Android 10+: request "Allow all the time" so tracking survives background.
-    final always = await Permission.locationAlways.request();
+    // Play/App Store: disclose why "Allow all the time" is needed before the OS dialog.
+    var always = await Permission.locationAlways.status;
+    if (!always.isGranted) {
+      if (!mounted) return;
+      final proceed = await showBackgroundLocationDisclosure(context);
+      if (!proceed) {
+        // Continue with when-in-use only; do not open the Always dialog.
+        always = PermissionStatus.denied;
+      } else {
+        final store = ref.read(sessionStoreProvider);
+        await store.saveBgLocationDisclosureAcked();
+        if (!mounted) return;
+        always = await Permission.locationAlways.request();
+      }
+    }
+
     await Permission.notification.request();
 
     final token = ref.read(authControllerProvider).token;
@@ -969,6 +987,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       );
       // One immediate foreground push so parent sees a point right away.
       await _pushLocationOnce();
+      unawaited(_syncZoneGeofences());
       if (!mounted) return;
       setState(() {
         _tracking = true;
@@ -978,11 +997,36 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _tracking = true;
-        _status = AppLocalizations.of(context).trackingOn;
-      });
-      unawaited(_pushLocationOnce());
+      setState(() => _status = AppLocalizations.of(context).locationSendFailed);
+    }
+  }
+
+  Future<void> _syncZoneGeofences() async {
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/zones');
+      final zones = (data['zones'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((z) {
+            final id = z['id']?.toString() ?? '';
+            final lat = parseCoord(z['lat']);
+            final lng = parseCoord(z['lng']);
+            final radius = (z['radius_m'] as num?)?.toDouble() ??
+                (z['radiusM'] as num?)?.toDouble();
+            if (id.isEmpty || lat == null || lng == null || radius == null) {
+              return null;
+            }
+            return <String, dynamic>{
+              'id': id,
+              'lat': lat,
+              'lng': lng,
+              'radiusM': radius,
+            };
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      await _locationChannel.syncZoneGeofences(zones);
+    } catch (_) {
+      // Geofence sync is best-effort; live tracking still works via FGS.
     }
   }
 
@@ -1353,6 +1397,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
               if (ok != true) return;
               try {
                 await _locationChannel.stop();
+              } catch (_) {}
+              try {
+                await _locationChannel.clearZoneGeofences();
               } catch (_) {}
               await ref.read(authControllerProvider.notifier).logout();
             },

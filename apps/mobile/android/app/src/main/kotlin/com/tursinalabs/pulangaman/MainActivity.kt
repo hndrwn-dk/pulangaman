@@ -121,6 +121,36 @@ class MainActivity : FlutterActivity() {
                     "isLocationTrackingRunning" -> {
                         result.success(isServiceRunning(LocationTrackingService::class.java))
                     }
+                    "syncZoneGeofences" -> {
+                        val list = call.arguments as? List<*> ?: emptyList<Any>()
+                        val zones = buildList {
+                            for (item in list) {
+                                val map = item as? Map<*, *> ?: continue
+                                val id = map["id"]?.toString()?.trim().orEmpty()
+                                val lat = (map["lat"] as? Number)?.toDouble()
+                                val lng = (map["lng"] as? Number)?.toDouble()
+                                val radius = (map["radiusM"] as? Number)?.toFloat()
+                                    ?: (map["radius_m"] as? Number)?.toFloat()
+                                if (id.isEmpty() || lat == null || lng == null || radius == null) {
+                                    continue
+                                }
+                                add(
+                                    ZoneGeofenceManager.ZoneSpec(
+                                        id = id,
+                                        lat = lat,
+                                        lng = lng,
+                                        radiusM = radius,
+                                    ),
+                                )
+                            }
+                        }
+                        ZoneGeofenceManager.saveAndRegister(this, zones)
+                        result.success(zones.size)
+                    }
+                    "clearZoneGeofences" -> {
+                        ZoneGeofenceManager.clear(this)
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

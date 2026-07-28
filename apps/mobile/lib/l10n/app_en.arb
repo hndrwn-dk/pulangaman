@@ -238,6 +238,9 @@
   "tripArrivedNotified": "Arrived at {place} — parent notified",
   "destinationFallback": "destination",
   "locationSendFailed": "Failed to send location",
+  "bgLocationDisclosureTitle": "Why do we need location all the time?",
+  "bgLocationDisclosureBody": "So parents can see your live location and get safe-zone alerts even when the app is closed.",
+  "bgLocationDisclosureContinue": "Continue",
   "locationPermissionDenied": "Location permission denied",
   "sessionNotReady": "Session not ready",
   "allowExactAlarmMessage": "Allow exact alarms so your parent's reminders show up.",
@@ -1061,8 +1064,6 @@
   "premiumChargeSoonMeta": "charge soon",
   "settingsPremiumHomeShell": "Editorial home (Alt A)",
   "settingsPremiumHomeShellHint": "No bottom navigation bar. Turn off to restore the classic tabs.",
-  "settingsVisualRefresh": "Visual refresh",
-  "settingsVisualRefreshHint": "Cream canvas, editorial type, and softer home styling. Turn off for classic look.",
   "updatedJustNowBadge": "Updated just now",
   "updatedMinutesAgoBadge": "Updated {minutes}m ago",
   "@updatedMinutesAgoBadge": {

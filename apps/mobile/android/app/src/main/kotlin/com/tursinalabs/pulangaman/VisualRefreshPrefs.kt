@@ -3,8 +3,8 @@ package com.tursinalabs.pulangaman
 import android.content.Context
 
 /**
- * Mirrors Flutter [VisualRefreshController] / dart-define so native fullscreen
- * reminder templates can respect the same flag when alarms fire.
+ * Native Visual Refresh flag for fullscreen reminder templates.
+ * Defaults on — Flutter always syncs true via [MainActivity] setVisualRefresh.
  */
 object VisualRefreshPrefs {
     private const val PREFS = "pulangaman_ui"
@@ -12,7 +12,7 @@ object VisualRefreshPrefs {
 
     fun isEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY, false)
+            .getBoolean(KEY, true)
 
     fun setEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

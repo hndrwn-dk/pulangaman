@@ -78,6 +78,15 @@
             android:exported="false"
             android:foregroundServiceType="location"/>
         <receiver
+            android:name=".ZoneGeofenceReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="com.tursinalabs.pulangaman.ZONE_GEOFENCE_EVENT"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+        <receiver
             android:name=".ReminderReceiver"
             android:exported="false"
             android:enabled="true">

@@ -12,8 +12,8 @@ class SessionStore {
   static const _roleKey = 'role';
   static const _nameKey = 'name';
   static const _localeKey = 'locale_override';
-  /// Runtime override for Visual Refresh (`'1'` / `'0'`). Null = use dart-define.
-  static const _visualRefreshKey = 'visual_refresh';
+  /// Child acknowledged the background-location disclosure screen.
+  static const _bgLocationDisclosureKey = 'bg_location_disclosure_acked';
 
   Future<void> save({
     required String token,
@@ -37,21 +37,15 @@ class SessionStore {
 
   Future<String?> locale() => _storage.read(key: _localeKey);
 
-  /// Persists runtime Visual Refresh preference. Survives logout (like locale).
-  Future<void> saveVisualRefresh(bool enabled) =>
-      _storage.write(key: _visualRefreshKey, value: enabled ? '1' : '0');
+  Future<void> saveBgLocationDisclosureAcked() =>
+      _storage.write(key: _bgLocationDisclosureKey, value: '1');
 
-  /// `null` when unset — callers should fall back to dart-define default.
-  Future<bool?> visualRefresh() async {
-    final raw = await _storage.read(key: _visualRefreshKey);
-    if (raw == null) return null;
-    return raw == '1' || raw.toLowerCase() == 'true';
+  Future<bool> bgLocationDisclosureAcked() async {
+    final raw = await _storage.read(key: _bgLocationDisclosureKey);
+    return raw == '1' || raw?.toLowerCase() == 'true';
   }
 
-  Future<void> clearVisualRefresh() =>
-      _storage.delete(key: _visualRefreshKey);
-
-  /// Clears auth session only — keeps [locale] and visual-refresh preference.
+  /// Clears auth session only — keeps [locale] and disclosure ack.
   Future<void> clear() async {
     await Future.wait([
       _storage.delete(key: _tokenKey),

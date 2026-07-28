@@ -300,6 +300,9 @@
   "panicHoldConfirm": "Tekan & tahan 3 detik untuk kirim peringatan",
   "panicSent": "Peringatan panik terkirim",
   "trackingOn": "Pelacakan aktif",
+  "bgLocationDisclosureTitle": "Kenapa butuh akses lokasi selalu?",
+  "bgLocationDisclosureBody": "Biar orang tua bisa lihat lokasi kamu dan dapat kabar zona aman meskipun aplikasi ditutup.",
+  "bgLocationDisclosureContinue": "Lanjutkan",
   "trackingOff": "Pelacakan berhenti",
   "staleLocation": "Lokasi anak tidak diperbarui",
   "ackAlert": "Saya sudah merespons",
@@ -1497,8 +1500,6 @@
   "premiumChargeSoonMeta": "segera dicas",
   "settingsPremiumHomeShell": "Tampilan editorial (Alt A)",
   "settingsPremiumHomeShellHint": "Tanpa bilah navigasi bawah. Nonaktifkan untuk kembali ke tampilan biasa.",
-  "settingsVisualRefresh": "Penyegaran tampilan",
-  "settingsVisualRefreshHint": "Kanvas krem, tipografi editorial, dan gaya beranda lebih lembut. Matikan untuk tampilan klasik.",
   "updatedJustNowBadge": "Baru saja diperbarui",
   "updatedMinutesAgoBadge": "Diperbarui {minutes} mnt lalu",
   "@updatedMinutesAgoBadge": {

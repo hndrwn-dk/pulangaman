@@ -1154,6 +1154,24 @@ abstract class AppLocalizations {
   /// **'Pelacakan aktif'**
   String get trackingOn;
 
+  /// No description provided for @bgLocationDisclosureTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kenapa butuh akses lokasi selalu?'**
+  String get bgLocationDisclosureTitle;
+
+  /// No description provided for @bgLocationDisclosureBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Biar orang tua bisa lihat lokasi kamu dan dapat kabar zona aman meskipun aplikasi ditutup.'**
+  String get bgLocationDisclosureBody;
+
+  /// No description provided for @bgLocationDisclosureContinue.
+  ///
+  /// In id, this message translates to:
+  /// **'Lanjutkan'**
+  String get bgLocationDisclosureContinue;
+
   /// No description provided for @trackingOff.
   ///
   /// In id, this message translates to:
@@ -4543,18 +4561,6 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tanpa bilah navigasi bawah. Nonaktifkan untuk kembali ke tampilan biasa.'**
   String get settingsPremiumHomeShellHint;
-
-  /// No description provided for @settingsVisualRefresh.
-  ///
-  /// In id, this message translates to:
-  /// **'Penyegaran tampilan'**
-  String get settingsVisualRefresh;
-
-  /// No description provided for @settingsVisualRefreshHint.
-  ///
-  /// In id, this message translates to:
-  /// **'Kanvas krem, tipografi editorial, dan gaya beranda lebih lembut. Matikan untuk tampilan klasik.'**
-  String get settingsVisualRefreshHint;
 
   /// No description provided for @updatedJustNowBadge.
   ///

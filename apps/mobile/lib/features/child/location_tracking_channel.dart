@@ -33,7 +33,19 @@ class LocationTrackingChannel {
   }
 
   Future<bool> isRunning() async {
-    final running = await _channel.invokeMethod<bool>('isLocationTrackingRunning');
+    final running =
+        await _channel.invokeMethod<bool>('isLocationTrackingRunning');
     return running == true;
+  }
+
+  /// Registers circular safe-zones with Android GeofencingClient.
+  /// Each map: `{id, lat, lng, radiusM}`.
+  Future<int> syncZoneGeofences(List<Map<String, dynamic>> zones) async {
+    final count = await _channel.invokeMethod<int>('syncZoneGeofences', zones);
+    return count ?? 0;
+  }
+
+  Future<void> clearZoneGeofences() async {
+    await _channel.invokeMethod<bool>('clearZoneGeofences');
   }
 }

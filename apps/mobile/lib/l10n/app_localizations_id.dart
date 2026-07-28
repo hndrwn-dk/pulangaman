@@ -578,6 +578,16 @@ class AppLocalizationsId extends AppLocalizations {
   String get trackingOn => 'Pelacakan aktif';
 
   @override
+  String get bgLocationDisclosureTitle => 'Kenapa butuh akses lokasi selalu?';
+
+  @override
+  String get bgLocationDisclosureBody =>
+      'Biar orang tua bisa lihat lokasi kamu dan dapat kabar zona aman meskipun aplikasi ditutup.';
+
+  @override
+  String get bgLocationDisclosureContinue => 'Lanjutkan';
+
+  @override
   String get trackingOff => 'Pelacakan berhenti';
 
   @override
@@ -2541,13 +2551,6 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get settingsPremiumHomeShellHint =>
       'Tanpa bilah navigasi bawah. Nonaktifkan untuk kembali ke tampilan biasa.';
-
-  @override
-  String get settingsVisualRefresh => 'Penyegaran tampilan';
-
-  @override
-  String get settingsVisualRefreshHint =>
-      'Kanvas krem, tipografi editorial, dan gaya beranda lebih lembut. Matikan untuk tampilan klasik.';
 
   @override
   String get updatedJustNowBadge => 'Baru saja diperbarui';

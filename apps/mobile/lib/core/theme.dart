@@ -249,7 +249,7 @@ ThemeData buildAppTheme() {
 
 /// Visual Refresh parent theme: cream canvas, teal accents, Fraunces + Jakarta.
 ///
-/// Use when [AppConfig.visualRefresh] / Account toggle is on. Classic
+/// Visual Refresh theme (sole parent/child UI). Classic
 /// [buildAppTheme] remains the default when the flag is off.
 ThemeData buildVisualRefreshTheme([ThemeData? base]) {
   final app = base ?? buildAppTheme();

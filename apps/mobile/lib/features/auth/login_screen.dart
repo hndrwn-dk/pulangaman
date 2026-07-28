@@ -58,9 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
-    // Provider starts from compile-time VISUAL_REFRESH, then SessionStore
-    // preference (if set) wins once loaded — so login honors dart-define
-    // even before preference finishes loading.
+    // Visual Refresh is always on for login / parent / child.
     final refresh = ref.watch(visualRefreshEnabledProvider);
     final showOtp = auth.awaitingOtp &&
         _role != AppRole.child &&

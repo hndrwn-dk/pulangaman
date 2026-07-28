@@ -40,23 +40,6 @@ class _MemorySessionStore extends SessionStore {
   Future<String?> locale() async => _data['locale_override'];
 
   @override
-  Future<void> saveVisualRefresh(bool enabled) async {
-    _data['visual_refresh'] = enabled ? '1' : '0';
-  }
-
-  @override
-  Future<bool?> visualRefresh() async {
-    final raw = _data['visual_refresh'];
-    if (raw == null) return null;
-    return raw == '1' || raw.toLowerCase() == 'true';
-  }
-
-  @override
-  Future<void> clearVisualRefresh() async {
-    _data.remove('visual_refresh');
-  }
-
-  @override
   Future<void> clear() async {
     _data.remove('auth_token');
     _data.remove('user_id');

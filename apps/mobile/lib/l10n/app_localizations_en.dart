@@ -577,6 +577,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get trackingOn => 'Tracking on';
 
   @override
+  String get bgLocationDisclosureTitle =>
+      'Why do we need location all the time?';
+
+  @override
+  String get bgLocationDisclosureBody =>
+      'So parents can see your live location and get safe-zone alerts even when the app is closed.';
+
+  @override
+  String get bgLocationDisclosureContinue => 'Continue';
+
+  @override
   String get trackingOff => 'Tracking off';
 
   @override
@@ -2537,13 +2548,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsPremiumHomeShellHint =>
       'No bottom navigation bar. Turn off to restore the classic tabs.';
-
-  @override
-  String get settingsVisualRefresh => 'Visual refresh';
-
-  @override
-  String get settingsVisualRefreshHint =>
-      'Cream canvas, editorial type, and softer home styling. Turn off for classic look.';
 
   @override
   String get updatedJustNowBadge => 'Updated just now';
