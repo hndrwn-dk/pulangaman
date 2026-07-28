@@ -625,6 +625,15 @@
   "placesVisitedLabel": "Lokasi dikunjungi",
   "totalTripDistanceLabel": "Total perjalanan",
   "pendingCodesTitle": "Kode menunggu",
+  "dismissPendingCodeTooltip": "Buang kode",
+  "dismissPendingCodeConfirm": "Buang kode menunggu ini? Kode tidak akan berlaku lagi.",
+  "pendingCodeDismissedSnack": "Kode menunggu dibuang",
+  "dismissPendingCodeFailed": "Gagal buang kode: {error}",
+  "@dismissPendingCodeFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "relinkReplaceConfirmBody": "Sudah ada kode menunggu untuk {name}. Buat kode baru? Kode lama tidak akan berlaku lagi.",
   "@relinkReplaceConfirmBody": {
     "placeholders": {

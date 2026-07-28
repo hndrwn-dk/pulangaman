@@ -1193,6 +1193,21 @@ class AppLocalizationsId extends AppLocalizations {
   String get pendingCodesTitle => 'Kode menunggu';
 
   @override
+  String get dismissPendingCodeTooltip => 'Buang kode';
+
+  @override
+  String get dismissPendingCodeConfirm =>
+      'Buang kode menunggu ini? Kode tidak akan berlaku lagi.';
+
+  @override
+  String get pendingCodeDismissedSnack => 'Kode menunggu dibuang';
+
+  @override
+  String dismissPendingCodeFailed(String error) {
+    return 'Gagal buang kode: $error';
+  }
+
+  @override
   String relinkReplaceConfirmBody(String name) {
     return 'Sudah ada kode menunggu untuk $name. Buat kode baru? Kode lama tidak akan berlaku lagi.';
   }

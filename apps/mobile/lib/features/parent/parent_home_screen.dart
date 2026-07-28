@@ -745,6 +745,17 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                             ],
                           ),
                         ),
+                        IconButton(
+                          tooltip: l10n.dismissPendingCodeTooltip,
+                          onPressed: () =>
+                              _dismissPendingInvite(context, invite),
+                          icon: Icon(
+                            Icons.close,
+                            color: refresh
+                                ? VisualRefreshColors.textTertiary
+                                : AppColors.inkSoft,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -828,6 +839,60 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.recoverChildrenFailed('$e'))),
+      );
+    }
+  }
+
+  Future<void> _dismissPendingInvite(
+    BuildContext context,
+    ChildInvite invite,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) {
+            final refresh = visualRefreshOf(ctx);
+            return AlertDialog(
+              backgroundColor: refresh ? VisualRefreshColors.surface : null,
+              shape: refresh
+                  ? RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    )
+                  : null,
+              title: Text(l10n.dismissPendingCodeTooltip),
+              content: Text(l10n.dismissPendingCodeConfirm),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: refresh
+                        ? VisualRefreshColors.anchor
+                        : AppColors.teal,
+                  ),
+                  child: Text(l10n.dismissPendingCodeTooltip),
+                ),
+              ],
+            );
+          },
+        ) ==
+        true;
+    if (!ok || !context.mounted) return;
+    try {
+      await ref
+          .read(childrenControllerProvider.notifier)
+          .revokeInvite(invite.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.pendingCodeDismissedSnack)),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.dismissPendingCodeFailed('$e'))),
       );
     }
   }

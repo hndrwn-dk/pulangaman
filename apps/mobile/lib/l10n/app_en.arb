@@ -390,6 +390,15 @@
   "placesVisitedLabel": "Places visited",
   "totalTripDistanceLabel": "Total distance",
   "pendingCodesTitle": "Pending codes",
+  "dismissPendingCodeTooltip": "Dismiss code",
+  "dismissPendingCodeConfirm": "Dismiss this pending code? It will stop working.",
+  "pendingCodeDismissedSnack": "Pending code dismissed",
+  "dismissPendingCodeFailed": "Could not dismiss code: {error}",
+  "@dismissPendingCodeFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "relinkReplaceConfirmBody": "There's already a pending code for {name}. Generate a new one? The old code will stop working.",
   "@relinkReplaceConfirmBody": {
     "placeholders": {

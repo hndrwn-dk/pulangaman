@@ -79,8 +79,13 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
       await client.query(
         `UPDATE child_invites
          SET status = 'expired'
-         WHERE parent_id = $1 AND status = 'pending' AND expires_at <= now()`,
-        [parentId],
+         WHERE parent_id = $1
+           AND status = 'pending'
+           AND (
+             expires_at <= now()
+             OR created_at <= now() - ($2::int * interval '1 hour')
+           )`,
+        [parentId, INVITE_TTL_HOURS],
       );
 
       // At most one pending code per child (relink) or per new-child display name.
@@ -113,11 +118,12 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
             id: string;
             code: string;
             expires_at: Date;
+            created_at: Date;
           }>(
             `INSERT INTO child_invites
                (parent_id, code, child_display_name, expires_at, relink_child_id)
              VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, code, expires_at`,
+             RETURNING id, code, expires_at, created_at`,
             [
               parentId,
               code,
@@ -144,6 +150,7 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
             id: result.rows[0].id,
             code: result.rows[0].code,
             expiresAt: toIsoUtc(result.rows[0].expires_at),
+            createdAt: toIsoUtc(result.rows[0].created_at),
             childDisplayName: relinkName,
             relinkChildId: body.relinkChildId ?? null,
           });
@@ -182,8 +189,13 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
     await pool.query(
       `UPDATE child_invites
        SET status = 'expired'
-       WHERE parent_id = $1 AND status = 'pending' AND expires_at <= now()`,
-      [parentId],
+       WHERE parent_id = $1
+         AND status = 'pending'
+         AND (
+           expires_at <= now()
+           OR created_at <= now() - ($2::int * interval '1 hour')
+         )`,
+      [parentId, INVITE_TTL_HOURS],
     );
 
     const result = await pool.query<{
@@ -202,9 +214,10 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
        WHERE parent_id = $1
          AND status = 'pending'
          AND expires_at > now()
+         AND created_at > now() - ($2::int * interval '1 hour')
        ORDER BY created_at DESC
        LIMIT 20`,
-      [parentId],
+      [parentId, INVITE_TTL_HOURS],
     );
     res.json({
       invites: result.rows.map((row) => ({

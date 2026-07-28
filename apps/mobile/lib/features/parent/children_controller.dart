@@ -46,49 +46,85 @@ class ChildInvite {
     required this.code,
     required this.status,
     required this.expiresAt,
+    this.createdAt,
     this.childDisplayName,
     this.relinkChildId,
   });
+
+  static const maxTtl = Duration(hours: 24);
 
   final String id;
   final String code;
   final String status;
   final DateTime expiresAt;
+  final DateTime? createdAt;
   final String? childDisplayName;
   final String? relinkChildId;
 
-  bool get isStillValid =>
-      status == 'pending' && expiresAt.toUtc().isAfter(DateTime.now().toUtc());
+  /// Pending and not past expiresAt; also hard-caps at [maxTtl] from createdAt
+  /// when known (guards bad/far-future expires_at). Missing/unparseable expiry
+  /// is treated as already expired.
+  bool get isStillValid {
+    if (status != 'pending') return false;
+    final now = DateTime.now().toUtc();
+    if (!expiresAt.toUtc().isAfter(now)) return false;
+    if (createdAt != null) {
+      final hardCap = createdAt!.toUtc().add(maxTtl);
+      if (!hardCap.isAfter(now)) return false;
+    }
+    return true;
+  }
+
+  /// Parses API/cache timestamps; naive values are treated as UTC.
+  /// Returns null when missing or unparseable.
+  static DateTime? tryParseUtc(Object? raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw.toUtc();
+    final s = raw.toString().trim();
+    if (s.isEmpty || s == 'null') return null;
+    try {
+      final parsed = DateTime.parse(s);
+      final hasZone =
+          s.endsWith('Z') || RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
+      if (!hasZone) {
+        return DateTime.utc(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          parsed.hour,
+          parsed.minute,
+          parsed.second,
+          parsed.millisecond,
+          parsed.microsecond,
+        );
+      }
+      return parsed.toUtc();
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Parses API/cache expiry; naive timestamps are treated as UTC.
   static DateTime parseExpiresAt(Object? raw) {
-    if (raw is DateTime) return raw.toUtc();
-    final s = raw.toString().trim();
-    final parsed = DateTime.parse(s);
-    final hasZone = s.endsWith('Z') ||
-        RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
-    if (!hasZone) {
-      return DateTime.utc(
-        parsed.year,
-        parsed.month,
-        parsed.day,
-        parsed.hour,
-        parsed.minute,
-        parsed.second,
-        parsed.millisecond,
-        parsed.microsecond,
-      );
-    }
-    return parsed.toUtc();
+    return tryParseUtc(raw) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 
   factory ChildInvite.fromJson(Map<String, dynamic> json) {
-    final expires = json['expires_at'] ?? json['expiresAt'];
+    final expiresRaw = json['expires_at'] ?? json['expiresAt'];
+    final createdRaw = json['created_at'] ?? json['createdAt'];
+    final createdAt = tryParseUtc(createdRaw);
+    var expiresAt = tryParseUtc(expiresRaw);
+    // Unparseable/missing expiry: force-expire (or fall back to created+TTL).
+    expiresAt ??= createdAt != null
+        ? createdAt.add(maxTtl)
+        : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
     return ChildInvite(
       id: json['id'] as String,
       code: json['code'] as String,
       status: json['status'] as String? ?? 'pending',
-      expiresAt: parseExpiresAt(expires),
+      expiresAt: expiresAt,
+      createdAt: createdAt,
       childDisplayName:
           json['child_display_name'] as String? ?? json['childDisplayName'] as String?,
       relinkChildId:
@@ -101,6 +137,7 @@ class ChildInvite {
         'code': code,
         'status': status,
         'expires_at': expiresAt.toUtc().toIso8601String(),
+        if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
         'child_display_name': childDisplayName,
         'relink_child_id': relinkChildId,
       };
@@ -269,6 +306,8 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       code: data['code'] as String,
       status: 'pending',
       expiresAt: ChildInvite.parseExpiresAt(data['expiresAt']),
+      createdAt: ChildInvite.tryParseUtc(data['createdAt']) ??
+          DateTime.now().toUtc(),
       childDisplayName: data['childDisplayName'] as String?,
       relinkChildId:
           data['relinkChildId'] as String? ?? relinkChildId,
@@ -317,6 +356,28 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       fromCache: false,
     );
     unawaited(refresh(force: true));
+  }
+
+  /// Revoke a pending invite so it disappears from PENDING CODES immediately.
+  Future<void> revokeInvite(String inviteId) async {
+    final api = _ref.read(apiClientProvider);
+    await api.post('/api/v1/child-invites/$inviteId/revoke');
+    final kept = state.invites.where((i) => i.id != inviteId).toList();
+    state = ChildrenState(
+      items: state.items,
+      invites: kept,
+      fromCache: false,
+    );
+    final key = _cacheKey;
+    if (key != null) {
+      unawaited(
+        ChildrenLocalCache.instance.write(
+          parentKey: key,
+          items: state.items,
+          invites: kept,
+        ),
+      );
+    }
   }
 
   Future<void> clearCache() async {

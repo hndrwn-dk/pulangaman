@@ -2252,6 +2252,30 @@ abstract class AppLocalizations {
   /// **'Kode menunggu'**
   String get pendingCodesTitle;
 
+  /// No description provided for @dismissPendingCodeTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Buang kode'**
+  String get dismissPendingCodeTooltip;
+
+  /// No description provided for @dismissPendingCodeConfirm.
+  ///
+  /// In id, this message translates to:
+  /// **'Buang kode menunggu ini? Kode tidak akan berlaku lagi.'**
+  String get dismissPendingCodeConfirm;
+
+  /// No description provided for @pendingCodeDismissedSnack.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode menunggu dibuang'**
+  String get pendingCodeDismissedSnack;
+
+  /// No description provided for @dismissPendingCodeFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal buang kode: {error}'**
+  String dismissPendingCodeFailed(String error);
+
   /// No description provided for @relinkReplaceConfirmBody.
   ///
   /// In id, this message translates to:
