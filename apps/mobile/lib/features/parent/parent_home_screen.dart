@@ -747,13 +747,15 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                         ),
                         IconButton(
                           tooltip: l10n.dismissPendingCodeTooltip,
+                          visualDensity: VisualDensity.compact,
                           onPressed: () =>
                               _dismissPendingInvite(context, invite),
                           icon: Icon(
                             Icons.close,
+                            size: 22,
                             color: refresh
-                                ? VisualRefreshColors.textTertiary
-                                : AppColors.inkSoft,
+                                ? VisualRefreshColors.textPrimary
+                                : AppColors.ink,
                           ),
                         ),
                       ],

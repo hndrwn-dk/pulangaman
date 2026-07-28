@@ -804,12 +804,18 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
     final pillFill =
         refresh ? VisualRefreshColors.anchor : AppColors.tealDeep;
 
+    // Sheet peeks 28px over the map; clipped so scroll never paints over it.
+    const sheetOverlap = 28.0;
+
     return Scaffold(
       backgroundColor:
           refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
-      body: Column(
+      body: Stack(
         children: [
-          SizedBox(
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
             height: mapHeight,
             child: Stack(
               fit: StackFit.expand,
@@ -944,9 +950,12 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
               ],
             ),
           ),
-          Expanded(
-            child: Transform.translate(
-              offset: const Offset(0, -28),
+          Positioned(
+            top: mapHeight - sheetOverlap,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRect(
               child: RefreshIndicator(
                 color: refresh ? VisualRefreshColors.accent : AppColors.teal,
                 onRefresh: () async {
@@ -1515,7 +1524,7 @@ class _FeatureSummaryCard extends StatelessWidget {
 
     if (refresh) {
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: onOpen,
@@ -1559,6 +1568,7 @@ class _FeatureSummaryCard extends StatelessWidget {
               onTap: onOpen,
               borderRadius: BorderRadius.circular(AppRadius.vrCard),
               child: Ink(
+                width: double.infinity,
                 decoration: _cardDecoration(true),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
