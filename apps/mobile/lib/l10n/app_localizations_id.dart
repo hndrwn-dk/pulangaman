@@ -1143,6 +1143,11 @@ class AppLocalizationsId extends AppLocalizations {
       'Belum ada pengingat. Pakai tambah cepat di atas.';
 
   @override
+  String reminderPresetAlreadyExists(String title) {
+    return 'Jadwal \"$title\" sudah ada untuk anak ini.';
+  }
+
+  @override
   String get reminderStudyChipLabel => 'Belajar 19:00';
 
   @override

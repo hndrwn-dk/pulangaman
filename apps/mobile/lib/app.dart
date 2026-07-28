@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'l10n/app_localizations.dart';
@@ -6,6 +8,7 @@ import 'core/theme.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/login_screen.dart';
 import 'features/child/child_home_screen.dart';
+import 'features/child/reminder_channel.dart';
 import 'features/guardian/guardian_home_screen.dart';
 import 'features/parent/parent_home_screen.dart';
 import 'features/parent/visual_refresh_flag.dart';
@@ -19,6 +22,12 @@ class PulangAmanApp extends ConsumerWidget {
     final locale = ref.watch(localeControllerProvider);
     // Instantiates provider so native VR prefs sync on startup.
     ref.watch(visualRefreshEnabledProvider);
+    // Keep native fullscreen reminder chrome in sync with Flutter locale.
+    unawaited(_syncNativeAppLocale(locale.languageCode));
+    ref.listen<Locale>(localeControllerProvider, (prev, next) {
+      if (prev?.languageCode == next.languageCode) return;
+      unawaited(_syncNativeAppLocale(next.languageCode));
+    });
     // Parent/child (and login) always use Visual Refresh. Guardian keeps classic.
     final useVisualRefreshTheme = !auth.isAuthenticated ||
         auth.role == AppRole.parent ||
@@ -65,5 +74,13 @@ class PulangAmanApp extends ConsumerWidget {
                   },
       ),
     );
+  }
+}
+
+Future<void> _syncNativeAppLocale(String languageCode) async {
+  try {
+    await ReminderChannel().setAppLocale(languageCode);
+  } catch (_) {
+    // Native channel unavailable (tests / non-Android) — ignore.
   }
 }

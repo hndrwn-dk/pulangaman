@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
+import '../../core/locale_controller.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/parse_coord.dart';
 import '../../core/storage/offline_queue.dart';
@@ -17,6 +18,7 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../parent/emergency_meeting_alert_screen.dart';
 import '../parent/visual_refresh_flag.dart';
+import '../reminders/reminder_templates.dart';
 import '../screentime/screen_time_channel.dart';
 import 'child_beranda_tab.dart';
 import 'child_kabar_tab.dart';
@@ -842,32 +844,48 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         // Soft prompt once via status chip; user can tap later.
       }
 
+      final l10n = AppLocalizations.of(context);
       final data = await ref.read(apiClientProvider).get('/api/v1/reminders/me');
       final list = (data['reminders'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .map(
-            (r) => {
+          .map((r) {
+            final title = r['title'] as String? ?? '';
+            final body = r['body'] as String? ?? '';
+            final templateKey = ReminderTemplates.normalizeKey(
+              r['templateKey'] as String?,
+            );
+            return {
               'id': r['id'],
-              'title': r['title'],
-              'body': r['body'],
+              'title': ReminderTemplates.displayTitle(
+                l10n,
+                templateKey: templateKey,
+                title: title,
+                body: body,
+              ),
+              'body': ReminderTemplates.displayBody(
+                l10n,
+                templateKey: templateKey,
+                title: title,
+                body: body,
+              ),
               'hour': r['hour'],
               'minute': r['minute'],
               'daysOfWeek': r['daysOfWeek'] ?? [1, 2, 3, 4, 5, 6, 7],
               'style': r['style'] ?? 'fullscreen',
               'enabled': r['enabled'] != false,
-            },
-          )
+            };
+          })
           .toList();
       await _reminderChannel.syncReminders(list);
       if (!mounted) return;
       setState(() => _reminderCount = list.length);
       if (!_exactAlarmOk && list.isNotEmpty) {
-        final l10n = AppLocalizations.of(context);
+        final alarmL10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.allowExactAlarmMessage),
+            content: Text(alarmL10n.allowExactAlarmMessage),
             action: SnackBarAction(
-              label: l10n.openAction,
+              label: alarmL10n.openAction,
               onPressed: _openReminderPermissions,
             ),
           ),
@@ -877,6 +895,73 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (!mounted) return;
       setState(() => _reminderCount = 0);
     }
+  }
+
+  Future<void> _showLanguagePicker() async {
+    final locale = ref.read(localeControllerProvider);
+    final refresh = visualRefreshOf(context);
+    final chosen = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor:
+          refresh ? VisualRefreshColors.surface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final sheetL10n = AppLocalizations.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  sheetL10n.settingsLanguage,
+                  style: TextStyle(
+                    fontSize: refresh ? 20 : 18,
+                    fontWeight: FontWeight.w900,
+                    color: refresh
+                        ? VisualRefreshColors.textPrimary
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  sheetL10n.settingsLanguageHint,
+                  style: TextStyle(
+                    color: refresh
+                        ? VisualRefreshColors.textSecondary
+                        : AppColors.inkSoft,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _ChildLanguageOption(
+                  label: sheetL10n.settingsLanguageId,
+                  selected: locale.languageCode == 'id',
+                  refresh: refresh,
+                  onTap: () => Navigator.pop(ctx, 'id'),
+                ),
+                const SizedBox(height: 8),
+                _ChildLanguageOption(
+                  label: sheetL10n.settingsLanguageEn,
+                  selected: locale.languageCode == 'en',
+                  refresh: refresh,
+                  onTap: () => Navigator.pop(ctx, 'en'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (chosen == null || !mounted) return;
+    await ref
+        .read(localeControllerProvider.notifier)
+        .setLocale(Locale(chosen));
+    if (!mounted) return;
+    unawaited(_syncReminders());
   }
 
   Future<void> _openReminderPermissions() async {
@@ -1345,6 +1430,13 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         title: const SizedBox.shrink(),
         actions: [
           IconButton(
+            tooltip: l10n.settingsLanguage,
+            onPressed: () => unawaited(_showLanguagePicker()),
+            icon: Icon(
+              refresh ? Icons.language_outlined : Icons.language_rounded,
+            ),
+          ),
+          IconButton(
             tooltip: l10n.refreshTooltip,
             onPressed: () async {
               await _refreshScreenTimeAndRewards();
@@ -1533,6 +1625,63 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             label: l10n.childTabMessages,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChildLanguageOption extends StatelessWidget {
+  const _ChildLanguageOption({
+    required this.label,
+    required this.selected,
+    required this.refresh,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool refresh;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? (refresh
+              ? VisualRefreshColors.accentTint
+              : AppColors.teal.withValues(alpha: 0.12))
+          : (refresh ? VisualRefreshColors.warmTint : const Color(0xFFF3F5F7)),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: refresh ? VisualRefreshColors.textPrimary : null,
+                  ),
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.circle_outlined,
+                color: selected
+                    ? (refresh ? VisualRefreshColors.accent : AppColors.teal)
+                    : (refresh
+                        ? VisualRefreshColors.textTertiary
+                        : AppColors.inkSoft),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

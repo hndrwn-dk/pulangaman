@@ -23,6 +23,7 @@ const upsertSchema = z.object({
   daysOfWeek: daysSchema,
   style: z.enum(['fullscreen', 'notification']).default('fullscreen'),
   enabled: z.boolean().default(true),
+  templateKey: z.enum(['study', 'bedtime']).nullable().optional(),
 });
 
 async function assertParentOfChild(parentId: string, childId: string): Promise<boolean> {
@@ -44,6 +45,7 @@ function mapReminder(row: {
   days_of_week: number[];
   style: string;
   enabled: boolean;
+  template_key: string | null;
   created_at: Date;
   updated_at: Date;
 }) {
@@ -58,6 +60,7 @@ function mapReminder(row: {
     daysOfWeek: row.days_of_week,
     style: row.style,
     enabled: row.enabled,
+    templateKey: row.template_key ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -150,10 +153,11 @@ remindersRouter.post('/:childId', async (req: AuthedRequest, res, next) => {
     const body = upsertSchema.parse(req.body);
     const uniqueDays = [...new Set(body.daysOfWeek)].sort((a, b) => a - b);
 
+    const templateKey = body.templateKey ?? null;
     const result = await pool.query(
       `INSERT INTO child_reminders
-         (child_id, parent_id, title, body, hour, minute, days_of_week, style, enabled)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::integer[], $8, $9)
+         (child_id, parent_id, title, body, hour, minute, days_of_week, style, enabled, template_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::integer[], $8, $9, $10)
        RETURNING *`,
       [
         childId,
@@ -165,6 +169,7 @@ remindersRouter.post('/:childId', async (req: AuthedRequest, res, next) => {
         uniqueDays,
         body.style,
         body.enabled,
+        templateKey,
       ],
     );
 
@@ -206,6 +211,7 @@ remindersRouter.put('/:id', async (req: AuthedRequest, res, next) => {
     const body = upsertSchema.parse(req.body);
     const uniqueDays = [...new Set(body.daysOfWeek)].sort((a, b) => a - b);
 
+    const templateKey = body.templateKey ?? null;
     const result = await pool.query(
       `UPDATE child_reminders
        SET title = $2,
@@ -216,6 +222,7 @@ remindersRouter.put('/:id', async (req: AuthedRequest, res, next) => {
            style = $7,
            enabled = $8,
            parent_id = $9,
+           template_key = $10,
            updated_at = now()
        WHERE id = $1
        RETURNING *`,
@@ -229,6 +236,7 @@ remindersRouter.put('/:id', async (req: AuthedRequest, res, next) => {
         body.style,
         body.enabled,
         parentId,
+        templateKey,
       ],
     );
 

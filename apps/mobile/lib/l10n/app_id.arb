@@ -603,6 +603,14 @@
   "reminderActiveScheduleTitle": "Jadwal Aktif",
   "reminderAddShort": "+ Tambah",
   "reminderEmptyMessage": "Belum ada pengingat. Pakai tambah cepat di atas.",
+  "reminderPresetAlreadyExists": "Jadwal \"{title}\" sudah ada untuk anak ini.",
+  "@reminderPresetAlreadyExists": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "reminderStudyChipLabel": "Belajar 19:00",
   "reminderSleepChipLabel": "Tidur 21:00",
   "reminderStudyPresetTitle": "Waktunya Belajar",

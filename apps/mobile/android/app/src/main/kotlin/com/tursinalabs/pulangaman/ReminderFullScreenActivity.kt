@@ -48,9 +48,12 @@ class ReminderFullScreenActivity : ComponentActivity() {
         turnScreenOnAndUnlock()
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        val title = intent.getStringExtra(ReminderReceiver.EXTRA_TITLE) ?: "Pengingat"
+        val title = intent.getStringExtra(ReminderReceiver.EXTRA_TITLE) ?: run {
+            if (AppLocalePrefs.isEnglish(this)) "Reminder" else "Pengingat"
+        }
         val body = intent.getStringExtra(ReminderReceiver.EXTRA_BODY) ?: ""
         val visualRefresh = intent.getBooleanExtra(EXTRA_VISUAL_REFRESH, VisualRefreshPrefs.isEnabled(this))
+        val english = AppLocalePrefs.isEnglish(this)
         val mood = moodFor(title, body)
         val accent = accentFor(mood, visualRefresh)
         val bg = if (visualRefresh) BG_VR else BG_CLASSIC
@@ -94,7 +97,7 @@ class ReminderFullScreenActivity : ComponentActivity() {
             gravity = Gravity.CENTER
             setTextColor(if (visualRefresh) MUTED_TEAL else Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
-            contentDescription = "Tutup"
+            contentDescription = if (english) "Close" else "Tutup"
             setOnClickListener { finish() }
             layoutParams = FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END)
         }
@@ -137,7 +140,7 @@ class ReminderFullScreenActivity : ComponentActivity() {
         }
 
         val button = TextView(this).apply {
-            text = "Mengerti"
+            text = if (english) "Got it" else "Mengerti"
             gravity = Gravity.CENTER
             setTextColor(ON_ACCENT)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)

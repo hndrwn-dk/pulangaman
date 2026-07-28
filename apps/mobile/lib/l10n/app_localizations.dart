@@ -2162,6 +2162,12 @@ abstract class AppLocalizations {
   /// **'Belum ada pengingat. Pakai tambah cepat di atas.'**
   String get reminderEmptyMessage;
 
+  /// No description provided for @reminderPresetAlreadyExists.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal \"{title}\" sudah ada untuk anak ini.'**
+  String reminderPresetAlreadyExists(String title);
+
   /// No description provided for @reminderStudyChipLabel.
   ///
   /// In id, this message translates to:

@@ -199,6 +199,11 @@ class MainActivity : FlutterActivity() {
                         VisualRefreshPrefs.setEnabled(this, enabled)
                         result.success(true)
                     }
+                    "setAppLocale" -> {
+                        val code = call.argument<String>("languageCode") ?: "id"
+                        AppLocalePrefs.setLanguageCode(this, code)
+                        result.success(true)
+                    }
                     "previewNow" -> {
                         val title = call.argument<String>("title") ?: "Pengingat"
                         val body = call.argument<String>("body") ?: ""

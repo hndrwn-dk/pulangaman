@@ -368,6 +368,14 @@
   "reminderActiveScheduleTitle": "Active Schedule",
   "reminderAddShort": "+ Add",
   "reminderEmptyMessage": "No reminders yet. Use quick add above.",
+  "reminderPresetAlreadyExists": "\"{title}\" is already scheduled for this child.",
+  "@reminderPresetAlreadyExists": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "reminderStudyChipLabel": "Study 19:00",
   "reminderSleepChipLabel": "Sleep 21:00",
   "reminderStudyPresetTitle": "Study Time",

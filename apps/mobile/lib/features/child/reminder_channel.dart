@@ -26,6 +26,13 @@ class ReminderChannel {
     await _channel.invokeMethod<void>('setVisualRefresh', {'enabled': enabled});
   }
 
+  /// Persist Flutter app locale for native fullscreen reminder chrome (CTA).
+  Future<void> setAppLocale(String languageCode) async {
+    await _channel.invokeMethod<void>('setAppLocale', {
+      'languageCode': languageCode,
+    });
+  }
+
   Future<void> previewNow({
     required String title,
     required String body,

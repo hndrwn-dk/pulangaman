@@ -1143,6 +1143,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reminderEmptyMessage => 'No reminders yet. Use quick add above.';
 
   @override
+  String reminderPresetAlreadyExists(String title) {
+    return '\"$title\" is already scheduled for this child.';
+  }
+
+  @override
   String get reminderStudyChipLabel => 'Study 19:00';
 
   @override

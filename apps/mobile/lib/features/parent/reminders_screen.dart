@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
+import '../reminders/reminder_templates.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
 import 'vr_sheet_chrome.dart';
@@ -23,6 +24,7 @@ class ChildReminder {
     required this.daysOfWeek,
     required this.style,
     required this.enabled,
+    this.templateKey,
   });
 
   final String id;
@@ -34,6 +36,27 @@ class ChildReminder {
   final List<int> daysOfWeek;
   final String style;
   final bool enabled;
+  final String? templateKey;
+
+  String? get resolvedTemplateKey => ReminderTemplates.resolveKey(
+        templateKey: templateKey,
+        title: title,
+        body: body,
+      );
+
+  String displayTitle(AppLocalizations l10n) => ReminderTemplates.displayTitle(
+        l10n,
+        templateKey: templateKey,
+        title: title,
+        body: body,
+      );
+
+  String displayBody(AppLocalizations l10n) => ReminderTemplates.displayBody(
+        l10n,
+        templateKey: templateKey,
+        title: title,
+        body: body,
+      );
 
   factory ChildReminder.fromJson(Map<String, dynamic> json) {
     return ChildReminder(
@@ -48,6 +71,9 @@ class ChildReminder {
           .toList(),
       style: json['style'] as String? ?? 'fullscreen',
       enabled: json['enabled'] != false,
+      templateKey: ReminderTemplates.normalizeKey(
+        json['templateKey'] as String?,
+      ),
     );
   }
 
@@ -179,6 +205,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   }
 
   Future<void> _createPreset({
+    required String templateKey,
     required String title,
     required String body,
     required int hour,
@@ -186,6 +213,18 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
   }) async {
     final childId = _childId;
     if (childId == null) return;
+    final l10n = AppLocalizations.of(context);
+    final already = _items.any((e) => e.resolvedTemplateKey == templateKey);
+    if (already) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.reminderPresetAlreadyExists(title)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
     try {
       await ref.read(apiClientProvider).post(
         '/api/v1/reminders/$childId',
@@ -197,14 +236,13 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
           'daysOfWeek': [1, 2, 3, 4, 5, 6, 7],
           'style': 'fullscreen',
           'enabled': true,
+          'templateKey': templateKey,
         },
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context).reminderPresetSaved(title),
-          ),
+          content: Text(l10n.reminderPresetSaved(title)),
           duration: const Duration(seconds: 5),
         ),
       );
@@ -278,8 +316,12 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     if (childId == null) return;
     final l10n = AppLocalizations.of(context);
     final refresh = visualRefreshOf(context);
-    final titleCtrl = TextEditingController(text: existing?.title ?? '');
-    final bodyCtrl = TextEditingController(text: existing?.body ?? '');
+    final titleCtrl = TextEditingController(
+      text: existing == null ? '' : existing.displayTitle(l10n),
+    );
+    final bodyCtrl = TextEditingController(
+      text: existing == null ? '' : existing.displayBody(l10n),
+    );
     var hour = existing?.hour ?? 19;
     var minute = existing?.minute ?? 0;
     var style = existing?.style ?? 'fullscreen';
@@ -666,6 +708,11 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
         'daysOfWeek': (days.toList()..sort()),
         'style': style,
         'enabled': existing?.enabled ?? true,
+        'templateKey': ReminderTemplates.resolveKey(
+          templateKey: null,
+          title: title,
+          body: body,
+        ),
       };
 
       try {
@@ -743,6 +790,7 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                   daysOfWeek: e.daysOfWeek,
                   style: e.style,
                   enabled: enabled,
+                  templateKey: e.templateKey,
                 )
               : e,
         )
@@ -750,16 +798,23 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     setState(() => _items = next);
     if (childId != null) _putCache(childId, next);
     try {
+      final l10n = AppLocalizations.of(context);
+      final key = item.resolvedTemplateKey;
       await ref.read(apiClientProvider).put(
         '/api/v1/reminders/${item.id}',
         body: {
-          'title': item.title,
-          'body': item.body,
+          'title': key != null
+              ? ReminderTemplates.titleFor(l10n, key)
+              : item.title,
+          'body': key != null
+              ? ReminderTemplates.bodyFor(l10n, key)
+              : item.body,
           'hour': item.hour,
           'minute': item.minute,
           'daysOfWeek': item.daysOfWeek,
           'style': item.style,
           'enabled': enabled,
+          'templateKey': key,
         },
       );
     } catch (e) {
@@ -805,31 +860,47 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
     return days.map((d) => names[d] ?? '$d').join(', ');
   }
 
-  IconData _iconForTitle(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('tidur') || t.contains('istirahat')) {
-      return Icons.bedtime_rounded;
+  IconData _iconForReminder(ChildReminder item) {
+    switch (item.resolvedTemplateKey) {
+      case ReminderTemplateKeys.bedtime:
+        return Icons.bedtime_rounded;
+      case ReminderTemplateKeys.study:
+        return Icons.menu_book_rounded;
+      default:
+        final t = item.title.toLowerCase();
+        if (t.contains('tidur') ||
+            t.contains('istirahat') ||
+            t.contains('sleep') ||
+            t.contains('bedtime')) {
+          return Icons.bedtime_rounded;
+        }
+        if (t.contains('belajar') || t.contains('study')) {
+          return Icons.menu_book_rounded;
+        }
+        return Icons.alarm_rounded;
     }
-    if (t.contains('belajar')) return Icons.menu_book_rounded;
-    return Icons.alarm_rounded;
   }
 
-  Color _iconBgForTitle(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('tidur') || t.contains('istirahat')) {
-      return const Color(0xFFDCEBFF);
+  Color _iconBgForReminder(ChildReminder item) {
+    switch (item.resolvedTemplateKey) {
+      case ReminderTemplateKeys.bedtime:
+        return const Color(0xFFDCEBFF);
+      case ReminderTemplateKeys.study:
+        return const Color(0xFFE8F6F1);
+      default:
+        return const Color(0xFFFFF0DC);
     }
-    if (t.contains('belajar')) return const Color(0xFFE8F6F1);
-    return const Color(0xFFFFF0DC);
   }
 
-  Color _iconFgForTitle(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('tidur') || t.contains('istirahat')) {
-      return const Color(0xFF2563EB);
+  Color _iconFgForReminder(ChildReminder item) {
+    switch (item.resolvedTemplateKey) {
+      case ReminderTemplateKeys.bedtime:
+        return const Color(0xFF2563EB);
+      case ReminderTemplateKeys.study:
+        return AppColors.tealDeep;
+      default:
+        return const Color(0xFFD97706);
     }
-    if (t.contains('belajar')) return AppColors.tealDeep;
-    return const Color(0xFFD97706);
   }
 
   @override
@@ -1043,10 +1114,15 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                               icon: Icons.menu_book_rounded,
                               label: l10n.reminderStudyChipLabel,
                               onTap: () => _createPreset(
+                                templateKey: ReminderTemplateKeys.study,
                                 title: l10n.reminderStudyPresetTitle,
                                 body: l10n.reminderStudyPresetBody,
-                                hour: 19,
-                                minute: 0,
+                                hour: ReminderTemplates.defaultHour(
+                                  ReminderTemplateKeys.study,
+                                ),
+                                minute: ReminderTemplates.defaultMinute(
+                                  ReminderTemplateKeys.study,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1055,10 +1131,15 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                               icon: Icons.bedtime_rounded,
                               label: l10n.reminderSleepChipLabel,
                               onTap: () => _createPreset(
+                                templateKey: ReminderTemplateKeys.bedtime,
                                 title: l10n.reminderSleepPresetTitle,
                                 body: l10n.reminderSleepPresetBody,
-                                hour: 21,
-                                minute: 0,
+                                hour: ReminderTemplates.defaultHour(
+                                  ReminderTemplateKeys.bedtime,
+                                ),
+                                minute: ReminderTemplates.defaultMinute(
+                                  ReminderTemplateKeys.bedtime,
+                                ),
                               ),
                             ),
                           ],
@@ -1161,10 +1242,12 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                             child: _ReminderCard(
                               refresh: refresh,
                               item: item,
+                              titleText: item.displayTitle(l10n),
+                              bodyText: item.displayBody(l10n),
                               daysLabel: _daysLabel(l10n, item.daysOfWeek),
-                              icon: _iconForTitle(item.title),
-                              iconBg: _iconBgForTitle(item.title),
-                              iconFg: _iconFgForTitle(item.title),
+                              icon: _iconForReminder(item),
+                              iconBg: _iconBgForReminder(item),
+                              iconFg: _iconFgForReminder(item),
                               onToggle: (v) => _toggleEnabled(item, v),
                               onEdit: () =>
                                   unawaited(_showCustomDialog(existing: item)),
@@ -1448,6 +1531,8 @@ class _QuickChip extends StatelessWidget {
 class _ReminderCard extends StatelessWidget {
   const _ReminderCard({
     required this.item,
+    required this.titleText,
+    required this.bodyText,
     required this.daysLabel,
     required this.icon,
     required this.iconBg,
@@ -1459,6 +1544,8 @@ class _ReminderCard extends StatelessWidget {
   });
 
   final ChildReminder item;
+  final String titleText;
+  final String bodyText;
   final String daysLabel;
   final IconData icon;
   final Color iconBg;
@@ -1500,7 +1587,7 @@ class _ReminderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${item.timeLabel} · ${item.title}',
+                      '${item.timeLabel} · $titleText',
                       style: refresh
                           ? GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w700,
@@ -1514,7 +1601,7 @@ class _ReminderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      item.body,
+                      bodyText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
