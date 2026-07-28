@@ -33,7 +33,7 @@ class ChildrenLocalCache {
       final invites = (raw['invites'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map(ChildInvite.fromJson)
-          .where((i) => i.status == 'pending')
+          .where((i) => i.isStillValid)
           .toList();
       return (items: items, invites: invites);
     } catch (_) {

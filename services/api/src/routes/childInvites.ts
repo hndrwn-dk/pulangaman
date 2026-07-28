@@ -24,6 +24,12 @@ function normalizeCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+function toIsoUtc(value: Date | string): string {
+  if (value instanceof Date) return value.toISOString();
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
+}
+
 /** Parent creates a short invite code for a child device to join. */
 childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, res, next) => {
   try {
@@ -73,7 +79,7 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
       await client.query(
         `UPDATE child_invites
          SET status = 'expired'
-         WHERE parent_id = $1 AND status = 'pending' AND expires_at < now()`,
+         WHERE parent_id = $1 AND status = 'pending' AND expires_at <= now()`,
         [parentId],
       );
 
@@ -137,7 +143,7 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
           res.status(201).json({
             id: result.rows[0].id,
             code: result.rows[0].code,
-            expiresAt: result.rows[0].expires_at,
+            expiresAt: toIsoUtc(result.rows[0].expires_at),
             childDisplayName: relinkName,
             relinkChildId: body.relinkChildId ?? null,
           });
@@ -176,11 +182,20 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
     await pool.query(
       `UPDATE child_invites
        SET status = 'expired'
-       WHERE parent_id = $1 AND status = 'pending' AND expires_at < now()`,
+       WHERE parent_id = $1 AND status = 'pending' AND expires_at <= now()`,
       [parentId],
     );
 
-    const result = await pool.query(
+    const result = await pool.query<{
+      id: string;
+      code: string;
+      child_display_name: string | null;
+      status: string;
+      expires_at: Date;
+      redeemed_at: Date | null;
+      created_at: Date;
+      relink_child_id: string | null;
+    }>(
       `SELECT id, code, child_display_name, status, expires_at, redeemed_at, created_at,
               relink_child_id
        FROM child_invites
@@ -191,7 +206,18 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
        LIMIT 20`,
       [parentId],
     );
-    res.json({ invites: result.rows });
+    res.json({
+      invites: result.rows.map((row) => ({
+        id: row.id,
+        code: row.code,
+        child_display_name: row.child_display_name,
+        status: row.status,
+        expires_at: toIsoUtc(row.expires_at),
+        redeemed_at: row.redeemed_at ? toIsoUtc(row.redeemed_at) : null,
+        created_at: toIsoUtc(row.created_at),
+        relink_child_id: row.relink_child_id,
+      })),
+    });
   } catch (error) {
     next(error);
   }
@@ -223,7 +249,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
       await client.query(
         `UPDATE child_invites
          SET status = 'expired'
-         WHERE code = $1 AND status = 'pending' AND expires_at < now()`,
+         WHERE code = $1 AND status = 'pending' AND expires_at <= now()`,
         [code],
       );
 
@@ -235,7 +261,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
       }>(
         `SELECT id, parent_id, child_display_name, relink_child_id
          FROM child_invites
-         WHERE code = $1 AND status = 'pending'
+         WHERE code = $1 AND status = 'pending' AND expires_at > now()
          FOR UPDATE`,
         [code],
       );

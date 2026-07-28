@@ -445,7 +445,9 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         child: RefreshIndicator(
           color: AppColors.teal,
           onRefresh: () async {
-            await ref.read(childrenControllerProvider.notifier).refresh();
+            await ref
+                .read(childrenControllerProvider.notifier)
+                .refresh(force: true);
             await _loadGenders();
             await _loadMessages();
             await _loadLocations();
@@ -652,7 +654,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   ],
                 ),
               ],
-              if (children.invites.isNotEmpty) ...[
+              if (children.pendingInvites.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text(
                   visualRefreshOf(context)
@@ -671,7 +673,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                         ),
                 ),
                 const SizedBox(height: 10),
-                ...children.invites.map((invite) {
+                ...children.pendingInvites.map((invite) {
                   final refresh = visualRefreshOf(context);
                   final codeLabel = refresh
                       ? SignInCodeSheet.formatSpacedCode(invite.code)

@@ -58,7 +58,29 @@ class ChildInvite {
   final String? relinkChildId;
 
   bool get isStillValid =>
-      status == 'pending' && expiresAt.isAfter(DateTime.now());
+      status == 'pending' && expiresAt.toUtc().isAfter(DateTime.now().toUtc());
+
+  /// Parses API/cache expiry; naive timestamps are treated as UTC.
+  static DateTime parseExpiresAt(Object? raw) {
+    if (raw is DateTime) return raw.toUtc();
+    final s = raw.toString().trim();
+    final parsed = DateTime.parse(s);
+    final hasZone = s.endsWith('Z') ||
+        RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
+    if (!hasZone) {
+      return DateTime.utc(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+        parsed.second,
+        parsed.millisecond,
+        parsed.microsecond,
+      );
+    }
+    return parsed.toUtc();
+  }
 
   factory ChildInvite.fromJson(Map<String, dynamic> json) {
     final expires = json['expires_at'] ?? json['expiresAt'];
@@ -66,7 +88,7 @@ class ChildInvite {
       id: json['id'] as String,
       code: json['code'] as String,
       status: json['status'] as String? ?? 'pending',
-      expiresAt: DateTime.parse(expires as String),
+      expiresAt: parseExpiresAt(expires),
       childDisplayName:
           json['child_display_name'] as String? ?? json['childDisplayName'] as String?,
       relinkChildId:
@@ -78,7 +100,7 @@ class ChildInvite {
         'id': id,
         'code': code,
         'status': status,
-        'expires_at': expiresAt.toIso8601String(),
+        'expires_at': expiresAt.toUtc().toIso8601String(),
         'child_display_name': childDisplayName,
         'relink_child_id': relinkChildId,
       };
@@ -105,7 +127,11 @@ class ChildrenState {
   final String? error;
   final bool fromCache;
 
-  bool get hasData => items.isNotEmpty || invites.isNotEmpty;
+  /// Pending invites that have not expired (safe for UI).
+  List<ChildInvite> get pendingInvites =>
+      invites.where((i) => i.isStillValid).toList();
+
+  bool get hasData => items.isNotEmpty || pendingInvites.isNotEmpty;
 }
 
 final childrenControllerProvider =
@@ -144,6 +170,8 @@ class ChildrenController extends StateNotifier<ChildrenState> {
   }
 
   Future<void> refresh({bool force = false}) {
+    // Drop time-expired codes even when we skip a network round-trip.
+    _pruneExpiredInvites();
     if (!force &&
         _lastOkAt != null &&
         DateTime.now().difference(_lastOkAt!) < _minRefreshGap &&
@@ -154,11 +182,27 @@ class ChildrenController extends StateNotifier<ChildrenState> {
     return _inFlight ??= _refreshBody().whenComplete(() => _inFlight = null);
   }
 
+  void _pruneExpiredInvites() {
+    final kept = state.pendingInvites;
+    if (kept.length == state.invites.length) return;
+    state = ChildrenState(
+      items: state.items,
+      invites: kept,
+      loading: state.loading,
+      refreshing: state.refreshing,
+      fromCache: state.fromCache,
+      error: state.error,
+    );
+  }
+
   Future<void> _refreshBody() async {
+    // Always start from a pruned list so a failed/slow request cannot
+    // keep showing codes past TTL (e.g. "coba" after 24h).
+    final prunedInvites = state.pendingInvites;
     final showBlockingLoader = !state.hasData;
     state = ChildrenState(
       items: state.items,
-      invites: state.invites,
+      invites: prunedInvites,
       loading: showBlockingLoader,
       refreshing: !showBlockingLoader,
       fromCache: state.fromCache,
@@ -196,12 +240,15 @@ class ChildrenController extends StateNotifier<ChildrenState> {
         );
       }
     } catch (e) {
-      // Keep stale list visible; only surface error if we have nothing.
+      // Keep children list visible; never keep time-expired invites.
+      final keptInvites = state.pendingInvites;
       state = ChildrenState(
         items: state.items,
-        invites: state.invites,
-        fromCache: state.fromCache || state.hasData,
-        error: state.hasData ? null : e.toString(),
+        invites: keptInvites,
+        fromCache: state.fromCache || state.items.isNotEmpty || keptInvites.isNotEmpty,
+        error: (state.items.isNotEmpty || keptInvites.isNotEmpty)
+            ? null
+            : e.toString(),
       );
     }
   }
@@ -221,7 +268,7 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       id: data['id'] as String,
       code: data['code'] as String,
       status: 'pending',
-      expiresAt: DateTime.parse(data['expiresAt'] as String),
+      expiresAt: ChildInvite.parseExpiresAt(data['expiresAt']),
       childDisplayName: data['childDisplayName'] as String?,
       relinkChildId:
           data['relinkChildId'] as String? ?? relinkChildId,
