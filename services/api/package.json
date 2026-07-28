@@ -16,7 +16,8 @@
     "migrate:down": "node-pg-migrate -m migrations down",
     "migrate:create": "node-pg-migrate -m migrations create",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/**/*.test.ts"
+    "test": "tsx --test src/**/*.test.ts",
+    "seed:screentime": "tsx scripts/seed-screentime.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

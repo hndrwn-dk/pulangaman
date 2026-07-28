@@ -38,3 +38,6 @@ services:
         value: "false"
       - key: KILL_SWITCH_POLICY_ENFORCE
         value: "false"
+      # Keep enough usage history for month heatmap + weekday insights
+      - key: USAGE_RETENTION_DAYS
+        value: "42"
