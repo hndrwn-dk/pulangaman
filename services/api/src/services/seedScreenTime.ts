@@ -97,8 +97,12 @@ function dayTotalSeconds(
   // One over-limit spike mid-window for heatmap danger cells
   if (daysAgo === 3 || daysAgo === 10) mult = Math.max(mult, 1.25);
   // Keep several recent days under limit for streak copy
-  if (daysAgo <= 6 && daysAgo !== 2 && daysAgo !== 5) {
-    mult = Math.min(mult, 0.88);
+  if (daysAgo <= 6 && ![2, 5].includes(daysAgo)) {
+    mult = Math.min(mult, 0.85);
+  }
+  // Force Tue/Fri high even in the recent week (weekday pattern needs ≥3 weeks)
+  if (dow === 2 || dow === 5) {
+    mult = Math.max(mult, 1.35);
   }
   return Math.max(600, Math.round(base * mult));
 }
@@ -176,6 +180,18 @@ export async function seedScreenTimeForChildren(
     const salt = (options.profileSalt ?? 0) + hashSalt(childId);
     let usageEvents = 0;
     let hourlyEvents = 0;
+
+    // Replace the window so real device uploads do not stack on demo rows
+    // and flatten Tue/Fri / under-limit patterns.
+    const windowStart = jakartaNoonUtc(days - 1);
+    windowStart.setUTCHours(windowStart.getUTCHours() - 12);
+    await db.query(
+      `DELETE FROM usage_telemetry
+       WHERE child_id = $1
+         AND kind IN ('usage', 'usage_hourly')
+         AND recorded_at >= $2`,
+      [childId, windowStart.toISOString()],
+    );
 
     for (let daysAgo = 0; daysAgo < days; daysAgo++) {
       const recordedAt = jakartaNoonUtc(daysAgo);
