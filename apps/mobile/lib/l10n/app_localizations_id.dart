@@ -1485,6 +1485,68 @@ class AppLocalizationsId extends AppLocalizations {
   String get thisWeekTitle => 'Minggu Ini';
 
   @override
+  String get thisMonthTitle => 'Bulan Ini';
+
+  @override
+  String get heatmapLegendLow => 'Sedikit';
+
+  @override
+  String get heatmapLegendOver => 'Lewat limit';
+
+  @override
+  String topAppCallout(String period, String app, String time) {
+    return 'Paling sering dipakai $period: $app, total $time';
+  }
+
+  @override
+  String get periodLabelToday => 'hari ini';
+
+  @override
+  String get periodLabelThisWeek => 'minggu ini';
+
+  @override
+  String get periodLabelThisMonth => 'bulan ini';
+
+  @override
+  String appTrendNew(String period) {
+    return 'Baru $period';
+  }
+
+  @override
+  String get noAppDataForPeriod => 'Belum ada data app untuk periode ini.';
+
+  @override
+  String weekdayPatternInsight(String dayNames, int weekCount) {
+    return 'Pola kelihatan: $dayNames konsisten lebih tinggi $weekCount minggu terakhir.';
+  }
+
+  @override
+  String weekendPatternInsight(int weekCount) {
+    return 'Akhir pekan konsisten lebih tinggi $weekCount minggu terakhir.';
+  }
+
+  @override
+  String get weekdayMonFull => 'Senin';
+
+  @override
+  String get weekdayTueFull => 'Selasa';
+
+  @override
+  String get weekdayWedFull => 'Rabu';
+
+  @override
+  String get weekdayThuFull => 'Kamis';
+
+  @override
+  String get weekdayFriFull => 'Jumat';
+
+  @override
+  String get weekdaySatFull => 'Sabtu';
+
+  @override
+  String get weekdaySunFull => 'Minggu';
+
+  @override
   String get insightThisWeekTitle => 'Insight minggu ini';
 
   @override

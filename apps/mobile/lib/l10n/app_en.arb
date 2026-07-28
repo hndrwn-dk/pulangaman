@@ -497,6 +497,47 @@
   "noAppDataToday": "No app data yet today.",
   "appUsageTitle": "App Usage",
   "thisWeekTitle": "This Week",
+  "thisMonthTitle": "This Month",
+  "heatmapLegendLow": "Little",
+  "heatmapLegendOver": "Over limit",
+  "topAppCallout": "Most used {period}: {app}, total {time}",
+  "@topAppCallout": {
+    "placeholders": {
+      "period": { "type": "String" },
+      "app": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "periodLabelToday": "today",
+  "periodLabelThisWeek": "this week",
+  "periodLabelThisMonth": "this month",
+  "appTrendNew": "New {period}",
+  "@appTrendNew": {
+    "placeholders": {
+      "period": { "type": "String" }
+    }
+  },
+  "noAppDataForPeriod": "No app data for this period yet.",
+  "weekdayPatternInsight": "A pattern is showing: {dayNames} consistently higher over the last {weekCount} weeks.",
+  "@weekdayPatternInsight": {
+    "placeholders": {
+      "dayNames": { "type": "String" },
+      "weekCount": { "type": "int" }
+    }
+  },
+  "weekendPatternInsight": "Weekends have been consistently higher over the last {weekCount} weeks.",
+  "@weekendPatternInsight": {
+    "placeholders": {
+      "weekCount": { "type": "int" }
+    }
+  },
+  "weekdayMonFull": "Monday",
+  "weekdayTueFull": "Tuesday",
+  "weekdayWedFull": "Wednesday",
+  "weekdayThuFull": "Thursday",
+  "weekdayFriFull": "Friday",
+  "weekdaySatFull": "Saturday",
+  "weekdaySunFull": "Sunday",
   "insightThisWeekTitle": "This week's insight",
   "insightAddReminderPrompt": "Add a reminder at {time}?",
   "@insightAddReminderPrompt": {

@@ -118,11 +118,13 @@ class _UsageAppRow {
     required this.packageName,
     required this.label,
     required this.durationSeconds,
+    this.priorDurationSeconds,
   });
 
   final String packageName;
   final String label;
   final int durationSeconds;
+  final int? priorDurationSeconds;
 }
 
 class _DayUsage {
@@ -130,6 +132,121 @@ class _DayUsage {
 
   final DateTime day;
   final int totalSeconds;
+}
+
+class _WeekdayPattern {
+  _WeekdayPattern({
+    required this.isWeekend,
+    required this.dayNames,
+    required this.weekCount,
+  });
+
+  final bool isWeekend;
+  final String dayNames;
+  final int weekCount;
+}
+
+String _dayKey(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+/// Heatmap cell color from usage as % of that day's limit.
+Color _heatmapColorForPct(double pctOfLimit) {
+  if (pctOfLimit <= 0) return VisualRefreshColors.tagMuted;
+  if (pctOfLimit <= 0.5) return const Color(0xFFE8D9BB);
+  if (pctOfLimit <= 0.9) return VisualRefreshColors.praiseBtn;
+  if (pctOfLimit <= 1.1) return const Color(0xFFC9634C);
+  return VisualRefreshColors.danger;
+}
+
+String _weekdayFullName(AppLocalizations l10n, int weekday) {
+  return switch (weekday) {
+    DateTime.monday => l10n.weekdayMonFull,
+    DateTime.tuesday => l10n.weekdayTueFull,
+    DateTime.wednesday => l10n.weekdayWedFull,
+    DateTime.thursday => l10n.weekdayThuFull,
+    DateTime.friday => l10n.weekdayFriFull,
+    DateTime.saturday => l10n.weekdaySatFull,
+    DateTime.sunday => l10n.weekdaySunFull,
+    _ => '',
+  };
+}
+
+String _joinDayNames(List<String> names) {
+  if (names.isEmpty) return '';
+  if (names.length == 1) return names.first;
+  if (names.length == 2) return '${names[0]} & ${names[1]}';
+  return '${names.sublist(0, names.length - 1).join(', ')} & ${names.last}';
+}
+
+/// Deterministic weekday pattern (§4): weekday >25% above mean in ≥3 of last weeks.
+_WeekdayPattern? _detectWeekdayPattern(
+  List<_DayUsage> days,
+  AppLocalizations l10n,
+) {
+  if (days.isEmpty) return null;
+
+  final byWeek = <String, Map<int, int>>{};
+  var sum = 0;
+  for (final d in days) {
+    sum += d.totalSeconds;
+    final monday = _dateOnly(d.day).subtract(Duration(days: d.day.weekday - 1));
+    final wk = _dayKey(monday);
+    final map = byWeek.putIfAbsent(wk, () => <int, int>{});
+    map[d.day.weekday] = (map[d.day.weekday] ?? 0) + d.totalSeconds;
+  }
+
+  final weeks = byWeek.keys.toList()..sort();
+  final weekCount = weeks.length;
+  if (weekCount < 3) return null;
+
+  final dailyAvg = sum / days.length;
+  final threshold = dailyAvg * 1.25;
+
+  final weekdayHighCounts = <int, int>{
+    for (var dow = DateTime.monday; dow <= DateTime.friday; dow++) dow: 0,
+  };
+  var weekendHighWeeks = 0;
+
+  for (final wk in weeks) {
+    final map = byWeek[wk]!;
+    for (var dow = DateTime.monday; dow <= DateTime.friday; dow++) {
+      final secs = map[dow] ?? 0;
+      if (secs > threshold) {
+        weekdayHighCounts[dow] = (weekdayHighCounts[dow] ?? 0) + 1;
+      }
+    }
+    final sat = map[DateTime.saturday] ?? 0;
+    final sun = map[DateTime.sunday] ?? 0;
+    if ((sat + sun) / 2 > threshold) weekendHighWeeks += 1;
+  }
+
+  final strong = weekdayHighCounts.entries
+      .where((e) => e.value >= 3)
+      .toList()
+    ..sort((a, b) => b.value != a.value
+        ? b.value.compareTo(a.value)
+        : a.key.compareTo(b.key));
+  final top = strong.take(2).map((e) => e.key).toList();
+
+  if (top.isNotEmpty) {
+    return _WeekdayPattern(
+      isWeekend: false,
+      dayNames: _joinDayNames(
+        top.map((d) => _weekdayFullName(l10n, d)).toList(),
+      ),
+      weekCount: weekCount,
+    );
+  }
+  if (weekendHighWeeks >= 3) {
+    return _WeekdayPattern(
+      isWeekend: true,
+      dayNames: '',
+      weekCount: weekCount,
+    );
+  }
+  return null;
 }
 
 const _limitPresetMinutes = <int>[30, 60, 90, 120, 180, 300];
@@ -159,7 +276,8 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   int _schoolLimitMinutes = 180;
   int _weekendLimitMinutes = 300;
   List<_UsageAppRow> _apps = [];
-  List<_DayUsage> _week = [];
+  List<_DayUsage> _history = [];
+  UsagePeriod _period = UsagePeriod.week;
   bool _showAllApps = false;
   _ScreenTimeInsight? _insight;
   bool _insightLoading = false;
@@ -198,8 +316,19 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
     setState(() {
       _selectedChildId = id;
       _showAllApps = false;
+      _period = UsagePeriod.week;
     });
     unawaited(_loadFor(id));
+  }
+
+  void _setPeriod(UsagePeriod period) {
+    if (_period == period) return;
+    setState(() {
+      _period = period;
+      _showAllApps = false;
+    });
+    final id = _selectedChildId;
+    if (id != null) unawaited(_loadAppsForPeriod(id));
   }
 
   void _applyPolicyToState(Map<String, dynamic>? current) {
@@ -262,27 +391,103 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
       final api = ref.read(apiClientProvider);
       final policy = await api.get('/api/v1/policies/$childId');
       final current = policy['policy'] as Map<String, dynamic>?;
-      final summary = await api.get('/api/v1/telemetry/$childId/summary');
 
-      List<_DayUsage> week = [];
+      List<_DayUsage> history = [];
       try {
-        final weekly = await api.get('/api/v1/telemetry/$childId/weekly');
-        week = (weekly['days'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .map((d) {
-              final dayRaw = d['day'] as String? ?? '';
-              final parsed = DateTime.tryParse(dayRaw);
-              return _DayUsage(
-                day: parsed ?? DateTime.now(),
-                totalSeconds: (d['totalSeconds'] as num?)?.toInt() ?? 0,
-              );
-            })
-            .toList();
+        final weekly = await api.get(
+          '/api/v1/telemetry/$childId/weekly',
+          query: {'days': '35'},
+        );
+        history = _parseDayUsage(weekly);
       } catch (_) {
-        week = [];
+        history = [];
       }
 
-      final apps = (summary['apps'] as List<dynamic>? ?? [])
+      final apps = await _fetchPeriodApps(childId, _period);
+
+      if (!mounted) return;
+      setState(() {
+        _applyPolicyToState(current);
+        _apps = apps;
+        _history = history;
+        _loading = false;
+      });
+
+      unawaited(_loadInsight(childId, history: history, apps: apps));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _apps = [];
+        _history = [];
+        _loading = false;
+        _insightLoading = false;
+        _insight = null;
+      });
+    }
+  }
+
+  Future<void> _loadAppsForPeriod(String childId) async {
+    try {
+      final apps = await _fetchPeriodApps(childId, _period);
+      if (!mounted) return;
+      setState(() => _apps = apps);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _apps = []);
+    }
+  }
+
+  List<_DayUsage> _parseDayUsage(Map<String, dynamic> weekly) {
+    return (weekly['days'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map((d) {
+          final dayRaw = d['day'] as String? ?? '';
+          final parsed = DateTime.tryParse(dayRaw);
+          return _DayUsage(
+            day: parsed ?? DateTime.now(),
+            totalSeconds: (d['totalSeconds'] as num?)?.toInt() ?? 0,
+          );
+        })
+        .toList();
+  }
+
+  Future<List<_UsageAppRow>> _fetchPeriodApps(
+    String childId,
+    UsagePeriod period,
+  ) async {
+    final api = ref.read(apiClientProvider);
+    try {
+      final summary = await api.get(
+        '/api/v1/telemetry/$childId/summary',
+        query: {'period': period.apiValue},
+      );
+      final priorByPkg = <String, int>{};
+      for (final item in (summary['priorApps'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()) {
+        final pkg = item['package_name'] as String? ?? '';
+        if (pkg.isEmpty) continue;
+        priorByPkg[pkg] = (item['duration_seconds'] as num?)?.toInt() ?? 0;
+      }
+      return (summary['apps'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((item) {
+            final pkg = item['package_name'] as String? ?? '';
+            final label = item['app_label'] as String?;
+            return _UsageAppRow(
+              packageName: pkg,
+              label: friendlyAppName(pkg, appLabel: label),
+              durationSeconds: (item['duration_seconds'] as num?)?.toInt() ?? 0,
+              priorDurationSeconds:
+                  period == UsagePeriod.today ? null : (priorByPkg[pkg] ?? 0),
+            );
+          })
+          .where((a) => a.packageName.isNotEmpty)
+          .toList();
+    } catch (_) {
+      // Older API without period support — fall back to today-only summary.
+      if (period != UsagePeriod.today) return [];
+      final summary = await api.get('/api/v1/telemetry/$childId/summary');
+      return (summary['apps'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .map((item) {
             final pkg = item['package_name'] as String? ?? '';
@@ -295,31 +500,12 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
           })
           .where((a) => a.packageName.isNotEmpty)
           .toList();
-
-      if (!mounted) return;
-      setState(() {
-        _applyPolicyToState(current);
-        _apps = apps;
-        _week = week;
-        _loading = false;
-      });
-
-      unawaited(_loadInsight(childId, week: week, apps: apps));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _apps = [];
-        _week = [];
-        _loading = false;
-        _insightLoading = false;
-        _insight = null;
-      });
     }
   }
 
   Future<void> _loadInsight(
     String childId, {
-    required List<_DayUsage> week,
+    required List<_DayUsage> history,
     required List<_UsageAppRow> apps,
   }) async {
     try {
@@ -339,21 +525,21 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
       // still appears from weekly totals already on screen.
       if (!mounted) return;
       setState(() {
-        _insight = _localFallbackInsight(week: week, apps: apps);
+        _insight = _localFallbackInsight(history: history, apps: apps);
         _insightLoading = false;
       });
     }
   }
 
   _ScreenTimeInsight _localFallbackInsight({
-    required List<_DayUsage> week,
+    required List<_DayUsage> history,
     required List<_UsageAppRow> apps,
   }) {
     final l10n = AppLocalizations.of(context);
     final isEn = Localizations.localeOf(context).languageCode == 'en';
     final limitMin = _activeLimitMinutes;
     final limitSec = limitMin * 60;
-    final days = week.isEmpty
+    final days = history.isEmpty
         ? <_DayUsage>[
             _DayUsage(
               day: DateTime.now(),
@@ -361,7 +547,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                   apps.fold<int>(0, (s, a) => s + a.durationSeconds),
             ),
           ]
-        : week;
+        : history;
     var under = 0;
     var sum = 0;
     for (final d in days) {
@@ -376,12 +562,19 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
     final period = isEn ? 'this month' : 'bulan ini';
     final projected = isEn ? '$projectedHours hours' : '$projectedHours jam';
     final streak = l10n.insightDaysUnderLimit(under, totalDays);
+    final pattern = _detectWeekdayPattern(history, l10n);
+    String? patternDayText;
+    if (pattern != null) {
+      patternDayText = pattern.isWeekend
+          ? l10n.weekendPatternInsight(pattern.weekCount)
+          : l10n.weekdayPatternInsight(pattern.dayNames, pattern.weekCount);
+    }
     return _ScreenTimeInsight(
       trendText: isEn
           ? 'Usage is holding steady, projected $period: $projected.'
           : 'Pemakaian relatif stabil, proyeksi $period: $projected.',
       patternText: null,
-      patternDayText: null,
+      patternDayText: patternDayText,
       streakText: streak,
       suggestedReminderTime: null,
       suggestedReminderLabel: null,
@@ -426,8 +619,28 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
     });
   }
 
-  int get _usedSeconds =>
+  int get _usedSeconds {
+    final now = DateTime.now();
+    final todayKey = _dayKey(now);
+    for (final d in _history) {
+      if (_dayKey(d.day) == todayKey) return d.totalSeconds;
+    }
+    if (_period == UsagePeriod.today) {
+      return _apps.fold<int>(0, (sum, a) => sum + a.durationSeconds);
+    }
+    return 0;
+  }
+
+  int get _periodTotalSeconds =>
       _apps.fold<int>(0, (sum, a) => sum + a.durationSeconds);
+
+  String _periodPhrase(AppLocalizations l10n) {
+    return switch (_period) {
+      UsagePeriod.today => l10n.periodLabelToday,
+      UsagePeriod.week => l10n.periodLabelThisWeek,
+      UsagePeriod.month => l10n.periodLabelThisMonth,
+    };
+  }
 
   int get _activeLimitMinutes {
     final now = DateTime.now();
@@ -485,9 +698,25 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
     final used = _usedSeconds;
     final progress = limitSec <= 0 ? 0.0 : (used / limitSec).clamp(0.0, 1.0);
     final remaining = (limitSec - used).clamp(0, limitSec);
+    final periodTotal = _periodTotalSeconds;
     final visibleApps = _showAllApps ? _apps : _apps.take(4).toList();
     final cardDecoration = _hubCardDecoration(context);
     final sectionTitle = _hubSectionTitleStyle(context);
+    final chartTitle = switch (_period) {
+      UsagePeriod.month => l10n.thisMonthTitle,
+      UsagePeriod.week => l10n.thisWeekTitle,
+      UsagePeriod.today => l10n.thisWeekTitle,
+    };
+    final heatmapPattern = _period == UsagePeriod.month
+        ? (_insight?.patternDayText ??
+            () {
+              final p = _detectWeekdayPattern(_history, l10n);
+              if (p == null) return null;
+              return p.isWeekend
+                  ? l10n.weekendPatternInsight(p.weekCount)
+                  : l10n.weekdayPatternInsight(p.dayNames, p.weekCount);
+            }())
+        : null;
 
     return Scaffold(
       backgroundColor:
@@ -645,6 +874,41 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                     ),
                   ],
                   const SizedBox(height: 22),
+                  _PeriodToggle(
+                    period: _period,
+                    onChanged: _setPeriod,
+                  ),
+                  const SizedBox(height: 18),
+                  if (_period != UsagePeriod.today) ...[
+                    Text(
+                      chartTitle,
+                      style: sectionTitle,
+                    ),
+                    const SizedBox(height: 10),
+                    if (_period == UsagePeriod.week)
+                      _WeekChart(
+                        days: _history,
+                        schoolLimitMinutes: _schoolDaysOn
+                            ? _schoolLimitMinutes
+                            : _weekendLimitMinutes,
+                        weekendLimitMinutes: _weekendOn
+                            ? _weekendLimitMinutes
+                            : _schoolLimitMinutes,
+                        todaySeconds: used,
+                      )
+                    else
+                      _MonthHeatmap(
+                        days: _history,
+                        schoolLimitMinutes: _schoolDaysOn
+                            ? _schoolLimitMinutes
+                            : _weekendLimitMinutes,
+                        weekendLimitMinutes: _weekendOn
+                            ? _weekendLimitMinutes
+                            : _schoolLimitMinutes,
+                        patternText: heatmapPattern,
+                      ),
+                    const SizedBox(height: 22),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -679,13 +943,22 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
+                  if (_apps.isNotEmpty) ...[
+                    _TopAppCallout(
+                      app: _apps.first,
+                      periodLabel: _periodPhrase(l10n),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   if (_apps.isEmpty)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: cardDecoration,
                       child: Text(
-                        l10n.noAppDataToday,
+                        _period == UsagePeriod.today
+                            ? l10n.noAppDataToday
+                            : l10n.noAppDataForPeriod,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: refresh
@@ -711,23 +984,14 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
                               ),
                             _AppUsageRow(
                               app: visibleApps[i],
-                              totalSeconds: used <= 0 ? 1 : used,
+                              totalSeconds: periodTotal <= 0 ? 1 : periodTotal,
+                              showTrend: _period != UsagePeriod.today,
+                              periodLabel: _periodPhrase(l10n),
                             ),
                           ],
                         ],
                       ),
                     ),
-                  const SizedBox(height: 22),
-                  Text(
-                    l10n.thisWeekTitle,
-                    style: sectionTitle,
-                  ),
-                  const SizedBox(height: 10),
-                  _WeekChart(
-                    days: _week,
-                    limitMinutes: _activeLimitMinutes,
-                    todaySeconds: used,
-                  ),
                   const SizedBox(height: 22),
                   Text(
                     l10n.limitScheduleTitle,
@@ -1419,14 +1683,149 @@ class _TodayHeroCard extends StatelessWidget {
   }
 }
 
-class _AppUsageRow extends StatelessWidget {
-  const _AppUsageRow({required this.app, required this.totalSeconds});
+class _PeriodToggle extends StatelessWidget {
+  const _PeriodToggle({
+    required this.period,
+    required this.onChanged,
+  });
 
-  final _UsageAppRow app;
-  final int totalSeconds;
+  final UsagePeriod period;
+  final ValueChanged<UsagePeriod> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: refresh ? VisualRefreshColors.tagMuted : Colors.white,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: refresh ? null : Border.all(color: const Color(0x14075A4F)),
+      ),
+      child: Row(
+        children: UsagePeriod.values.map((p) {
+          final selected = p == period;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(p),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? (refresh
+                          ? VisualRefreshColors.anchor
+                          : AppColors.teal)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  p.shortLabel(l10n),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: selected
+                        ? (refresh
+                            ? VisualRefreshColors.background
+                            : Colors.white)
+                        : (refresh
+                            ? VisualRefreshColors.textSecondary
+                            : AppColors.inkSoft),
+                    fontFamily: refresh
+                        ? GoogleFonts.plusJakartaSans().fontFamily
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _TopAppCallout extends StatelessWidget {
+  const _TopAppCallout({
+    required this.app,
+    required this.periodLabel,
+  });
+
+  final _UsageAppRow app;
+  final String periodLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.routeTint,
+        borderRadius: BorderRadius.circular(
+          refresh ? AppRadius.vrCard : 16,
+        ),
+        border: Border.all(color: VisualRefreshColors.rewardBorder, width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(
+                refresh ? AppRadius.vrChip : 12,
+              ),
+            ),
+            child: Icon(
+              appIconForPackage(app.packageName),
+              color: VisualRefreshColors.routeText,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              l10n.topAppCallout(
+                periodLabel,
+                app.label,
+                formatDurationCompact(app.durationSeconds),
+              ),
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                height: 1.35,
+                color: VisualRefreshColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppUsageRow extends StatelessWidget {
+  const _AppUsageRow({
+    required this.app,
+    required this.totalSeconds,
+    required this.showTrend,
+    required this.periodLabel,
+  });
+
+  final _UsageAppRow app;
+  final int totalSeconds;
+  final bool showTrend;
+  final String periodLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final refresh = visualRefreshOf(context);
     final classicAccent = appAccentForPackage(app.packageName);
     final iconBg =
@@ -1437,6 +1836,64 @@ class _AppUsageRow extends StatelessWidget {
         refresh ? VisualRefreshColors.anchor : classicAccent;
     final share = (app.durationSeconds / totalSeconds).clamp(0.0, 1.0);
     final pct = (share * 100).round();
+
+    Widget? trend;
+    if (showTrend) {
+      final prior = app.priorDurationSeconds;
+      if (prior == null || prior <= 0) {
+        trend = Text(
+          l10n.appTrendNew(periodLabel),
+          style: TextStyle(
+            color: refresh
+                ? VisualRefreshColors.textSecondary
+                : AppColors.inkSoft,
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+            fontFamily: refresh
+                ? GoogleFonts.plusJakartaSans().fontFamily
+                : null,
+          ),
+        );
+      } else {
+        final delta =
+            ((app.durationSeconds - prior) / prior * 100).round();
+        final up = delta > 0;
+        final flat = delta == 0;
+        final color = flat
+            ? (refresh
+                ? VisualRefreshColors.textSecondary
+                : AppColors.inkSoft)
+            : (up
+                ? VisualRefreshColors.danger
+                : VisualRefreshColors.accent);
+        trend = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              flat
+                  ? Icons.remove_rounded
+                  : (up
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded),
+              size: 12,
+              color: color,
+            ),
+            const SizedBox(width: 2),
+            Text(
+              flat ? '0%' : '${delta.abs()}%',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                fontFamily: refresh
+                    ? GoogleFonts.plusJakartaSans().fontFamily
+                    : null,
+              ),
+            ),
+          ],
+        );
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1516,6 +1973,10 @@ class _AppUsageRow extends StatelessWidget {
                       : null,
                 ),
               ),
+              if (trend != null) ...[
+                const SizedBox(height: 2),
+                trend,
+              ],
             ],
           ),
         ],
@@ -1527,13 +1988,21 @@ class _AppUsageRow extends StatelessWidget {
 class _WeekChart extends StatelessWidget {
   const _WeekChart({
     required this.days,
-    required this.limitMinutes,
+    required this.schoolLimitMinutes,
+    required this.weekendLimitMinutes,
     required this.todaySeconds,
   });
 
   final List<_DayUsage> days;
-  final int limitMinutes;
+  final int schoolLimitMinutes;
+  final int weekendLimitMinutes;
   final int todaySeconds;
+
+  int _limitFor(DateTime day) {
+    final isWeekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+    return isWeekend ? weekendLimitMinutes : schoolLimitMinutes;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1548,22 +2017,17 @@ class _WeekChart extends StatelessWidget {
       l10n.weekdaySatShort,
       l10n.weekdaySunShort,
     ];
-    // Build Mon→Sun of current week, fill from API days when available.
     final now = DateTime.now();
     final monday = DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
     final byKey = <String, int>{
-      for (final d in days)
-        '${d.day.year}-${d.day.month.toString().padLeft(2, '0')}-${d.day.day.toString().padLeft(2, '0')}':
-            d.totalSeconds,
+      for (final d in days) _dayKey(d.day): d.totalSeconds,
     };
 
     final values = List<int>.generate(7, (i) {
       final day = monday.add(Duration(days: i));
-      final key =
-          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+      final key = _dayKey(day);
       if (byKey.containsKey(key)) return byKey[key]!;
-      // Fallback: put today's usage on today's column if weekly API empty.
       if (days.isEmpty &&
           day.year == now.year &&
           day.month == now.month &&
@@ -1573,19 +2037,22 @@ class _WeekChart extends StatelessWidget {
       return 0;
     });
 
-    final limitSec = limitMinutes * 60;
+    final dayLimits = List<int>.generate(
+      7,
+      (i) => _limitFor(monday.add(Duration(days: i))) * 60,
+    );
     final maxVal = [
       ...values,
-      limitSec,
+      ...dayLimits,
       1,
     ].reduce((a, b) => a > b ? a : b);
 
     final overColor =
         refresh ? VisualRefreshColors.danger : AppColors.coral;
-    // Muted accent-family for safe days (not bright teal).
     final safeColor = refresh
         ? VisualRefreshColors.accent.withValues(alpha: 0.45)
         : AppColors.teal;
+    final legendLimit = schoolLimitMinutes;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
@@ -1604,7 +2071,7 @@ class _WeekChart extends StatelessWidget {
                       label: labels[i],
                       seconds: values[i],
                       maxSeconds: maxVal,
-                      overLimit: values[i] > limitSec && limitSec > 0,
+                      overLimit: values[i] > dayLimits[i] && dayLimits[i] > 0,
                       overColor: overColor,
                       safeColor: safeColor,
                     ),
@@ -1619,7 +2086,8 @@ class _WeekChart extends StatelessWidget {
             children: [
               _LegendDot(
                 color: overColor,
-                label: l10n.overLimitLegend(_fmtLimitHours(l10n, limitMinutes)),
+                label:
+                    l10n.overLimitLegend(_fmtLimitHours(l10n, legendLimit)),
               ),
               const SizedBox(width: 16),
               _LegendDot(
@@ -1651,10 +2119,19 @@ class _WeekBar extends StatelessWidget {
   final Color overColor;
   final Color safeColor;
 
+  static const _barMax = 110.0;
+  /// Floor ~8% of chart height so safe days stay visible.
+  static const _minVisible = _barMax * 0.08;
+
   @override
   Widget build(BuildContext context) {
     final refresh = visualRefreshOf(context);
-    final h = maxSeconds <= 0 ? 0.0 : (seconds / maxSeconds) * 110;
+    var h = maxSeconds <= 0 ? 0.0 : (seconds / maxSeconds) * _barMax;
+    if (seconds > 0 && !overLimit && h < _minVisible) {
+      h = _minVisible;
+    } else if (seconds > 0 && h < 4) {
+      h = 4;
+    }
     final color = overLimit ? overColor : safeColor;
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -1675,7 +2152,7 @@ class _WeekBar extends StatelessWidget {
           ),
         const SizedBox(height: 4),
         Container(
-          height: h.clamp(4.0, 110.0),
+          height: h.clamp(0.0, _barMax),
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(8),
@@ -1696,6 +2173,194 @@ class _WeekBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MonthHeatmap extends StatelessWidget {
+  const _MonthHeatmap({
+    required this.days,
+    required this.schoolLimitMinutes,
+    required this.weekendLimitMinutes,
+    this.patternText,
+  });
+
+  final List<_DayUsage> days;
+  final int schoolLimitMinutes;
+  final int weekendLimitMinutes;
+  final String? patternText;
+
+  int _limitFor(DateTime day) {
+    final isWeekend =
+        day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+    return isWeekend ? weekendLimitMinutes : schoolLimitMinutes;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month, 1);
+    final monthEnd = DateTime(now.year, now.month + 1, 0);
+    final gridStart =
+        monthStart.subtract(Duration(days: monthStart.weekday - 1));
+    final lastCell =
+        monthEnd.add(Duration(days: DateTime.sunday - monthEnd.weekday));
+    final weekCount =
+        (lastCell.difference(gridStart).inDays ~/ 7) + 1;
+
+    final byKey = <String, int>{
+      for (final d in days) _dayKey(d.day): d.totalSeconds,
+    };
+
+    final headers = [
+      l10n.weekdayMonShort,
+      l10n.weekdayTueShort,
+      l10n.weekdayWedShort,
+      l10n.weekdayThuShort,
+      l10n.weekdayFriShort,
+      l10n.weekdaySatShort,
+      l10n.weekdaySunShort,
+    ];
+
+    final legendColors = [
+      VisualRefreshColors.tagMuted,
+      const Color(0xFFE8D9BB),
+      VisualRefreshColors.praiseBtn,
+      const Color(0xFFC9634C),
+      VisualRefreshColors.danger,
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: _hubCardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              for (final h in headers)
+                Expanded(
+                  child: Text(
+                    h,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: VisualRefreshColors.textSecondary,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (var w = 0; w < weekCount; w++) ...[
+            if (w > 0) const SizedBox(height: 6),
+            Row(
+              children: [
+                for (var d = 0; d < 7; d++) ...[
+                  if (d > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: Builder(
+                        builder: (context) {
+                          final day =
+                              gridStart.add(Duration(days: w * 7 + d));
+                          final inMonth = day.month == now.month;
+                          if (!inMonth) {
+                            return const SizedBox.shrink();
+                          }
+                          final secs = byKey[_dayKey(day)] ?? 0;
+                          final limitSec = _limitFor(day) * 60;
+                          final pct =
+                              limitSec <= 0 ? 0.0 : secs / limitSec;
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: _heatmapColorForPct(pct),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Text(
+                l10n.heatmapLegendLow,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: VisualRefreshColors.textSecondary,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              for (final c in legendColors) ...[
+                Container(
+                  width: 14,
+                  height: 10,
+                  margin: const EdgeInsets.only(right: 3),
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              Text(
+                l10n.heatmapLegendOver,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: VisualRefreshColors.textSecondary,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          if (patternText != null && patternText!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: VisualRefreshColors.routeTint,
+                borderRadius: BorderRadius.circular(
+                  refresh ? AppRadius.vrChip : 12,
+                ),
+                border: Border.all(
+                  color: VisualRefreshColors.rewardBorder,
+                  width: 0.5,
+                ),
+              ),
+              child: Text(
+                patternText!,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                  color: VisualRefreshColors.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -98,6 +98,27 @@ telemetryRouter.post('/batch', async (req: AuthedRequest, res, next) => {
   }
 });
 
+type AppsAggRow = {
+  package_name: string | null;
+  app_label: string | null;
+  duration_seconds: number;
+  blocked_count: number;
+};
+
+function mapAppsRows(rows: AppsAggRow[]) {
+  return rows.map((row) => ({
+    package_name: row.package_name,
+    app_label: row.app_label,
+    duration_seconds: Number(row.duration_seconds) || 0,
+    blocked_count: Number(row.blocked_count) || 0,
+  }));
+}
+
+/**
+ * Parent usage summary for today / this week / this month (Jakarta calendar).
+ * Query: ?period=today|week|month (default today).
+ * For week/month also returns priorApps for the immediately preceding period.
+ */
 telemetryRouter.get('/:childId/summary', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -114,36 +135,82 @@ telemetryRouter.get('/:childId/summary', async (req: AuthedRequest, res, next) =
       res.status(403).json({ error: 'parent_access_required' });
       return;
     }
-    const result = await pool.query(
-      `SELECT package_name,
-              MAX(payload->>'appLabel') AS app_label,
-              SUM(COALESCE(duration_seconds, 0))::integer AS duration_seconds,
-              COUNT(*) FILTER (WHERE kind = 'blocked')::integer AS blocked_count
-       FROM usage_telemetry
-       WHERE child_id = $1
-         AND kind = 'usage'
-         AND recorded_at >= (
-           date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta')
-           AT TIME ZONE 'Asia/Jakarta'
-         )
-       GROUP BY package_name
-       ORDER BY duration_seconds DESC`,
-      [childId],
-    );
+
+    const periodRaw = typeof req.query.period === 'string' ? req.query.period : 'today';
+    const period = z.enum(['today', 'week', 'month']).catch('today').parse(periodRaw);
+
+    // Jakarta day start as timestamptz; ranges are [start, end).
+    const rangeSql =
+      period === 'today'
+        ? {
+            currentStart: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta')`,
+            currentEnd: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') + interval '1 day'`,
+            priorStart: null as string | null,
+            priorEnd: null as string | null,
+          }
+        : period === 'week'
+          ? {
+              currentStart: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') - interval '6 days'`,
+              currentEnd: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') + interval '1 day'`,
+              priorStart: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') - interval '13 days'`,
+              priorEnd: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') - interval '6 days'`,
+            }
+          : {
+              // Calendar month (1st → tomorrow) vs prior calendar month.
+              currentStart: `(date_trunc('month', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta')`,
+              currentEnd: `(date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') + interval '1 day'`,
+              priorStart: `(date_trunc('month', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta') - interval '1 month'`,
+              priorEnd: `(date_trunc('month', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta')`,
+            };
+
+    const appsQuery = `
+      SELECT package_name,
+             MAX(payload->>'appLabel') AS app_label,
+             SUM(COALESCE(duration_seconds, 0))::integer AS duration_seconds,
+             COUNT(*) FILTER (WHERE kind = 'blocked')::integer AS blocked_count
+      FROM usage_telemetry
+      WHERE child_id = $1
+        AND kind = 'usage'
+        AND recorded_at >= ${rangeSql.currentStart}
+        AND recorded_at < ${rangeSql.currentEnd}
+      GROUP BY package_name
+      ORDER BY duration_seconds DESC`;
+
+    const result = await pool.query<AppsAggRow>(appsQuery, [childId]);
+
+    let priorApps: ReturnType<typeof mapAppsRows> | undefined;
+    if (rangeSql.priorStart && rangeSql.priorEnd) {
+      const prior = await pool.query<AppsAggRow>(
+        `SELECT package_name,
+                MAX(payload->>'appLabel') AS app_label,
+                SUM(COALESCE(duration_seconds, 0))::integer AS duration_seconds,
+                COUNT(*) FILTER (WHERE kind = 'blocked')::integer AS blocked_count
+         FROM usage_telemetry
+         WHERE child_id = $1
+           AND kind = 'usage'
+           AND recorded_at >= ${rangeSql.priorStart}
+           AND recorded_at < ${rangeSql.priorEnd}
+         GROUP BY package_name
+         ORDER BY duration_seconds DESC`,
+        [childId],
+      );
+      priorApps = mapAppsRows(prior.rows);
+    }
+
     res.json({
-      apps: result.rows.map((row) => ({
-        package_name: row.package_name,
-        app_label: row.app_label,
-        duration_seconds: row.duration_seconds,
-        blocked_count: row.blocked_count,
-      })),
+      period,
+      apps: mapAppsRows(result.rows),
+      ...(priorApps ? { priorApps } : {}),
     });
   } catch (error) {
     next(error);
   }
 });
 
-/** Last 7 Jakarta calendar days of total screen time (seconds per day). */
+/**
+ * Daily totals for the last N Jakarta calendar days (seconds per day).
+ * Query: ?days=7 (default) … max 42 for month heatmap (~5 weeks).
+ */
 telemetryRouter.get('/:childId/weekly', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -160,11 +227,18 @@ telemetryRouter.get('/:childId/weekly', async (req: AuthedRequest, res, next) =>
       res.status(403).json({ error: 'parent_access_required' });
       return;
     }
+
+    const daysRaw = typeof req.query.days === 'string' ? Number(req.query.days) : 7;
+    const dayCount = Number.isFinite(daysRaw)
+      ? Math.min(42, Math.max(1, Math.floor(daysRaw)))
+      : 7;
+    const offsetDays = dayCount - 1;
+
     const result = await pool.query(
       `WITH days AS (
          SELECT generate_series(
            (date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta')
-             - interval '6 days',
+             - ($2::int * interval '1 day'),
            date_trunc('day', now() AT TIME ZONE 'Asia/Jakarta') AT TIME ZONE 'Asia/Jakarta',
            interval '1 day'
          ) AS day_start
@@ -179,7 +253,7 @@ telemetryRouter.get('/:childId/weekly', async (req: AuthedRequest, res, next) =>
         AND t.recorded_at < d.day_start + interval '1 day'
        GROUP BY d.day_start
        ORDER BY d.day_start`,
-      [childId],
+      [childId, offsetDays],
     );
     res.json({
       days: result.rows.map((row) => ({

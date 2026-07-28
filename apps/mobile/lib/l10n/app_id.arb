@@ -846,6 +846,47 @@
   "noAppDataToday": "Belum ada data app hari ini.",
   "appUsageTitle": "Penggunaan Aplikasi",
   "thisWeekTitle": "Minggu Ini",
+  "thisMonthTitle": "Bulan Ini",
+  "heatmapLegendLow": "Sedikit",
+  "heatmapLegendOver": "Lewat limit",
+  "topAppCallout": "Paling sering dipakai {period}: {app}, total {time}",
+  "@topAppCallout": {
+    "placeholders": {
+      "period": { "type": "String" },
+      "app": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "periodLabelToday": "hari ini",
+  "periodLabelThisWeek": "minggu ini",
+  "periodLabelThisMonth": "bulan ini",
+  "appTrendNew": "Baru {period}",
+  "@appTrendNew": {
+    "placeholders": {
+      "period": { "type": "String" }
+    }
+  },
+  "noAppDataForPeriod": "Belum ada data app untuk periode ini.",
+  "weekdayPatternInsight": "Pola kelihatan: {dayNames} konsisten lebih tinggi {weekCount} minggu terakhir.",
+  "@weekdayPatternInsight": {
+    "placeholders": {
+      "dayNames": { "type": "String" },
+      "weekCount": { "type": "int" }
+    }
+  },
+  "weekendPatternInsight": "Akhir pekan konsisten lebih tinggi {weekCount} minggu terakhir.",
+  "@weekendPatternInsight": {
+    "placeholders": {
+      "weekCount": { "type": "int" }
+    }
+  },
+  "weekdayMonFull": "Senin",
+  "weekdayTueFull": "Selasa",
+  "weekdayWedFull": "Rabu",
+  "weekdayThuFull": "Kamis",
+  "weekdayFriFull": "Jumat",
+  "weekdaySatFull": "Sabtu",
+  "weekdaySunFull": "Minggu",
   "insightThisWeekTitle": "Insight minggu ini",
   "insightAddReminderPrompt": "Tambah pengingat jam {time}?",
   "@insightAddReminderPrompt": {

@@ -2750,6 +2750,114 @@ abstract class AppLocalizations {
   /// **'Minggu Ini'**
   String get thisWeekTitle;
 
+  /// No description provided for @thisMonthTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Bulan Ini'**
+  String get thisMonthTitle;
+
+  /// No description provided for @heatmapLegendLow.
+  ///
+  /// In id, this message translates to:
+  /// **'Sedikit'**
+  String get heatmapLegendLow;
+
+  /// No description provided for @heatmapLegendOver.
+  ///
+  /// In id, this message translates to:
+  /// **'Lewat limit'**
+  String get heatmapLegendOver;
+
+  /// No description provided for @topAppCallout.
+  ///
+  /// In id, this message translates to:
+  /// **'Paling sering dipakai {period}: {app}, total {time}'**
+  String topAppCallout(String period, String app, String time);
+
+  /// No description provided for @periodLabelToday.
+  ///
+  /// In id, this message translates to:
+  /// **'hari ini'**
+  String get periodLabelToday;
+
+  /// No description provided for @periodLabelThisWeek.
+  ///
+  /// In id, this message translates to:
+  /// **'minggu ini'**
+  String get periodLabelThisWeek;
+
+  /// No description provided for @periodLabelThisMonth.
+  ///
+  /// In id, this message translates to:
+  /// **'bulan ini'**
+  String get periodLabelThisMonth;
+
+  /// No description provided for @appTrendNew.
+  ///
+  /// In id, this message translates to:
+  /// **'Baru {period}'**
+  String appTrendNew(String period);
+
+  /// No description provided for @noAppDataForPeriod.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada data app untuk periode ini.'**
+  String get noAppDataForPeriod;
+
+  /// No description provided for @weekdayPatternInsight.
+  ///
+  /// In id, this message translates to:
+  /// **'Pola kelihatan: {dayNames} konsisten lebih tinggi {weekCount} minggu terakhir.'**
+  String weekdayPatternInsight(String dayNames, int weekCount);
+
+  /// No description provided for @weekendPatternInsight.
+  ///
+  /// In id, this message translates to:
+  /// **'Akhir pekan konsisten lebih tinggi {weekCount} minggu terakhir.'**
+  String weekendPatternInsight(int weekCount);
+
+  /// No description provided for @weekdayMonFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Senin'**
+  String get weekdayMonFull;
+
+  /// No description provided for @weekdayTueFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Selasa'**
+  String get weekdayTueFull;
+
+  /// No description provided for @weekdayWedFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Rabu'**
+  String get weekdayWedFull;
+
+  /// No description provided for @weekdayThuFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamis'**
+  String get weekdayThuFull;
+
+  /// No description provided for @weekdayFriFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Jumat'**
+  String get weekdayFriFull;
+
+  /// No description provided for @weekdaySatFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Sabtu'**
+  String get weekdaySatFull;
+
+  /// No description provided for @weekdaySunFull.
+  ///
+  /// In id, this message translates to:
+  /// **'Minggu'**
+  String get weekdaySunFull;
+
   /// No description provided for @insightThisWeekTitle.
   ///
   /// In id, this message translates to:
