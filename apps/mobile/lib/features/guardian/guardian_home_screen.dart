@@ -130,154 +130,51 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
   Future<void> _redeemInviteCode() async {
     final l10n = AppLocalizations.of(context);
     final refresh = visualRefreshOf(context);
-    final codeCtrl = TextEditingController();
+
+    // Sheet/dialog owns its TextEditingController so it is not disposed while
+    // the modal route is still animating out (that caused a red-screen assert).
+    final String? code = refresh
+        ? await showVrModalBottomSheet<String>(
+            context: context,
+            builder: (ctx) => const _EnterGuardianInviteCodeSheet(),
+          )
+        : await showDialog<String>(
+            context: context,
+            builder: (ctx) => const _EnterGuardianInviteCodeDialog(),
+          );
+
+    if (code == null || !mounted) return;
+    final trimmed = code.trim();
+    if (trimmed.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
+      );
+      return;
+    }
 
     try {
-      final bool? ok;
-      if (refresh) {
-        ok = await showVrModalBottomSheet<bool>(
-          context: context,
-          builder: (ctx) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(ctx).bottom,
-              ),
-              child: VrSheetShell(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    VrSheetTitle(l10n.enterGuardianInviteCode),
-                    const SizedBox(height: 10),
-                    VrSheetBody(l10n.enterGuardianInviteCodeHint),
-                    const SizedBox(height: 18),
-                    TextField(
-                      controller: codeCtrl,
-                      autofocus: true,
-                      textCapitalization: TextCapitalization.characters,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                        fontSize: 20,
-                        color: VisualRefreshColors.textPrimary,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'ABC123',
-                        filled: true,
-                        fillColor: VisualRefreshColors.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: VisualRefreshColors.border,
-                            width: 0.5,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: VisualRefreshColors.border,
-                            width: 0.5,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: VisualRefreshColors.accent,
-                            width: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: VisualRefreshColors.anchor,
-                          foregroundColor: VisualRefreshColors.background,
-                          elevation: 0,
-                          shape: const StadiumBorder(),
-                        ),
-                        child: Text(
-                          l10n.acceptInvite,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      } else {
-        ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(l10n.enterGuardianInviteCode),
-            content: TextField(
-              controller: codeCtrl,
-              autofocus: true,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: l10n.inviteCodeLabel,
-                hintText: l10n.enterGuardianInviteCodeHint,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-                child: Text(l10n.acceptInvite),
-              ),
-            ],
+      final data = await ref.read(apiClientProvider).post(
+        '/api/v1/guardian-invites/redeem',
+        body: {'code': trimmed},
+      );
+      await _loadInvites();
+      await _loadCoParentChildren();
+      if (!mounted) return;
+      final childName = data['childName']?.toString() ?? '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            childName.isEmpty
+                ? l10n.acceptInvite
+                : l10n.guardianInviteRedeemed(childName),
           ),
-        );
-      }
-
-      if (ok != true || !mounted) return;
-      final code = codeCtrl.text.trim();
-      if (code.length < 4) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
-        );
-        return;
-      }
-
-      try {
-        final data = await ref.read(apiClientProvider).post(
-          '/api/v1/guardian-invites/redeem',
-          body: {'code': code},
-        );
-        await _loadInvites();
-        await _loadCoParentChildren();
-        if (!mounted) return;
-        final childName = data['childName']?.toString() ?? '';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              childName.isEmpty
-                  ? l10n.acceptInvite
-                  : l10n.guardianInviteRedeemed(childName),
-            ),
-          ),
-        );
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
-        );
-      }
-    } finally {
-      codeCtrl.dispose();
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
+      );
     }
   }
 
@@ -624,6 +521,165 @@ class _CoParentToolTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Owns the invite-code [TextEditingController] for the VR bottom-sheet lifetime.
+class _EnterGuardianInviteCodeSheet extends StatefulWidget {
+  const _EnterGuardianInviteCodeSheet();
+
+  @override
+  State<_EnterGuardianInviteCodeSheet> createState() =>
+      _EnterGuardianInviteCodeSheetState();
+}
+
+class _EnterGuardianInviteCodeSheetState
+    extends State<_EnterGuardianInviteCodeSheet> {
+  final _codeCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.pop(context, _codeCtrl.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: VrSheetShell(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              VrSheetTitle(l10n.enterGuardianInviteCode),
+              const SizedBox(height: 10),
+              VrSheetBody(l10n.enterGuardianInviteCodeHint),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _codeCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                onSubmitted: (_) => _submit(),
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2,
+                  fontSize: 20,
+                  color: VisualRefreshColors.textPrimary,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'ABC123',
+                  filled: true,
+                  fillColor: VisualRefreshColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.border,
+                      width: 0.5,
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.border,
+                      width: 0.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(
+                      color: VisualRefreshColors.accent,
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 52,
+                child: FilledButton(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: VisualRefreshColors.anchor,
+                    foregroundColor: VisualRefreshColors.background,
+                    elevation: 0,
+                    shape: const StadiumBorder(),
+                  ),
+                  child: Text(
+                    l10n.acceptInvite,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Owns the invite-code [TextEditingController] for the legacy dialog lifetime.
+class _EnterGuardianInviteCodeDialog extends StatefulWidget {
+  const _EnterGuardianInviteCodeDialog();
+
+  @override
+  State<_EnterGuardianInviteCodeDialog> createState() =>
+      _EnterGuardianInviteCodeDialogState();
+}
+
+class _EnterGuardianInviteCodeDialogState
+    extends State<_EnterGuardianInviteCodeDialog> {
+  final _codeCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _codeCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.pop(context, _codeCtrl.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.enterGuardianInviteCode),
+      content: TextField(
+        controller: _codeCtrl,
+        autofocus: true,
+        textCapitalization: TextCapitalization.characters,
+        onSubmitted: (_) => _submit(),
+        decoration: InputDecoration(
+          labelText: l10n.inviteCodeLabel,
+          hintText: l10n.enterGuardianInviteCodeHint,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.cancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+          child: Text(l10n.acceptInvite),
+        ),
+      ],
     );
   }
 }
