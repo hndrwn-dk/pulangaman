@@ -883,6 +883,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get yourPoints => 'Your points';
 
   @override
+  String dayStreakCaption(int streak) {
+    return '$streak-day streak';
+  }
+
+  @override
+  String get todaysRemindersTitle => 'Today\'s reminders';
+
+  @override
+  String get todaysRemindersEmpty => 'No reminders scheduled for today.';
+
+  @override
   String get kabarTitle => 'Update to parent';
 
   @override
@@ -2405,12 +2416,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guardianInviteChannelHint =>
-      'Guardian will receive an invite via WhatsApp or email';
+      'Create a code, then share it. The guardian installs the app, signs in as Guardian, and enters the code.';
 
   @override
   String guardianInviteBody(String name, String children, String link) {
     return 'Hi $name, you are invited as a Trusted Guardian for $children on PulangAman. Open invite: $link';
   }
+
+  @override
+  String guardianInviteCodeShareBody(String child, String code, String link) {
+    return 'You are invited as a Trusted Guardian for $child on PulangAman.\n\n1. Install the app: $link\n2. Sign in as Guardian\n3. Enter invite code: $code';
+  }
+
+  @override
+  String guardianInviteCodeTitle(String name) {
+    return 'Guardian invite code for $name';
+  }
+
+  @override
+  String get guardianInviteCodeBody =>
+      'Ask the guardian to install PulangAman, sign in as Guardian, then enter this code under Invites.';
+
+  @override
+  String get createGuardianInviteCode => 'Create invite code';
+
+  @override
+  String get enterGuardianInviteCode => 'Enter invite code';
+
+  @override
+  String get enterGuardianInviteCodeHint =>
+      'Ask the primary parent for a 6-character code';
+
+  @override
+  String guardianInviteRedeemed(String name) {
+    return 'Invite accepted for $name';
+  }
+
+  @override
+  String get guardianInviteInvalidCode => 'Invalid or expired invite code';
+
+  @override
+  String get shareCodeAction => 'Share code';
 
   @override
   String get guardianInviteSubject => 'PulangAman Trusted Guardian Invite';

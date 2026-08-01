@@ -1694,6 +1694,24 @@ abstract class AppLocalizations {
   /// **'Poin kamu'**
   String get yourPoints;
 
+  /// No description provided for @dayStreakCaption.
+  ///
+  /// In id, this message translates to:
+  /// **'{streak} hari berturut-turut'**
+  String dayStreakCaption(int streak);
+
+  /// No description provided for @todaysRemindersTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengingat hari ini'**
+  String get todaysRemindersTitle;
+
+  /// No description provided for @todaysRemindersEmpty.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak ada pengingat untuk hari ini.'**
+  String get todaysRemindersEmpty;
+
   /// No description provided for @kabarTitle.
   ///
   /// In id, this message translates to:
@@ -4331,7 +4349,7 @@ abstract class AppLocalizations {
   /// No description provided for @guardianInviteChannelHint.
   ///
   /// In id, this message translates to:
-  /// **'Wali akan menerima undangan via WhatsApp atau email'**
+  /// **'Buat kode, lalu bagikan. Wali memasang aplikasi, masuk sebagai Wali, lalu memasukkan kode.'**
   String get guardianInviteChannelHint;
 
   /// No description provided for @guardianInviteBody.
@@ -4339,6 +4357,60 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Halo {name}, kamu diundang jadi Wali Terpercaya untuk {children} di PulangAman. Buka undangan: {link}'**
   String guardianInviteBody(String name, String children, String link);
+
+  /// No description provided for @guardianInviteCodeShareBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamu diundang jadi Wali Terpercaya untuk {child} di PulangAman.\n\n1. Pasang aplikasi: {link}\n2. Masuk sebagai Wali\n3. Masukkan kode undangan: {code}'**
+  String guardianInviteCodeShareBody(String child, String code, String link);
+
+  /// No description provided for @guardianInviteCodeTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode undangan wali untuk {name}'**
+  String guardianInviteCodeTitle(String name);
+
+  /// No description provided for @guardianInviteCodeBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Minta wali memasang PulangAman, masuk sebagai Wali, lalu masukkan kode ini di bagian Undangan.'**
+  String get guardianInviteCodeBody;
+
+  /// No description provided for @createGuardianInviteCode.
+  ///
+  /// In id, this message translates to:
+  /// **'Buat kode undangan'**
+  String get createGuardianInviteCode;
+
+  /// No description provided for @enterGuardianInviteCode.
+  ///
+  /// In id, this message translates to:
+  /// **'Masukkan kode undangan'**
+  String get enterGuardianInviteCode;
+
+  /// No description provided for @enterGuardianInviteCodeHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Minta kode 6 karakter dari orang tua utama'**
+  String get enterGuardianInviteCodeHint;
+
+  /// No description provided for @guardianInviteRedeemed.
+  ///
+  /// In id, this message translates to:
+  /// **'Undangan diterima untuk {name}'**
+  String guardianInviteRedeemed(String name);
+
+  /// No description provided for @guardianInviteInvalidCode.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode undangan tidak valid atau sudah kedaluwarsa'**
+  String get guardianInviteInvalidCode;
+
+  /// No description provided for @shareCodeAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Bagikan kode'**
+  String get shareCodeAction;
 
   /// No description provided for @guardianInviteSubject.
   ///

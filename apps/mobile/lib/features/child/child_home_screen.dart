@@ -60,6 +60,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   bool _usageLoading = false;
   String? _sendingPresetId;
   int _reminderCount = 0;
+  List<Map<String, dynamic>> _reminders = [];
   bool _exactAlarmOk = true;
   final ScreenTimeChannel _screenTimeChannel = ScreenTimeChannel();
   final LocationTrackingChannel _locationChannel = LocationTrackingChannel();
@@ -892,7 +893,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           .toList();
       await _reminderChannel.syncReminders(list);
       if (!mounted) return;
-      setState(() => _reminderCount = list.length);
+      setState(() {
+        _reminders = list;
+        _reminderCount = list.length;
+      });
       if (!_exactAlarmOk && list.isNotEmpty) {
         final alarmL10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -907,7 +911,10 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _reminderCount = 0);
+      setState(() {
+        _reminders = [];
+        _reminderCount = 0;
+      });
     }
   }
 
@@ -985,6 +992,229 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       return;
     }
     await _reminderChannel.openFullScreenIntentSettings();
+  }
+
+  void _openScreenTab() {
+    setState(() => _tabIndex = 1);
+    unawaited(_loadUsageStats(_usagePeriod));
+  }
+
+  Future<void> _openRewards() async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => RewardsScreen(selfChildId: userId),
+      ),
+    );
+    unawaited(_loadRewards());
+  }
+
+  List<Map<String, dynamic>> _todaysReminders() {
+    final weekday = DateTime.now().weekday; // 1=Mon ... 7=Sun
+    final today = <Map<String, dynamic>>[];
+    for (final r in _reminders) {
+      if (r['enabled'] == false) continue;
+      final rawDays = r['daysOfWeek'];
+      final days = rawDays is List
+          ? rawDays
+              .map((d) => d is int ? d : int.tryParse('$d'))
+              .whereType<int>()
+              .toList()
+          : const [1, 2, 3, 4, 5, 6, 7];
+      if (days.isEmpty || days.contains(weekday)) {
+        today.add(r);
+      }
+    }
+    today.sort((a, b) {
+      final ah = (a['hour'] as num?)?.toInt() ?? 0;
+      final am = (a['minute'] as num?)?.toInt() ?? 0;
+      final bh = (b['hour'] as num?)?.toInt() ?? 0;
+      final bm = (b['minute'] as num?)?.toInt() ?? 0;
+      return (ah * 60 + am).compareTo(bh * 60 + bm);
+    });
+    return today;
+  }
+
+  String _formatReminderTime(Map<String, dynamic> r) {
+    final hour = (r['hour'] as num?)?.toInt() ?? 0;
+    final minute = (r['minute'] as num?)?.toInt() ?? 0;
+    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _openRemindersSheet() async {
+    if (!mounted) return;
+    final refresh = visualRefreshOf(context);
+    final today = _todaysReminders();
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: refresh ? VisualRefreshColors.surface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final sheetL10n = AppLocalizations.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  sheetL10n.todaysRemindersTitle,
+                  style: TextStyle(
+                    fontSize: refresh ? 20 : 18,
+                    fontWeight: FontWeight.w900,
+                    color: refresh ? VisualRefreshColors.textPrimary : null,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (today.isEmpty)
+                  Text(
+                    sheetL10n.todaysRemindersEmpty,
+                    style: TextStyle(
+                      color: refresh
+                          ? VisualRefreshColors.textSecondary
+                          : AppColors.inkSoft,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                else
+                  for (final r in today) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.alarm_rounded,
+                            size: 20,
+                            color: refresh
+                                ? VisualRefreshColors.accent
+                                : AppColors.teal,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              r['title'] as String? ?? '',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: refresh
+                                    ? VisualRefreshColors.textPrimary
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            _formatReminderTime(r),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                              color: refresh
+                                  ? VisualRefreshColors.textSecondary
+                                  : AppColors.inkSoft,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openScreenPermissionSetup() async {
+    if (!mounted) return;
+    final refresh = visualRefreshOf(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: refresh ? VisualRefreshColors.surface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final sheetL10n = AppLocalizations.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  sheetL10n.enableScreenProtectionTitle,
+                  style: TextStyle(
+                    fontSize: refresh ? 20 : 18,
+                    fontWeight: FontWeight.w900,
+                    color: refresh ? VisualRefreshColors.textPrimary : null,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  sheetL10n.neverBlockedAppsNote,
+                  style: TextStyle(
+                    color: refresh
+                        ? VisualRefreshColors.textSecondary
+                        : AppColors.inkSoft,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (!_usageAccess)
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      unawaited(_screenTimeChannel.openUsageAccessSettings());
+                    },
+                    child: Text(sheetL10n.allowUsageAccess),
+                  ),
+                if (!_accessibility) ...[
+                  OutlinedButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      unawaited(
+                        _screenTimeChannel.openAccessibilitySettings(),
+                      );
+                    },
+                    child: Text(sheetL10n.enableAppBlocking),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    sheetL10n.restrictedSettingsHelp,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: refresh
+                          ? VisualRefreshColors.textSecondary
+                          : AppColors.inkSoft,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      unawaited(_screenTimeChannel.openAppInfoSettings());
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: refresh
+                          ? VisualRefreshColors.accent
+                          : AppColors.tealDeep,
+                    ),
+                    child: Text(
+                      sheetL10n.openAppInfo,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _syncScreenTimePermissions() async {
@@ -1706,6 +1936,11 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
                 _screenTimeChannel.openAccessibilitySettings,
             onOpenAppInfo: _screenTimeChannel.openAppInfoSettings,
             onOpenReminderPermissions: _openReminderPermissions,
+            onOpenScreenTab: _openScreenTab,
+            onOpenRewards: () => unawaited(_openRewards()),
+            onOpenRemindersSheet: () => unawaited(_openRemindersSheet()),
+            onOpenScreenPermissionSetup: () =>
+                unawaited(_openScreenPermissionSetup()),
             homeByAckVisible: (_homeByStatus == 'pre_notified' ||
                     _homeByStatus == 'target_notified') &&
                 !_homeByAcked,

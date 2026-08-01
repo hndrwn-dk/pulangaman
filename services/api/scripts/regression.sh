@@ -88,6 +88,16 @@ run "guardian invites list" 200 GET /api/v1/guardians/invites "$G_TOK"
 run "guardian accept"    200 POST /api/v1/guardians/accept "$G_TOK" "{\"childId\":\"$CHILD_ID\"}"
 run "list guardians"     200 GET  "/api/v1/guardians?childId=$CHILD_ID" "$P_TOK"
 run "guardian presence"  200 POST /api/v1/guardians/presence "$G_TOK" "{\"status\":\"ONLINE\",\"lat\":$PARENT_LAT,\"lng\":$PARENT_LNG}"
+run "revoke guardian"    200 POST /api/v1/guardians/revoke "$P_TOK" "{\"childId\":\"$CHILD_ID\",\"guardianId\":\"$GUARD_ID\"}"
+
+echo "----- Guardian invite codes -----"
+GI=$(curl -sS -X POST "$BASE/api/v1/guardian-invites" -H "Authorization: Bearer $P_TOK" -H "Content-Type: application/json" -d "{\"childId\":\"$CHILD_ID\",\"accessLevel\":\"view\"}")
+GI_CODE=$(echo "$GI" | jq -r '.code // empty'); GI_ID=$(echo "$GI" | jq -r '.id // empty')
+echo "guardian_invite_code=$GI_CODE id=$GI_ID"
+[ -n "$GI_CODE" ] && PASS=$((PASS+1)) && echo "PASS | create guardian invite code" || { FAIL=$((FAIL+1)); echo "FAIL | create guardian invite code | $GI"; }
+run "list guardian invite codes" 200 GET /api/v1/guardian-invites "$P_TOK"
+run "redeem guardian invite code" 201 POST /api/v1/guardian-invites/redeem "$G_TOK" "{\"code\":\"$GI_CODE\"}"
+run "list guardians after code" 200 GET "/api/v1/guardians?childId=$CHILD_ID" "$P_TOK"
 
 echo "----- Panic cascade -----"
 PA=$(curl -sS -X POST "$BASE/api/v1/panic/trigger" -H "Authorization: Bearer $C_TOK" -H "Content-Type: application/json" -d "{\"lat\":$CHILD_LAT,\"lng\":$CHILD_LNG}")
@@ -96,7 +106,7 @@ ALERT_ID=$(echo "$PA" | jq "['alertId']"); echo "alert=$ALERT_ID"
 run "guardian share location" 200 POST /api/v1/guardians/share-location "$G_TOK" "{\"alertId\":\"$ALERT_ID\",\"lat\":$PARENT_LAT,\"lng\":$PARENT_LNG}"
 run "parent ack panic"   200 POST /api/v1/panic/$ALERT_ID/ack "$P_TOK" "{}"
 run "parent resolve panic" 200 POST /api/v1/panic/$ALERT_ID/resolve "$P_TOK" "{\"notes\":\"aman\"}"
-run "revoke guardian"    200 POST /api/v1/guardians/revoke "$P_TOK" "{\"childId\":\"$CHILD_ID\",\"guardianId\":\"$GUARD_ID\"}"
+run "revoke guardian after panic" 200 POST /api/v1/guardians/revoke "$P_TOK" "{\"childId\":\"$CHILD_ID\",\"guardianId\":\"$GUARD_ID\"}"
 
 echo "----- Schools -----"
 SC=$(curl -sS -X POST "$BASE/api/v1/schools" -H "Authorization: Bearer $S_TOK" -H "Content-Type: application/json" -d "{\"name\":\"Sekolah Indonesia\",\"lat\":$CHILD_LAT,\"lng\":$CHILD_LNG,\"radiusM\":150,\"panicContactPhone\":\"$P_PHONE\",\"panicContactName\":\"TU\"}")

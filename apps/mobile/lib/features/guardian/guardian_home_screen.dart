@@ -16,6 +16,7 @@ import '../parent/emergency_meeting_screen.dart';
 import '../parent/guardians_screen.dart';
 import '../parent/home_by_screen.dart';
 import '../parent/reminders_screen.dart';
+import '../parent/vr_sheet_chrome.dart';
 import '../parent/zones_screen.dart';
 
 class GuardianHomeScreen extends ConsumerStatefulWidget {
@@ -124,6 +125,160 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     await api.post('/api/v1/guardians/accept', body: {'childId': childId});
     await _loadInvites();
     await _loadCoParentChildren();
+  }
+
+  Future<void> _redeemInviteCode() async {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final codeCtrl = TextEditingController();
+
+    try {
+      final bool? ok;
+      if (refresh) {
+        ok = await showVrModalBottomSheet<bool>(
+          context: context,
+          builder: (ctx) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+              ),
+              child: VrSheetShell(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    VrSheetTitle(l10n.enterGuardianInviteCode),
+                    const SizedBox(height: 10),
+                    VrSheetBody(l10n.enterGuardianInviteCodeHint),
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: codeCtrl,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.characters,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2,
+                        fontSize: 20,
+                        color: VisualRefreshColors.textPrimary,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'ABC123',
+                        filled: true,
+                        fillColor: VisualRefreshColors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: VisualRefreshColors.border,
+                            width: 0.5,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: VisualRefreshColors.border,
+                            width: 0.5,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: VisualRefreshColors.accent,
+                            width: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 52,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: VisualRefreshColors.anchor,
+                          foregroundColor: VisualRefreshColors.background,
+                          elevation: 0,
+                          shape: const StadiumBorder(),
+                        ),
+                        child: Text(
+                          l10n.acceptInvite,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      } else {
+        ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.enterGuardianInviteCode),
+            content: TextField(
+              controller: codeCtrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: l10n.inviteCodeLabel,
+                hintText: l10n.enterGuardianInviteCodeHint,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                child: Text(l10n.acceptInvite),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (ok != true || !mounted) return;
+      final code = codeCtrl.text.trim();
+      if (code.length < 4) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
+        );
+        return;
+      }
+
+      try {
+        final data = await ref.read(apiClientProvider).post(
+          '/api/v1/guardian-invites/redeem',
+          body: {'code': code},
+        );
+        await _loadInvites();
+        await _loadCoParentChildren();
+        if (!mounted) return;
+        final childName = data['childName']?.toString() ?? '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              childName.isEmpty
+                  ? l10n.acceptInvite
+                  : l10n.guardianInviteRedeemed(childName),
+            ),
+          ),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
+        );
+      }
+    } finally {
+      codeCtrl.dispose();
+    }
   }
 
   Future<void> _ack() async {
@@ -327,15 +482,36 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
           ),
           const SizedBox(height: 8),
           if (_invites.isEmpty)
-            Text(
-              l10n.noInvites,
-              style: TextStyle(
-                color: refresh
-                    ? VisualRefreshColors.textSecondary
-                    : null,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.noInvites,
+                  style: TextStyle(
+                    color: refresh
+                        ? VisualRefreshColors.textSecondary
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _redeemInviteCode,
+                  icon: const Icon(Icons.vpn_key_outlined),
+                  label: Text(l10n.enterGuardianInviteCode),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: refresh
+                        ? VisualRefreshColors.anchor
+                        : AppColors.teal,
+                    side: BorderSide(
+                      color: refresh
+                          ? VisualRefreshColors.border
+                          : AppColors.teal,
+                    ),
+                  ),
+                ),
+              ],
             )
-          else
+          else ...[
             ..._invites.map(
               (invite) {
                 final access = invite['accessLevel']?.toString() ??
@@ -364,6 +540,13 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 );
               },
             ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _redeemInviteCode,
+              icon: const Icon(Icons.vpn_key_outlined, size: 18),
+              label: Text(l10n.enterGuardianInviteCode),
+            ),
+          ],
         ],
       ),
     );

@@ -283,6 +283,16 @@
   "tripChooseSafeDestination": "Choose a safe destination from saved places",
   "screenTimeToday": "Screen time today",
   "yourPoints": "Your points",
+  "dayStreakCaption": "{streak}-day streak",
+  "@dayStreakCaption": {
+    "placeholders": {
+      "streak": {
+        "type": "int"
+      }
+    }
+  },
+  "todaysRemindersTitle": "Today's reminders",
+  "todaysRemindersEmpty": "No reminders scheduled for today.",
   "kabarTitle": "Update to parent",
   "kabarSubtitle": "Tap once — the message is sent right away.",
   "kabarInfoNote": "Messages go to your linked parent. For emergencies, use the panic button on Home.",
@@ -1014,7 +1024,7 @@
   "activeGuardiansSection": "ACTIVE GUARDIANS",
   "inviteNewSection": "INVITE NEW GUARDIAN",
   "addTrustedGuardian": "Add Trusted Guardian",
-  "guardianInviteChannelHint": "Guardian will receive an invite via WhatsApp or email",
+  "guardianInviteChannelHint": "Create a code, then share it. The guardian installs the app, signs in as Guardian, and enters the code.",
   "guardianInviteBody": "Hi {name}, you are invited as a Trusted Guardian for {children} on PulangAman. Open invite: {link}",
   "@guardianInviteBody": {
     "placeholders": {
@@ -1023,6 +1033,32 @@
       "link": { "type": "String" }
     }
   },
+  "guardianInviteCodeShareBody": "You are invited as a Trusted Guardian for {child} on PulangAman.\n\n1. Install the app: {link}\n2. Sign in as Guardian\n3. Enter invite code: {code}",
+  "@guardianInviteCodeShareBody": {
+    "placeholders": {
+      "child": { "type": "String" },
+      "code": { "type": "String" },
+      "link": { "type": "String" }
+    }
+  },
+  "guardianInviteCodeTitle": "Guardian invite code for {name}",
+  "@guardianInviteCodeTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "guardianInviteCodeBody": "Ask the guardian to install PulangAman, sign in as Guardian, then enter this code under Invites.",
+  "createGuardianInviteCode": "Create invite code",
+  "enterGuardianInviteCode": "Enter invite code",
+  "enterGuardianInviteCodeHint": "Ask the primary parent for a 6-character code",
+  "guardianInviteRedeemed": "Invite accepted for {name}",
+  "@guardianInviteRedeemed": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "guardianInviteInvalidCode": "Invalid or expired invite code",
+  "shareCodeAction": "Share code",
   "guardianInviteSubject": "PulangAman Trusted Guardian Invite",
   "activeGuardiansCount": "{count} active guardians",
   "@activeGuardiansCount": {

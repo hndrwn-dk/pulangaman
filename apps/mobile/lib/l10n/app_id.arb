@@ -466,6 +466,16 @@
   "tripChooseSafeDestination": "Pilih tujuan aman ke lokasi tersimpan",
   "screenTimeToday": "Layar hari ini",
   "yourPoints": "Poin kamu",
+  "dayStreakCaption": "{streak} hari berturut-turut",
+  "@dayStreakCaption": {
+    "placeholders": {
+      "streak": {
+        "type": "int"
+      }
+    }
+  },
+  "todaysRemindersTitle": "Pengingat hari ini",
+  "todaysRemindersEmpty": "Tidak ada pengingat untuk hari ini.",
   "kabarTitle": "Kabar ke ortu",
   "kabarSubtitle": "Ketuk sekali — pesan langsung terkirim.",
   "kabarInfoNote": "Pesan dikirim ke orang tua yang terhubung. Untuk darurat, gunakan tombol panik di Beranda.",
@@ -1450,7 +1460,7 @@
   "activeGuardiansSection": "WALI AKTIF",
   "inviteNewSection": "UNDANG WALI BARU",
   "addTrustedGuardian": "Tambah Wali Terpercaya",
-  "guardianInviteChannelHint": "Wali akan menerima undangan via WhatsApp atau email",
+  "guardianInviteChannelHint": "Buat kode, lalu bagikan. Wali memasang aplikasi, masuk sebagai Wali, lalu memasukkan kode.",
   "guardianInviteBody": "Halo {name}, kamu diundang jadi Wali Terpercaya untuk {children} di PulangAman. Buka undangan: {link}",
   "@guardianInviteBody": {
     "placeholders": {
@@ -1459,6 +1469,32 @@
       "link": { "type": "String" }
     }
   },
+  "guardianInviteCodeShareBody": "Kamu diundang jadi Wali Terpercaya untuk {child} di PulangAman.\n\n1. Pasang aplikasi: {link}\n2. Masuk sebagai Wali\n3. Masukkan kode undangan: {code}",
+  "@guardianInviteCodeShareBody": {
+    "placeholders": {
+      "child": { "type": "String" },
+      "code": { "type": "String" },
+      "link": { "type": "String" }
+    }
+  },
+  "guardianInviteCodeTitle": "Kode undangan wali untuk {name}",
+  "@guardianInviteCodeTitle": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "guardianInviteCodeBody": "Minta wali memasang PulangAman, masuk sebagai Wali, lalu masukkan kode ini di bagian Undangan.",
+  "createGuardianInviteCode": "Buat kode undangan",
+  "enterGuardianInviteCode": "Masukkan kode undangan",
+  "enterGuardianInviteCodeHint": "Minta kode 6 karakter dari orang tua utama",
+  "guardianInviteRedeemed": "Undangan diterima untuk {name}",
+  "@guardianInviteRedeemed": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "guardianInviteInvalidCode": "Kode undangan tidak valid atau sudah kedaluwarsa",
+  "shareCodeAction": "Bagikan kode",
   "guardianInviteSubject": "Undangan Wali Terpercaya PulangAman",
   "activeGuardiansCount": "{count} wali aktif",
   "@activeGuardiansCount": {

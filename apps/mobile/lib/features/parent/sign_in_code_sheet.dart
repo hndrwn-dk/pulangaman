@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
@@ -12,6 +13,9 @@ Future<void> showSignInCodeSheet({
   required String childName,
   required String code,
   DateTime? expiresAt,
+  String? title,
+  String? body,
+  String? shareMessage,
 }) {
   return showVrModalBottomSheet<void>(
     context: context,
@@ -19,6 +23,9 @@ Future<void> showSignInCodeSheet({
       childName: childName,
       code: code,
       expiresAt: expiresAt,
+      title: title,
+      body: body,
+      shareMessage: shareMessage,
     ),
   );
 }
@@ -29,11 +36,17 @@ class SignInCodeSheet extends StatelessWidget {
     required this.childName,
     required this.code,
     this.expiresAt,
+    this.title,
+    this.body,
+    this.shareMessage,
   });
 
   final String childName;
   final String code;
   final DateTime? expiresAt;
+  final String? title;
+  final String? body;
+  final String? shareMessage;
 
   static String formatSpacedCode(String raw) {
     final cleaned = raw.replaceAll(RegExp(r'\s+'), '').toUpperCase();
@@ -60,10 +73,17 @@ class SignInCodeSheet extends StatelessWidget {
     );
   }
 
+  Future<void> _share() async {
+    final msg = shareMessage;
+    if (msg == null || msg.isEmpty) return;
+    await Share.share(msg);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final spaced = formatSpacedCode(code);
+    final canShare = shareMessage != null && shareMessage!.trim().isNotEmpty;
 
     return VrSheetShell(
       child: Column(
@@ -76,9 +96,9 @@ class SignInCodeSheet extends StatelessWidget {
             iconColor: VisualRefreshColors.accent,
           ),
           const SizedBox(height: 18),
-          VrSheetTitle(l10n.newSignInCodeTitle(childName)),
+          VrSheetTitle(title ?? l10n.newSignInCodeTitle(childName)),
           const SizedBox(height: 10),
-          VrSheetBody(l10n.newSignInCodeBody(childName)),
+          VrSheetBody(body ?? l10n.newSignInCodeBody(childName)),
           const SizedBox(height: 22),
           CustomPaint(
             painter: _DashedRRectPainter(
@@ -116,12 +136,41 @@ class SignInCodeSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          VrSheetDualActions(
-            secondaryLabel: l10n.copyCodeAction,
-            primaryLabel: l10n.doneAction,
-            onSecondary: () => _copy(context),
-            onPrimary: () => Navigator.pop(context),
-          ),
+          if (canShare) ...[
+            SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: _share,
+                icon: const Icon(Icons.ios_share_rounded, size: 20),
+                label: Text(
+                  l10n.shareCodeAction,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: VisualRefreshColors.anchor,
+                  foregroundColor: VisualRefreshColors.background,
+                  elevation: 0,
+                  shape: const StadiumBorder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            VrSheetDualActions(
+              secondaryLabel: l10n.copyCodeAction,
+              primaryLabel: l10n.doneAction,
+              onSecondary: () => _copy(context),
+              onPrimary: () => Navigator.pop(context),
+            ),
+          ] else
+            VrSheetDualActions(
+              secondaryLabel: l10n.copyCodeAction,
+              primaryLabel: l10n.doneAction,
+              onSecondary: () => _copy(context),
+              onPrimary: () => Navigator.pop(context),
+            ),
         ],
       ),
     );

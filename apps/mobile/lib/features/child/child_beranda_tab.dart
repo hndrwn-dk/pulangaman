@@ -29,6 +29,10 @@ class ChildBerandaTab extends StatelessWidget {
     required this.onOpenUsageSettings,
     required this.onOpenAccessibilitySettings,
     required this.onOpenReminderPermissions,
+    required this.onOpenScreenTab,
+    required this.onOpenRewards,
+    required this.onOpenRemindersSheet,
+    required this.onOpenScreenPermissionSetup,
     this.onOpenAppInfo,
     this.homeByAckVisible = false,
     this.homeByAckSent = false,
@@ -66,6 +70,10 @@ class ChildBerandaTab extends StatelessWidget {
   final VoidCallback onOpenUsageSettings;
   final VoidCallback onOpenAccessibilitySettings;
   final VoidCallback onOpenReminderPermissions;
+  final VoidCallback onOpenScreenTab;
+  final VoidCallback onOpenRewards;
+  final VoidCallback onOpenRemindersSheet;
+  final VoidCallback onOpenScreenPermissionSetup;
   final VoidCallback? onOpenAppInfo;
   final bool homeByAckVisible;
   final bool homeByAckSent;
@@ -135,37 +143,48 @@ class ChildBerandaTab extends StatelessWidget {
               icon: tracking ? Icons.location_on : Icons.location_off,
               color: tracking ? AppColors.success : AppColors.danger,
             ),
-            PaStatusPill(
-              label: l10n.pointsStreakLabel(points, streak),
-              icon: Icons.star,
-              color: AppColors.coral,
-            ),
-            PaStatusPill(
-              label: usageAccess && accessibility
-                  ? l10n.screenRulesActive
-                  : l10n.screenPermissionIncomplete,
-              icon: Icons.hourglass_bottom,
-              color: AppColors.lavender,
-            ),
             GestureDetector(
-              onTap: exactAlarmOk ? null : onOpenReminderPermissions,
+              onTap: usageAccess && accessibility
+                  ? null
+                  : onOpenScreenPermissionSetup,
               child: PaStatusPill(
-                label: !exactAlarmOk
-                    ? l10n.alarmPermissionIncomplete
-                    : reminderCount > 0
-                        ? l10n.reminderActiveCount(reminderCount)
-                        : l10n.noRemindersYet,
-                icon: Icons.alarm_rounded,
-                color: exactAlarmOk ? AppColors.sky : AppColors.amber,
+                label: usageAccess && accessibility
+                    ? l10n.screenRulesActive
+                    : l10n.screenPermissionIncomplete,
+                icon: Icons.hourglass_bottom,
+                color: usageAccess && accessibility
+                    ? AppColors.lavender
+                    : AppColors.amber,
               ),
             ),
+            if (!exactAlarmOk)
+              GestureDetector(
+                onTap: onOpenReminderPermissions,
+                child: PaStatusPill(
+                  label: l10n.alarmPermissionIncomplete,
+                  icon: Icons.alarm_rounded,
+                  color: AppColors.amber,
+                ),
+              )
+            else if (reminderCount > 0)
+              GestureDetector(
+                onTap: onOpenRemindersSheet,
+                child: PaStatusPill(
+                  label: l10n.reminderActiveCount(reminderCount),
+                  icon: Icons.alarm_rounded,
+                  color: AppColors.sky,
+                ),
+              ),
           ],
         ),
         const SizedBox(height: AppSpacing.md),
         _QuickStatsRow(
           todayUsageSeconds: todayUsageSeconds,
           points: points,
+          streak: streak,
           refresh: false,
+          onOpenScreenTab: onOpenScreenTab,
+          onOpenRewards: onOpenRewards,
         ),
         if (empConfigured || empActive) ...[
           const SizedBox(height: AppSpacing.md),
@@ -375,34 +394,44 @@ class ChildBerandaTab extends StatelessWidget {
               label: tracking ? l10n.pillLocationOn : l10n.pillLocationOff,
               icon: tracking ? Icons.location_on : Icons.location_off,
             ),
-            _VrStatusPill(
-              label: l10n.pointsStreakLabel(points, streak),
-              icon: Icons.star_rounded,
-            ),
-            _VrStatusPill(
-              label: usageAccess && accessibility
-                  ? l10n.screenRulesActive
-                  : l10n.screenPermissionIncomplete,
-              icon: Icons.hourglass_bottom,
-            ),
-            GestureDetector(
-              onTap: exactAlarmOk ? null : onOpenReminderPermissions,
-              child: _VrStatusPill(
-                label: !exactAlarmOk
-                    ? l10n.alarmPermissionIncomplete
-                    : reminderCount > 0
-                        ? l10n.reminderActiveCount(reminderCount)
-                        : l10n.noRemindersYet,
-                icon: Icons.alarm_rounded,
+            if (!(usageAccess && accessibility))
+              _VrStatusPill(
+                label: l10n.screenPermissionIncomplete,
+                icon: Icons.hourglass_bottom,
+                warning: true,
+                showChevron: true,
+                onTap: onOpenScreenPermissionSetup,
+              )
+            else
+              _VrStatusPill(
+                label: l10n.screenRulesActive,
+                icon: Icons.hourglass_bottom,
               ),
-            ),
+            if (!exactAlarmOk)
+              _VrStatusPill(
+                label: l10n.alarmPermissionIncomplete,
+                icon: Icons.alarm_rounded,
+                warning: true,
+                showChevron: true,
+                onTap: onOpenReminderPermissions,
+              )
+            else if (reminderCount > 0)
+              _VrStatusPill(
+                label: l10n.reminderActiveCount(reminderCount),
+                icon: Icons.alarm_rounded,
+                showChevron: true,
+                onTap: onOpenRemindersSheet,
+              ),
           ],
         ),
         const SizedBox(height: 16),
         _QuickStatsRow(
           todayUsageSeconds: todayUsageSeconds,
           points: points,
+          streak: streak,
           refresh: true,
+          onOpenScreenTab: onOpenScreenTab,
+          onOpenRewards: onOpenRewards,
         ),
         if (empConfigured || empActive) ...[
           const SizedBox(height: 14),
@@ -551,35 +580,65 @@ class ChildBerandaTab extends StatelessWidget {
 }
 
 class _VrStatusPill extends StatelessWidget {
-  const _VrStatusPill({required this.label, required this.icon});
+  const _VrStatusPill({
+    required this.label,
+    required this.icon,
+    this.warning = false,
+    this.showChevron = false,
+    this.onTap,
+  });
 
   final String label;
   final IconData icon;
+  final bool warning;
+  final bool showChevron;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final bg = warning
+        ? VisualRefreshColors.routeTint
+        : VisualRefreshColors.accentTint;
+    final fg = warning
+        ? VisualRefreshColors.routeText
+        : VisualRefreshColors.accent;
+
+    final pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: VisualRefreshColors.accentTint,
+        color: bg,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: VisualRefreshColors.accent),
+          Icon(icon, size: 16, color: fg),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
               label,
               style: GoogleFonts.plusJakartaSans(
-                color: VisualRefreshColors.accent,
+                color: fg,
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
               ),
             ),
           ),
+          if (showChevron) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right_rounded, size: 18, color: fg),
+          ],
         ],
+      ),
+    );
+
+    if (onTap == null) return pill;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        child: pill,
       ),
     );
   }
@@ -1217,11 +1276,17 @@ class _QuickStatsRow extends StatelessWidget {
   const _QuickStatsRow({
     required this.todayUsageSeconds,
     required this.points,
+    required this.streak,
+    required this.onOpenScreenTab,
+    required this.onOpenRewards,
     this.refresh = false,
   });
 
   final int todayUsageSeconds;
   final int points;
+  final int streak;
+  final VoidCallback onOpenScreenTab;
+  final VoidCallback onOpenRewards;
   final bool refresh;
 
   @override
@@ -1230,75 +1295,143 @@ class _QuickStatsRow extends StatelessWidget {
     final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
 
     if (refresh) {
-      return Row(
-        children: [
-          Expanded(
-            child: _VrStatTile(
-              icon: Icons.schedule,
-              iconColor: VisualRefreshColors.accent,
-              background: VisualRefreshColors.accentTint,
-              value: formatDuration(l10n, todayUsageSeconds),
-              label: l10n.screenTimeToday,
-              valueColor: VisualRefreshColors.accent,
-              fontFamily: jakarta,
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _VrStatTile(
+                icon: Icons.schedule,
+                iconColor: VisualRefreshColors.accent,
+                background: VisualRefreshColors.accentTint,
+                value: formatDuration(l10n, todayUsageSeconds),
+                label: l10n.screenTimeToday,
+                valueColor: VisualRefreshColors.accent,
+                fontFamily: jakarta,
+                onTap: onOpenScreenTab,
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: _VrStatTile(
-              icon: Icons.emoji_events,
-              iconColor: VisualRefreshColors.routeText,
-              background: VisualRefreshColors.routeTint,
-              value: '$points',
-              label: l10n.yourPoints,
-              valueColor: VisualRefreshColors.routeText,
-              fontFamily: jakarta,
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: _VrStatTile(
+                icon: Icons.emoji_events,
+                iconColor: VisualRefreshColors.routeText,
+                background: VisualRefreshColors.routeTint,
+                value: '$points',
+                label: l10n.yourPoints,
+                valueColor: VisualRefreshColors.routeText,
+                fontFamily: jakarta,
+                onTap: onOpenRewards,
+                footer: Row(
+                  children: [
+                    Icon(
+                      Icons.local_fire_department_rounded,
+                      size: 14,
+                      color: VisualRefreshColors.routeText,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        l10n.dayStreakCaption(streak),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                          color: VisualRefreshColors.routeText,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
     return Row(
       children: [
         Expanded(
-          child: PaSectionCard(
+          child: Material(
             color: AppColors.sky.withValues(alpha: 0.14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.schedule, color: AppColors.teal),
-                const SizedBox(height: 8),
-                Text(
-                  formatDuration(l10n, todayUsageSeconds),
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.teal,
-                      ),
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: onOpenScreenTab,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule, color: AppColors.teal),
+                        const Spacer(),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.teal.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      formatDuration(l10n, todayUsageSeconds),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.teal,
+                          ),
+                    ),
+                    Text(l10n.screenTimeToday),
+                  ],
                 ),
-                Text(l10n.screenTimeToday),
-              ],
+              ),
             ),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: PaSectionCard(
+          child: Material(
             color: AppColors.amber.withValues(alpha: 0.18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.emoji_events, color: AppColors.coral),
-                const SizedBox(height: 8),
-                Text(
-                  '$points',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              onTap: onOpenRewards,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.emoji_events, color: AppColors.coral),
+                        const Spacer(),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.coral.withValues(alpha: 0.7),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$points',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.coral,
+                          ),
+                    ),
+                    Text(l10n.yourPoints),
+                    const SizedBox(height: 4),
+                    Text(
+                      l10n.dayStreakCaption(streak),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
                         color: AppColors.coral,
                       ),
+                    ),
+                  ],
                 ),
-                Text(l10n.yourPoints),
-              ],
+              ),
             ),
           ),
         ),
@@ -1316,6 +1449,8 @@ class _VrStatTile extends StatelessWidget {
     required this.label,
     required this.valueColor,
     required this.fontFamily,
+    required this.onTap,
+    this.footer,
   });
 
   final IconData icon;
@@ -1325,39 +1460,59 @@ class _VrStatTile extends StatelessWidget {
   final String label;
   final Color valueColor;
   final String? fontFamily;
+  final VoidCallback onTap;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: background,
       borderRadius: BorderRadius.circular(AppRadius.vrCard),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: iconColor, size: 22),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.w800,
-                fontSize: 22,
-                color: valueColor,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.vrCard),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: iconColor, size: 22),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: valueColor.withValues(alpha: 0.75),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: fontFamily,
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
-                color: VisualRefreshColors.textSecondary,
+              const SizedBox(height: 10),
+              Text(
+                value,
+                style: GoogleFonts.fraunces(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 26,
+                  height: 1.1,
+                  color: valueColor,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                  color: VisualRefreshColors.textSecondary,
+                ),
+              ),
+              if (footer != null) ...[
+                const SizedBox(height: 8),
+                footer!,
+              ],
+            ],
+          ),
         ),
       ),
     );

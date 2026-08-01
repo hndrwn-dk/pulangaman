@@ -883,6 +883,17 @@ class AppLocalizationsId extends AppLocalizations {
   String get yourPoints => 'Poin kamu';
 
   @override
+  String dayStreakCaption(int streak) {
+    return '$streak hari berturut-turut';
+  }
+
+  @override
+  String get todaysRemindersTitle => 'Pengingat hari ini';
+
+  @override
+  String get todaysRemindersEmpty => 'Tidak ada pengingat untuk hari ini.';
+
+  @override
   String get kabarTitle => 'Kabar ke ortu';
 
   @override
@@ -2406,12 +2417,48 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get guardianInviteChannelHint =>
-      'Wali akan menerima undangan via WhatsApp atau email';
+      'Buat kode, lalu bagikan. Wali memasang aplikasi, masuk sebagai Wali, lalu memasukkan kode.';
 
   @override
   String guardianInviteBody(String name, String children, String link) {
     return 'Halo $name, kamu diundang jadi Wali Terpercaya untuk $children di PulangAman. Buka undangan: $link';
   }
+
+  @override
+  String guardianInviteCodeShareBody(String child, String code, String link) {
+    return 'Kamu diundang jadi Wali Terpercaya untuk $child di PulangAman.\n\n1. Pasang aplikasi: $link\n2. Masuk sebagai Wali\n3. Masukkan kode undangan: $code';
+  }
+
+  @override
+  String guardianInviteCodeTitle(String name) {
+    return 'Kode undangan wali untuk $name';
+  }
+
+  @override
+  String get guardianInviteCodeBody =>
+      'Minta wali memasang PulangAman, masuk sebagai Wali, lalu masukkan kode ini di bagian Undangan.';
+
+  @override
+  String get createGuardianInviteCode => 'Buat kode undangan';
+
+  @override
+  String get enterGuardianInviteCode => 'Masukkan kode undangan';
+
+  @override
+  String get enterGuardianInviteCodeHint =>
+      'Minta kode 6 karakter dari orang tua utama';
+
+  @override
+  String guardianInviteRedeemed(String name) {
+    return 'Undangan diterima untuk $name';
+  }
+
+  @override
+  String get guardianInviteInvalidCode =>
+      'Kode undangan tidak valid atau sudah kedaluwarsa';
+
+  @override
+  String get shareCodeAction => 'Bagikan kode';
 
   @override
   String get guardianInviteSubject => 'Undangan Wali Terpercaya PulangAman';
