@@ -499,17 +499,23 @@
       }
     }
   },
-  "streakCelebrationBody": "You've kept your screen time on target for {days} days. Nice work! +{points} points",
+  "streakCelebrationBody": "You've kept your screen time on target for {days} days. Nice work!",
   "@streakCelebrationBody": {
     "placeholders": {
       "days": {
         "type": "int"
-      },
+      }
+    }
+  },
+  "streakPointsBadge": "+{points} points",
+  "@streakPointsBadge": {
+    "placeholders": {
       "points": {
         "type": "int"
       }
     }
   },
+  "viewPointsCta": "View Points",
   "weeklyDigestBannerTitle": "This week's summary",
   "weeklyDigestBannerAction": "View details",
   "weeklyDigestBannerDismiss": "Dismiss",

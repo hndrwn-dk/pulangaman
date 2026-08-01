@@ -29,11 +29,14 @@ import androidx.core.view.updatePadding
  *
  * When [VisualRefreshPrefs] is on, applies the moment palette (Fraunces-like
  * bold title, muted teal body, per-mood accent button / illustration).
+ *
+ * Streak celebrations add a gold-bordered points badge plus dual CTAs
+ * (primary "Lihat Poin", secondary "Mengerti") and return an action result.
  */
 class ReminderFullScreenActivity : ComponentActivity() {
     private val dismissReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            finish()
+            finishWithAction(ACTION_RESULT_DISMISS)
         }
     }
 
@@ -56,6 +59,10 @@ class ReminderFullScreenActivity : ComponentActivity() {
         val english = AppLocalePrefs.isEnglish(this)
         val moodOverride = intent.getStringExtra(EXTRA_MOOD)
         val accentOverride = intent.getStringExtra(EXTRA_ACCENT)
+        val pointsBadge = intent.getStringExtra(EXTRA_POINTS_BADGE)?.trim().orEmpty()
+        val primaryCta = intent.getStringExtra(EXTRA_PRIMARY_CTA)?.trim().orEmpty()
+        val secondaryCta = intent.getStringExtra(EXTRA_SECONDARY_CTA)?.trim().orEmpty()
+        val isCelebration = pointsBadge.isNotEmpty() && primaryCta.isNotEmpty()
         val mood = moodFromOverride(moodOverride) ?: moodFor(title, body)
         val accent = accentFromOverride(accentOverride, visualRefresh)
             ?: accentFor(mood, visualRefresh)
@@ -101,7 +108,7 @@ class ReminderFullScreenActivity : ComponentActivity() {
             setTextColor(if (visualRefresh) MUTED_TEAL else Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
             contentDescription = if (english) "Close" else "Tutup"
-            setOnClickListener { finish() }
+            setOnClickListener { finishWithAction(ACTION_RESULT_DISMISS) }
             layoutParams = FrameLayout.LayoutParams(dp(44), dp(44), Gravity.END)
         }
         topBar.addView(brand)
@@ -142,31 +149,102 @@ class ReminderFullScreenActivity : ComponentActivity() {
             }
         }
 
-        val button = TextView(this).apply {
-            text = if (english) "Got it" else "Mengerti"
-            gravity = Gravity.CENTER
-            setTextColor(ON_ACCENT)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(28).toFloat()
-                setColor(accent)
-            }
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { finish() }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(54),
-            )
-        }
-
         column.addView(topBar)
         column.addView(titleView)
         column.addView(bodyView)
+
+        if (isCelebration) {
+            val badge = TextView(this).apply {
+                text = pointsBadge
+                gravity = Gravity.CENTER
+                setTextColor(accent)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(20).toFloat()
+                    setColor(Color.TRANSPARENT)
+                    setStroke(dp(2), accent)
+                }
+                setPadding(dp(18), dp(8), dp(18), dp(8))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(14)
+                    gravity = Gravity.CENTER_HORIZONTAL
+                }
+            }
+            column.addView(badge)
+        }
+
         column.addView(hero)
-        column.addView(button)
+
+        if (isCelebration) {
+            val primary = TextView(this).apply {
+                text = primaryCta
+                gravity = Gravity.CENTER
+                setTextColor(ON_ACCENT)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(28).toFloat()
+                    setColor(accent)
+                }
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { finishWithAction(ACTION_RESULT_VIEW_POINTS) }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(54),
+                )
+            }
+            val secondaryLabel = secondaryCta.ifEmpty {
+                if (english) "Got it" else "Mengerti"
+            }
+            val secondary = TextView(this).apply {
+                text = secondaryLabel
+                gravity = Gravity.CENTER
+                setTextColor(if (visualRefresh) MUTED_TEAL else 0xB3FFFFFF.toInt())
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { finishWithAction(ACTION_RESULT_DISMISS) }
+                setPadding(0, dp(12), 0, dp(4))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    topMargin = dp(4)
+                }
+            }
+            column.addView(primary)
+            column.addView(secondary)
+        } else {
+            val button = TextView(this).apply {
+                text = if (english) "Got it" else "Mengerti"
+                gravity = Gravity.CENTER
+                setTextColor(ON_ACCENT)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(28).toFloat()
+                    setColor(accent)
+                }
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { finishWithAction(ACTION_RESULT_DISMISS) }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(54),
+                )
+            }
+            column.addView(button)
+        }
+
         root.addView(column)
         setContentView(root)
 
@@ -192,6 +270,13 @@ class ReminderFullScreenActivity : ComponentActivity() {
         } catch (_: Exception) {
         }
         super.onDestroy()
+    }
+
+    private fun finishWithAction(action: String) {
+        setResult(RESULT_OK, Intent().putExtra(EXTRA_ACTION, action))
+        onPreviewAction?.invoke(action)
+        onPreviewAction = null
+        finish()
     }
 
     private fun moodFromOverride(raw: String?): ReminderHeroView.Mood? {
@@ -251,7 +336,8 @@ class ReminderFullScreenActivity : ComponentActivity() {
             ReminderHeroView.Mood.SLEEP -> ACCENT_SLEEP
             ReminderHeroView.Mood.STUDY -> ACCENT_STUDY
             ReminderHeroView.Mood.EMP -> ACCENT_EMP
-            ReminderHeroView.Mood.STREAK_STAR -> ACCENT_STREAK_ROUTINE
+            // All streak milestones use bedtime-style gold (not study green).
+            ReminderHeroView.Mood.STREAK_STAR,
             ReminderHeroView.Mood.STREAK_TROPHY,
             ReminderHeroView.Mood.STREAK_MEDAL,
             -> ACCENT_STREAK_GOLD
@@ -286,6 +372,17 @@ class ReminderFullScreenActivity : ComponentActivity() {
         const val EXTRA_VISUAL_REFRESH = "visual_refresh"
         const val EXTRA_MOOD = "mood"
         const val EXTRA_ACCENT = "accent"
+        const val EXTRA_POINTS_BADGE = "points_badge"
+        const val EXTRA_PRIMARY_CTA = "primary_cta"
+        const val EXTRA_SECONDARY_CTA = "secondary_cta"
+        const val EXTRA_ACTION = "action"
+        const val ACTION_RESULT_DISMISS = "dismiss"
+        const val ACTION_RESULT_VIEW_POINTS = "view_points"
+
+        /** Set by [MainActivity] while awaiting a previewNow MethodChannel result. */
+        @Volatile
+        var onPreviewAction: ((String) -> Unit)? = null
+
         private const val BG_CLASSIC = 0xFF0B2E28.toInt()
         private const val BG_VR = 0xFF16362C.toInt()
         private const val ILLUSTRATION_BG = 0xFF2C4C41.toInt()
@@ -296,9 +393,9 @@ class ReminderFullScreenActivity : ComponentActivity() {
         private const val ACCENT_STUDY = 0xFF4A9F6C.toInt()
         private const val ACCENT_CUSTOM = 0xFF7C9A8B.toInt()
         private const val ACCENT_EMP = 0xFFD6875C.toInt()
-        /** Accent-tint green — routine-positive tier (3-day streak). */
+        /** Kept for explicit override; streak moments default to gold. */
         private const val ACCENT_STREAK_ROUTINE = 0xFF4A9F6C.toInt()
-        /** Warm celebratory gold (7 / 14 / 30-day streak). */
+        /** Bedtime-style celebratory gold for all streak milestones. */
         private const val ACCENT_STREAK_GOLD = 0xFFE8B94D.toInt()
     }
 }

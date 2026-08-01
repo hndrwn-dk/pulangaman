@@ -1473,9 +1473,17 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String streakCelebrationBody(int days, int points) {
-    return 'You\'ve kept your screen time on target for $days days. Nice work! +$points points';
+  String streakCelebrationBody(int days) {
+    return 'You\'ve kept your screen time on target for $days days. Nice work!';
   }
+
+  @override
+  String streakPointsBadge(int points) {
+    return '+$points points';
+  }
+
+  @override
+  String get viewPointsCta => 'View Points';
 
   @override
   String get weeklyDigestBannerTitle => 'This week\'s summary';

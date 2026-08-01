@@ -67,12 +67,14 @@ describe('milestoneBonusPoints and copy', () => {
     assert.equal(milestoneBonusPoints(30), 25);
   });
 
-  it('includes points in localized body', () => {
+  it('includes milestone days in localized copy', () => {
     const id = celebrationCopy(7, 10, 'id');
     assert.match(id.title, /7/);
-    assert.match(id.body, /\+10 poin/);
+    assert.match(id.body, /7 hari/);
+    assert.doesNotMatch(id.body, /\+10/);
     const en = celebrationCopy(7, 10, 'en');
     assert.match(en.title, /7-Day/);
-    assert.match(en.body, /\+10 points/);
+    assert.match(en.body, /7 days/);
+    assert.doesNotMatch(en.body, /\+10/);
   });
 });

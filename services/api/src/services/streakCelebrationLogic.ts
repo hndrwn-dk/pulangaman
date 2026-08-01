@@ -79,22 +79,22 @@ export function nextMilestoneToCelebrate(
 
 export function celebrationCopy(
   days: StreakMilestone,
-  points: number,
+  _points: number,
   locale: 'id' | 'en',
 ): { title: string; body: string } {
   if (locale === 'en') {
     return {
       title: `${days}-Day Streak!`,
-      body: `You've kept your screen time on target for ${days} days. Nice work! +${points} points`,
+      body: `You've kept your screen time on target for ${days} days. Nice work!`,
     };
   }
   return {
     title: `${days} Hari Berturut-turut!`,
-    body: `Kamu jaga waktu layar sesuai target selama ${days} hari. Mantap! +${points} poin`,
+    body: `Kamu jaga waktu layar sesuai target selama ${days} hari. Mantap!`,
   };
 }
 
-/** Accent tier for native moment UI (green for 3-day, gold for longer). */
-export function milestoneAccentTier(days: StreakMilestone): 'routine' | 'gold' {
-  return days === 3 ? 'routine' : 'gold';
+/** Accent for native moment UI — bedtime gold for every streak milestone. */
+export function milestoneAccentTier(_days: StreakMilestone): 'routine' | 'gold' {
+  return 'gold';
 }

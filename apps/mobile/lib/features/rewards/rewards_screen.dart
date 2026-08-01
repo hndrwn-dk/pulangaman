@@ -11,7 +11,11 @@ import '../parent/child_avatar.dart';
 import '../parent/children_controller.dart';
 
 class RewardsScreen extends ConsumerStatefulWidget {
-  const RewardsScreen({super.key});
+  const RewardsScreen({super.key, this.selfChildId});
+
+  /// When set (child opening their own ledger from streak CTA), load this id
+  /// and hide parent-only chrome (child picker / give-praise FAB).
+  final String? selfChildId;
 
   @override
   ConsumerState<RewardsScreen> createState() => _RewardsScreenState();
@@ -28,6 +32,11 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
   void initState() {
     super.initState();
     Future.microtask(() async {
+      final selfId = widget.selfChildId;
+      if (selfId != null && selfId.isNotEmpty) {
+        await _load(selfId);
+        return;
+      }
       await ref.read(childrenControllerProvider.notifier).bootstrap();
       await _loadGenders();
       final items = ref.read(childrenControllerProvider).items;
@@ -310,8 +319,11 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final refresh = visualRefreshOf(context);
+    final selfId = widget.selfChildId;
+    final isSelfView = selfId != null && selfId.isNotEmpty;
     final children = ref.watch(childrenControllerProvider);
-    final items = children.items;
+    final items = isSelfView ? const <ChildSummary>[] : children.items;
+    final auth = ref.watch(authControllerProvider);
     final selected = items.isEmpty
         ? null
         : items.firstWhere(
@@ -320,12 +332,16 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
           );
     final points = (_balance['points'] as num?)?.toInt() ?? 0;
     final streak = (_balance['current_streak'] as num?)?.toInt() ?? 0;
-    final name = selected?.name ?? l10n.homeByDefaultChildName;
+    final name = isSelfView
+        ? (auth.name?.trim().isNotEmpty == true
+            ? auth.name!.trim()
+            : l10n.yourPoints)
+        : (selected?.name ?? l10n.homeByDefaultChildName);
 
     return Scaffold(
       backgroundColor:
           refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
-      floatingActionButton: refresh || selected == null
+      floatingActionButton: refresh || isSelfView || selected == null
           ? null
           : FloatingActionButton.extended(
               onPressed: _bonus,
@@ -395,7 +411,7 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
                             ),
                     ),
                     SizedBox(height: refresh ? 16 : 14),
-                    if (items.isEmpty)
+                    if (!isSelfView && items.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 40),
                         child: Text(
@@ -412,69 +428,73 @@ class _RewardsScreenState extends ConsumerState<RewardsScreen> {
                         ),
                       )
                     else ...[
-                      if (refresh)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              for (var i = 0; i < items.length; i++) ...[
-                                if (i > 0) const SizedBox(width: 8),
-                                _ChildChip(
-                                  name: items[i].name,
-                                  selected: items[i].id == selected?.id,
-                                  onTap: () => _load(items[i].id),
-                                ),
-                              ],
-                            ],
-                          ),
-                        )
-                      else
-                        Material(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          child: InkWell(
-                            onTap: () => _pickChild(items),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                      if (!isSelfView) ...[
+                        if (refresh)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (var i = 0; i < items.length; i++) ...[
+                                  if (i > 0) const SizedBox(width: 8),
+                                  _ChildChip(
+                                    name: items[i].name,
+                                    selected: items[i].id == selected?.id,
+                                    onTap: () => _load(items[i].id),
                                   ),
                                 ],
-                              ),
-                              child: Row(
-                                children: [
-                                  ChildAvatar(
-                                    name: name,
-                                    gender: _genders[selected!.id] ??
-                                        ChildGenderStore.guessFromName(name),
-                                    size: 40,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      name,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 16,
+                              ],
+                            ),
+                          )
+                        else
+                          Material(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            child: InkWell(
+                              onTap: () => _pickChild(items),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding:
+                                    const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    ChildAvatar(
+                                      name: name,
+                                      gender: _genders[selected!.id] ??
+                                          ChildGenderStore.guessFromName(name),
+                                      size: 40,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 16,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const Icon(
-                                    Icons.expand_more_rounded,
-                                    color: AppColors.inkSoft,
-                                  ),
-                                ],
+                                    const Icon(
+                                      Icons.expand_more_rounded,
+                                      color: AppColors.inkSoft,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      SizedBox(height: refresh ? 16 : 14),
+                        SizedBox(height: refresh ? 16 : 14),
+                      ],
                       if (_loading)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 40),

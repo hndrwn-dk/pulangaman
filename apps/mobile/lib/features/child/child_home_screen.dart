@@ -19,6 +19,7 @@ import '../auth/auth_controller.dart';
 import '../parent/emergency_meeting_alert_screen.dart';
 import '../parent/visual_refresh_flag.dart';
 import '../reminders/reminder_templates.dart';
+import '../rewards/rewards_screen.dart';
 import '../screentime/screen_time_channel.dart';
 import 'child_beranda_tab.dart';
 import 'child_kabar_tab.dart';
@@ -1091,38 +1092,71 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             ? celebration['titleEn'] as String?
             : celebration['titleId'] as String?) ??
         l10n.streakCelebrationTitle(days);
-    final body = (isEn
-            ? celebration['bodyEn'] as String?
-            : celebration['bodyId'] as String?) ??
-        l10n.streakCelebrationBody(days, points);
+    // Prefer API body when present; fall back to local copy without points
+    // (points are shown in the gold badge, not duplicated in body).
+    final apiBody = isEn
+        ? celebration['bodyEn'] as String?
+        : celebration['bodyId'] as String?;
+    final rawBody = (apiBody != null && apiBody.trim().isNotEmpty)
+        ? apiBody
+        : l10n.streakCelebrationBody(days);
+    // Badge carries the points amount; strip legacy "+N poin" suffix from body.
+    final body = rawBody.replaceFirst(
+      RegExp(r'\s*\+\d+\s*(poin|points)\s*$', caseSensitive: false),
+      '',
+    );
 
     final mood = switch (days) {
       30 || 14 => 'streak_medal',
       7 => 'streak_trophy',
       _ => 'streak_star',
     };
-    final accent = (celebration['accent'] as String?) == 'gold' ? 'gold' : 'routine';
+    // Bedtime-style gold for every milestone (not study green / EMP terracotta).
+    const accent = 'gold';
 
     _streakCelebrationInFlight = true;
     _streakCelebrationShownId = id;
     try {
-      await _reminderChannel.previewNow(
+      final action = await _reminderChannel.previewNow(
         title: title,
         body: body,
         style: 'fullscreen',
         visualRefresh: true,
         mood: mood,
         accent: accent,
+        pointsBadge: l10n.streakPointsBadge(points > 0 ? points : _fallbackPoints(days)),
+        primaryCta: l10n.viewPointsCta,
+        secondaryCta: l10n.understood,
       );
       await ref.read(apiClientProvider).post(
             '/api/v1/rewards/${ref.read(authControllerProvider).userId}/streak-celebration/$id/ack',
           );
       unawaited(_loadRewards());
+      if (!mounted) return;
+      if (action == 'view_points') {
+        final userId = ref.read(authControllerProvider).userId;
+        if (userId != null) {
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => RewardsScreen(selfChildId: userId),
+            ),
+          );
+        }
+      }
     } catch (_) {
       _streakCelebrationShownId = null;
     } finally {
       _streakCelebrationInFlight = false;
     }
+  }
+
+  int _fallbackPoints(int days) {
+    return switch (days) {
+      30 => 25,
+      14 => 15,
+      7 => 10,
+      _ => 5,
+    };
   }
 
   Future<void> _startTracking() async {

@@ -25,6 +25,8 @@ class MainActivity : FlutterActivity() {
     private val locationChannel = "com.tursinalabs.pulangaman/location_tracking"
     private val remindersChannel = "com.tursinalabs.pulangaman/reminders"
 
+    private var pendingPreviewResult: MethodChannel.Result? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, screenTimeChannel)
@@ -218,6 +220,9 @@ class MainActivity : FlutterActivity() {
                             ?: VisualRefreshPrefs.isEnabled(this)
                         val mood = call.argument<String>("mood")
                         val accent = call.argument<String>("accent")
+                        val pointsBadge = call.argument<String>("pointsBadge")
+                        val primaryCta = call.argument<String>("primaryCta")
+                        val secondaryCta = call.argument<String>("secondaryCta")
                         val intent = Intent(this, ReminderFullScreenActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                             putExtra(ReminderReceiver.EXTRA_TITLE, title)
@@ -233,9 +238,44 @@ class MainActivity : FlutterActivity() {
                             if (accent != null) {
                                 putExtra(ReminderFullScreenActivity.EXTRA_ACCENT, accent)
                             }
+                            if (!pointsBadge.isNullOrBlank()) {
+                                putExtra(
+                                    ReminderFullScreenActivity.EXTRA_POINTS_BADGE,
+                                    pointsBadge,
+                                )
+                            }
+                            if (!primaryCta.isNullOrBlank()) {
+                                putExtra(
+                                    ReminderFullScreenActivity.EXTRA_PRIMARY_CTA,
+                                    primaryCta,
+                                )
+                            }
+                            if (!secondaryCta.isNullOrBlank()) {
+                                putExtra(
+                                    ReminderFullScreenActivity.EXTRA_SECONDARY_CTA,
+                                    secondaryCta,
+                                )
+                            }
                         }
-                        startActivity(intent)
-                        result.success(true)
+                        // Streak celebrations await CTA; bedtime/EMP previews return immediately.
+                        val awaitAction =
+                            !pointsBadge.isNullOrBlank() && !primaryCta.isNullOrBlank()
+                        if (awaitAction) {
+                            pendingPreviewResult?.success(
+                                ReminderFullScreenActivity.ACTION_RESULT_DISMISS,
+                            )
+                            pendingPreviewResult = result
+                            ReminderFullScreenActivity.onPreviewAction = { action ->
+                                pendingPreviewResult?.success(action)
+                                pendingPreviewResult = null
+                                ReminderFullScreenActivity.onPreviewAction = null
+                            }
+                            startActivity(intent)
+                        } else {
+                            ReminderFullScreenActivity.onPreviewAction = null
+                            startActivity(intent)
+                            result.success(ReminderFullScreenActivity.ACTION_RESULT_DISMISS)
+                        }
                     }
                     "dismissFullScreen" -> {
                         sendBroadcast(

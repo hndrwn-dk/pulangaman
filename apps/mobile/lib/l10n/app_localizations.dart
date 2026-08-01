@@ -2723,8 +2723,20 @@ abstract class AppLocalizations {
   /// No description provided for @streakCelebrationBody.
   ///
   /// In id, this message translates to:
-  /// **'Kamu jaga waktu layar sesuai target selama {days} hari. Mantap! +{points} poin'**
-  String streakCelebrationBody(int days, int points);
+  /// **'Kamu jaga waktu layar sesuai target selama {days} hari. Mantap!'**
+  String streakCelebrationBody(int days);
+
+  /// No description provided for @streakPointsBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'+{points} poin'**
+  String streakPointsBadge(int points);
+
+  /// No description provided for @viewPointsCta.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat Poin'**
+  String get viewPointsCta;
 
   /// No description provided for @weeklyDigestBannerTitle.
   ///

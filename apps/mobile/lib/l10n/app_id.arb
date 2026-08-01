@@ -848,17 +848,23 @@
       }
     }
   },
-  "streakCelebrationBody": "Kamu jaga waktu layar sesuai target selama {days} hari. Mantap! +{points} poin",
+  "streakCelebrationBody": "Kamu jaga waktu layar sesuai target selama {days} hari. Mantap!",
   "@streakCelebrationBody": {
     "placeholders": {
       "days": {
         "type": "int"
-      },
+      }
+    }
+  },
+  "streakPointsBadge": "+{points} poin",
+  "@streakPointsBadge": {
+    "placeholders": {
       "points": {
         "type": "int"
       }
     }
   },
+  "viewPointsCta": "Lihat Poin",
   "weeklyDigestBannerTitle": "Ringkasan minggu ini",
   "weeklyDigestBannerAction": "Lihat detail",
   "weeklyDigestBannerDismiss": "Tutup",

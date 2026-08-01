@@ -33,22 +33,32 @@ class ReminderChannel {
     });
   }
 
-  Future<void> previewNow({
+  /// Shows the native full-screen moment and returns the CTA action:
+  /// `view_points` or `dismiss` (null / unknown treated as dismiss).
+  Future<String?> previewNow({
     required String title,
     required String body,
     String style = 'fullscreen',
     bool? visualRefresh,
     String? mood,
     String? accent,
+    String? pointsBadge,
+    String? primaryCta,
+    String? secondaryCta,
   }) async {
-    await _channel.invokeMethod<void>('previewNow', {
+    final result = await _channel.invokeMethod<dynamic>('previewNow', {
       'title': title,
       'body': body,
       'style': style,
       if (visualRefresh != null) 'visualRefresh': visualRefresh,
       if (mood != null) 'mood': mood,
       if (accent != null) 'accent': accent,
+      if (pointsBadge != null) 'pointsBadge': pointsBadge,
+      if (primaryCta != null) 'primaryCta': primaryCta,
+      if (secondaryCta != null) 'secondaryCta': secondaryCta,
     });
+    if (result is String) return result;
+    return null;
   }
 
   /// Closes the native ReminderFullScreenActivity if it is on screen
