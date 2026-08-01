@@ -2504,6 +2504,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forChildLabel => 'For child';
 
   @override
+  String get allChildrenOption => 'All children';
+
+  @override
   String get phoneCountryCode => '+62';
 
   @override

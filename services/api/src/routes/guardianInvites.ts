@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
+import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
   canManageChildFeatures,
+  listFeatureManagedChildren,
   type GuardianAccessLevel,
 } from '../middleware/roles.js';
 
@@ -35,6 +37,46 @@ function toIsoUtc(value: Date | string): string {
   return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
 }
 
+async function insertInviteRow(
+  client: PoolClient,
+  input: {
+    parentId: string;
+    childId: string | null;
+    code: string;
+    guardianDisplayName: string | null;
+    accessLevel: GuardianAccessLevel;
+    expiresAt: Date;
+  },
+): Promise<{
+  id: string;
+  code: string;
+  expires_at: Date;
+  created_at: Date;
+  access_level: GuardianAccessLevel;
+}> {
+  const result = await client.query<{
+    id: string;
+    code: string;
+    expires_at: Date;
+    created_at: Date;
+    access_level: GuardianAccessLevel;
+  }>(
+    `INSERT INTO guardian_invites
+       (parent_id, child_id, code, guardian_display_name, access_level, expires_at)
+     VALUES ($1, $2, $3, $4, $5::guardian_access_level, $6)
+     RETURNING id, code, expires_at, created_at, access_level`,
+    [
+      input.parentId,
+      input.childId,
+      input.code,
+      input.guardianDisplayName,
+      input.accessLevel,
+      input.expiresAt.toISOString(),
+    ],
+  );
+  return result.rows[0];
+}
+
 /** Parent / co-parent creates a short invite code for a guardian. */
 guardianInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, res, next) => {
   try {
@@ -46,22 +88,46 @@ guardianInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedReques
 
     const body = z
       .object({
-        childId: z.string().uuid(),
+        childId: z.string().uuid().optional(),
+        allChildren: z.boolean().optional(),
         accessLevel: accessLevelSchema.default('view'),
         guardianDisplayName: z.string().min(1).max(120).optional(),
       })
+      .superRefine((value, ctx) => {
+        const hasChild = typeof value.childId === 'string';
+        const all = value.allChildren === true;
+        if (all === hasChild) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Provide either childId or allChildren: true',
+            path: ['childId'],
+          });
+        }
+      })
       .parse(req.body ?? {});
 
-    if (!(await canManageChildFeatures(parentId, body.childId))) {
-      res.status(404).json({ error: 'child_not_found' });
-      return;
-    }
+    const allChildren = body.allChildren === true;
+    let childId: string | null = null;
+    let childName: string | null = null;
 
-    const child = await pool.query<{ name: string }>(
-      `SELECT name FROM users WHERE id = $1`,
-      [body.childId],
-    );
-    const childName = child.rows[0]?.name ?? null;
+    if (allChildren) {
+      const managed = await listFeatureManagedChildren(parentId);
+      if (managed.length === 0) {
+        res.status(404).json({ error: 'child_not_found' });
+        return;
+      }
+    } else {
+      childId = body.childId!;
+      if (!(await canManageChildFeatures(parentId, childId))) {
+        res.status(404).json({ error: 'child_not_found' });
+        return;
+      }
+      const child = await pool.query<{ name: string }>(
+        `SELECT name FROM users WHERE id = $1`,
+        [childId],
+      );
+      childName = child.rows[0]?.name ?? null;
+    }
 
     const client = await pool.connect();
     try {
@@ -79,62 +145,65 @@ guardianInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedReques
         [parentId, INVITE_TTL_HOURS],
       );
 
-      // At most one pending code per child for this parent.
-      await client.query(
-        `UPDATE guardian_invites
-         SET status = 'revoked'
-         WHERE parent_id = $1
-           AND child_id = $2
-           AND status = 'pending'`,
-        [parentId, body.childId],
-      );
+      if (allChildren) {
+        // At most one pending family-wide code for this inviter.
+        await client.query(
+          `UPDATE guardian_invites
+           SET status = 'revoked'
+           WHERE parent_id = $1
+             AND child_id IS NULL
+             AND status = 'pending'`,
+          [parentId],
+        );
+      } else {
+        // At most one pending code per child for this parent.
+        await client.query(
+          `UPDATE guardian_invites
+           SET status = 'revoked'
+           WHERE parent_id = $1
+             AND child_id = $2
+             AND status = 'pending'`,
+          [parentId, childId],
+        );
+      }
 
       let code = generateInviteCode();
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3_600_000);
         try {
-          const result = await client.query<{
-            id: string;
-            code: string;
-            expires_at: Date;
-            created_at: Date;
-            access_level: GuardianAccessLevel;
-          }>(
-            `INSERT INTO guardian_invites
-               (parent_id, child_id, code, guardian_display_name, access_level, expires_at)
-             VALUES ($1, $2, $3, $4, $5::guardian_access_level, $6)
-             RETURNING id, code, expires_at, created_at, access_level`,
-            [
-              parentId,
-              body.childId,
-              code,
-              body.guardianDisplayName ?? null,
-              body.accessLevel,
-              expiresAt.toISOString(),
-            ],
-          );
+          const row = await insertInviteRow(client, {
+            parentId,
+            childId,
+            code,
+            guardianDisplayName: body.guardianDisplayName ?? null,
+            accessLevel: body.accessLevel,
+            expiresAt,
+          });
           await client.query(
             `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
              VALUES ($1, $2, 'guardian_invite.created', $3::jsonb)`,
             [
               parentId,
-              body.childId,
+              childId,
               JSON.stringify({
-                inviteId: result.rows[0].id,
+                inviteId: row.id,
                 code,
                 accessLevel: body.accessLevel,
+                allChildren,
               }),
             ],
           );
           await client.query('COMMIT');
           res.status(201).json({
-            id: result.rows[0].id,
-            code: result.rows[0].code,
-            expiresAt: toIsoUtc(result.rows[0].expires_at),
-            createdAt: toIsoUtc(result.rows[0].created_at),
-            childId: body.childId,
+            id: row.id,
+            code: row.code,
+            expiresAt: toIsoUtc(row.expires_at),
+            createdAt: toIsoUtc(row.created_at),
+            childId,
             childName,
-            accessLevel: result.rows[0].access_level,
+            allChildren,
+            scope: allChildren ? 'all' : 'child',
+            accessLevel: row.access_level,
             guardianDisplayName: body.guardianDisplayName ?? null,
           });
           return;
@@ -184,8 +253,8 @@ guardianInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest
     const result = await pool.query<{
       id: string;
       code: string;
-      child_id: string;
-      child_name: string;
+      child_id: string | null;
+      child_name: string | null;
       guardian_display_name: string | null;
       access_level: GuardianAccessLevel;
       status: string;
@@ -196,7 +265,7 @@ guardianInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest
               gi.guardian_display_name, gi.access_level, gi.status,
               gi.expires_at, gi.created_at
        FROM guardian_invites gi
-       JOIN users u ON u.id = gi.child_id
+       LEFT JOIN users u ON u.id = gi.child_id
        WHERE gi.parent_id = $1
          AND gi.status = 'pending'
          AND gi.expires_at > now()
@@ -207,17 +276,22 @@ guardianInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest
     );
 
     res.json({
-      invites: result.rows.map((row) => ({
-        id: row.id,
-        code: row.code,
-        childId: row.child_id,
-        childName: row.child_name,
-        guardianDisplayName: row.guardian_display_name,
-        accessLevel: row.access_level,
-        status: row.status,
-        expiresAt: toIsoUtc(row.expires_at),
-        createdAt: toIsoUtc(row.created_at),
-      })),
+      invites: result.rows.map((row) => {
+        const allChildren = row.child_id == null;
+        return {
+          id: row.id,
+          code: row.code,
+          childId: row.child_id,
+          childName: row.child_name,
+          allChildren,
+          scope: allChildren ? 'all' : 'child',
+          guardianDisplayName: row.guardian_display_name,
+          accessLevel: row.access_level,
+          status: row.status,
+          expiresAt: toIsoUtc(row.expires_at),
+          createdAt: toIsoUtc(row.created_at),
+        };
+      }),
     });
   } catch (error) {
     next(error);
@@ -226,7 +300,7 @@ guardianInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest
 
 /**
  * Authenticated guardian redeems an invite code.
- * Links the guardian to the child as active (view or co_parent).
+ * Links the guardian to the child (or all managed children) as active.
  */
 guardianInvitesRouter.post(
   '/redeem',
@@ -267,7 +341,7 @@ guardianInvitesRouter.post(
         const invite = await client.query<{
           id: string;
           parent_id: string;
-          child_id: string;
+          child_id: string | null;
           access_level: GuardianAccessLevel;
           guardian_display_name: string | null;
         }>(
@@ -306,28 +380,74 @@ guardianInvitesRouter.post(
           [guardianId],
         );
 
-        const link = await client.query<{
-          child_id: string;
-          guardian_id: string;
+        let targetChildIds: string[];
+        if (inviteRow.child_id) {
+          targetChildIds = [inviteRow.child_id];
+        } else {
+          const managed = await listFeatureManagedChildren(inviteRow.parent_id);
+          targetChildIds = managed.map((c) => c.id);
+        }
+
+        if (targetChildIds.length === 0) {
+          await client.query('ROLLBACK');
+          res.status(404).json({ error: 'invite_no_children' });
+          return;
+        }
+
+        const linked: Array<{
+          childId: string;
+          guardianId: string;
           status: string;
-          access_level: GuardianAccessLevel;
-        }>(
-          `INSERT INTO child_approved_guardians
-             (child_id, guardian_id, approved_by_parent_id, status, access_level)
-           VALUES ($1, $2, $3, 'active', $4::guardian_access_level)
-           ON CONFLICT (child_id, guardian_id) DO UPDATE
-             SET status = 'active',
-                 approved_by_parent_id = EXCLUDED.approved_by_parent_id,
-                 access_level = EXCLUDED.access_level,
-                 updated_at = now()
-           RETURNING child_id, guardian_id, status, access_level`,
-          [
-            inviteRow.child_id,
-            guardianId,
-            inviteRow.parent_id,
-            inviteRow.access_level,
-          ],
-        );
+          accessLevel: GuardianAccessLevel;
+        }> = [];
+
+        for (const targetChildId of targetChildIds) {
+          const link = await client.query<{
+            child_id: string;
+            guardian_id: string;
+            status: string;
+            access_level: GuardianAccessLevel;
+          }>(
+            `INSERT INTO child_approved_guardians
+               (child_id, guardian_id, approved_by_parent_id, status, access_level)
+             VALUES ($1, $2, $3, 'active', $4::guardian_access_level)
+             ON CONFLICT (child_id, guardian_id) DO UPDATE
+               SET status = 'active',
+                   approved_by_parent_id = EXCLUDED.approved_by_parent_id,
+                   access_level = EXCLUDED.access_level,
+                   updated_at = now()
+             RETURNING child_id, guardian_id, status, access_level`,
+            [
+              targetChildId,
+              guardianId,
+              inviteRow.parent_id,
+              inviteRow.access_level,
+            ],
+          );
+
+          await client.query(
+            `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+             VALUES ($1, $2, 'guardian_invite.redeemed', $3::jsonb)`,
+            [
+              guardianId,
+              targetChildId,
+              JSON.stringify({
+                inviteId: inviteRow.id,
+                parentId: inviteRow.parent_id,
+                code,
+                accessLevel: inviteRow.access_level,
+                allChildren: inviteRow.child_id == null,
+              }),
+            ],
+          );
+
+          linked.push({
+            childId: link.rows[0].child_id,
+            guardianId: link.rows[0].guardian_id,
+            status: link.rows[0].status,
+            accessLevel: link.rows[0].access_level,
+          });
+        }
 
         await client.query(
           `UPDATE guardian_invites
@@ -338,34 +458,26 @@ guardianInvitesRouter.post(
           [inviteRow.id, guardianId],
         );
 
-        await client.query(
-          `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
-           VALUES ($1, $2, 'guardian_invite.redeemed', $3::jsonb)`,
-          [
-            guardianId,
-            inviteRow.child_id,
-            JSON.stringify({
-              inviteId: inviteRow.id,
-              parentId: inviteRow.parent_id,
-              code,
-              accessLevel: inviteRow.access_level,
-            }),
-          ],
-        );
-
         await client.query('COMMIT');
 
-        const childName = await pool.query<{ name: string }>(
-          `SELECT name FROM users WHERE id = $1`,
-          [inviteRow.child_id],
+        const names = await pool.query<{ id: string; name: string }>(
+          `SELECT id, name FROM users WHERE id = ANY($1::uuid[])`,
+          [targetChildIds],
+        );
+        const nameById = new Map(names.rows.map((r) => [r.id, r.name]));
+        const childNames = targetChildIds.map(
+          (id) => nameById.get(id) ?? id,
         );
 
         res.status(201).json({
-          childId: link.rows[0].child_id,
-          guardianId: link.rows[0].guardian_id,
-          status: link.rows[0].status,
-          accessLevel: link.rows[0].access_level,
-          childName: childName.rows[0]?.name ?? null,
+          childId: linked[0]!.childId,
+          childIds: linked.map((l) => l.childId),
+          guardianId: linked[0]!.guardianId,
+          status: linked[0]!.status,
+          accessLevel: linked[0]!.accessLevel,
+          childName: childNames.join(', '),
+          childNames,
+          allChildren: inviteRow.child_id == null,
         });
       } catch (error) {
         await client.query('ROLLBACK');
@@ -393,14 +505,18 @@ guardianInvitesRouter.post(
         return;
       }
 
-      const owned = await pool.query<{ child_id: string }>(
+      const owned = await pool.query<{ child_id: string | null }>(
         `SELECT child_id FROM guardian_invites
          WHERE id = $1 AND parent_id = $2 AND status = 'pending'`,
         [inviteId, parentId],
       );
       if (owned.rowCount === 0) {
         // Co-parent may have created via canManage — also allow revoke if they manage the child.
-        const any = await pool.query<{ id: string; child_id: string; parent_id: string }>(
+        const any = await pool.query<{
+          id: string;
+          child_id: string | null;
+          parent_id: string;
+        }>(
           `SELECT id, child_id, parent_id FROM guardian_invites
            WHERE id = $1 AND status = 'pending'`,
           [inviteId],
@@ -409,7 +525,13 @@ guardianInvitesRouter.post(
           res.status(404).json({ error: 'invite_not_found' });
           return;
         }
-        if (!(await canManageChildFeatures(parentId, any.rows[0].child_id))) {
+        const targetChildId = any.rows[0].child_id;
+        if (targetChildId == null) {
+          // Family-wide invites are only revocable by the creator.
+          res.status(404).json({ error: 'invite_not_found' });
+          return;
+        }
+        if (!(await canManageChildFeatures(parentId, targetChildId))) {
           res.status(404).json({ error: 'invite_not_found' });
           return;
         }
@@ -428,6 +550,7 @@ guardianInvitesRouter.post(
       }
       res.json({
         ...result.rows[0],
+        allChildren: result.rows[0].child_id == null,
         accessLevel: result.rows[0].access_level,
       });
     } catch (error) {

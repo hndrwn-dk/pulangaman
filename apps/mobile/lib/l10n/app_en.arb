@@ -1082,6 +1082,7 @@
   "phoneInvalidFormat": "Invalid phone number. Use format +62...",
   "placesApiKeyHint": "Needs a separate server key: enable Places API + Geocoding.",
   "forChildLabel": "For child",
+  "allChildrenOption": "All children",
   "phoneCountryCode": "+62",
   "accessPerChildSection": "ACCESS PER CHILD",
   "revokeAccessTooltip": "Revoke access",

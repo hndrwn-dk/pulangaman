@@ -352,7 +352,9 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
 
     final refresh = visualRefreshOf(context);
     ChildSummary selected = fixedChild ?? children.first;
+    var forAllChildren = false;
     var inviteAsCoParent = false;
+    const allChildrenValue = '__all__';
 
     final bool? ok;
     if (refresh) {
@@ -390,12 +392,21 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                             scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
+                                _InviteChildChip(
+                                  name: sheetL10n.allChildrenOption,
+                                  selected: forAllChildren,
+                                  onTap: () => setLocal(() {
+                                    forAllChildren = true;
+                                  }),
+                                ),
                                 for (var i = 0; i < children.length; i++) ...[
-                                  if (i > 0) const SizedBox(width: 8),
+                                  const SizedBox(width: 8),
                                   _InviteChildChip(
                                     name: children[i].name,
-                                    selected: children[i].id == selected.id,
+                                    selected: !forAllChildren &&
+                                        children[i].id == selected.id,
                                     onTap: () => setLocal(() {
+                                      forAllChildren = false;
                                       selected = children[i];
                                     }),
                                   ),
@@ -472,23 +483,34 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                       const SizedBox(height: 12),
                       if (fixedChild == null)
                         DropdownButtonFormField<String>(
-                          initialValue: selected.id,
+                          initialValue: forAllChildren
+                              ? allChildrenValue
+                              : selected.id,
                           decoration: InputDecoration(
                             labelText: sheetL10n.forChildLabel,
                           ),
-                          items: children
-                              .map(
-                                (c) => DropdownMenuItem(
-                                  value: c.id,
-                                  child: Text(c.name),
-                                ),
-                              )
-                              .toList(),
+                          items: [
+                            DropdownMenuItem(
+                              value: allChildrenValue,
+                              child: Text(sheetL10n.allChildrenOption),
+                            ),
+                            ...children.map(
+                              (c) => DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.name),
+                              ),
+                            ),
+                          ],
                           onChanged: (id) {
                             if (id == null) return;
                             setLocal(() {
-                              selected =
-                                  children.firstWhere((c) => c.id == id);
+                              if (id == allChildrenValue) {
+                                forAllChildren = true;
+                              } else {
+                                forAllChildren = false;
+                                selected =
+                                    children.firstWhere((c) => c.id == id);
+                              }
                             });
                           },
                         ),
@@ -521,11 +543,15 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
 
     if (ok != true || !mounted) return;
 
+    final targetLabel =
+        forAllChildren ? l10n.allChildrenOption : selected.name;
+
     try {
       final data = await ref.read(apiClientProvider).post(
         '/api/v1/guardian-invites',
         body: {
-          'childId': selected.id,
+          if (forAllChildren) 'allChildren': true,
+          if (!forAllChildren) 'childId': selected.id,
           'accessLevel': inviteAsCoParent ? 'co_parent' : 'view',
         },
       );
@@ -543,7 +569,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       final expiresAt =
           expiresRaw != null ? DateTime.tryParse(expiresRaw) : null;
       final shareMessage = l10n.guardianInviteCodeShareBody(
-        selected.name,
+        targetLabel,
         code,
         _playStoreUrl,
       );
@@ -551,10 +577,10 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       if (refresh) {
         await showSignInCodeSheet(
           context: context,
-          childName: selected.name,
+          childName: targetLabel,
           code: code,
           expiresAt: expiresAt,
-          title: l10n.guardianInviteCodeTitle(selected.name),
+          title: l10n.guardianInviteCodeTitle(targetLabel),
           body: l10n.guardianInviteCodeBody,
           shareMessage: shareMessage,
         );
@@ -568,7 +594,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  l10n.guardianInviteCodeTitle(selected.name),
+                  l10n.guardianInviteCodeTitle(targetLabel),
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 18,

@@ -1518,6 +1518,7 @@
   "phoneInvalidFormat": "Nomor telepon tidak valid. Gunakan format +62...",
   "placesApiKeyHint": "Perlu key server terpisah: aktifkan Places API + Geocoding.",
   "forChildLabel": "Untuk anak",
+  "allChildrenOption": "Semua anak",
   "phoneCountryCode": "+62",
   "accessPerChildSection": "AKSES PER ANAK",
   "revokeAccessTooltip": "Cabut akses",

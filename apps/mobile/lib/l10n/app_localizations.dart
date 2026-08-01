@@ -4490,6 +4490,12 @@ abstract class AppLocalizations {
   /// **'Untuk anak'**
   String get forChildLabel;
 
+  /// No description provided for @allChildrenOption.
+  ///
+  /// In id, this message translates to:
+  /// **'Semua anak'**
+  String get allChildrenOption;
+
   /// No description provided for @phoneCountryCode.
   ///
   /// In id, this message translates to:

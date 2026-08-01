@@ -98,6 +98,13 @@ echo "guardian_invite_code=$GI_CODE id=$GI_ID"
 run "list guardian invite codes" 200 GET /api/v1/guardian-invites "$P_TOK"
 run "redeem guardian invite code" 201 POST /api/v1/guardian-invites/redeem "$G_TOK" "{\"code\":\"$GI_CODE\"}"
 run "list guardians after code" 200 GET "/api/v1/guardians?childId=$CHILD_ID" "$P_TOK"
+run "revoke guardian after code" 200 POST /api/v1/guardians/revoke "$P_TOK" "{\"childId\":\"$CHILD_ID\",\"guardianId\":\"$GUARD_ID\"}"
+GI_ALL=$(curl -sS -X POST "$BASE/api/v1/guardian-invites" -H "Authorization: Bearer $P_TOK" -H "Content-Type: application/json" -d '{"allChildren":true,"accessLevel":"view"}')
+GI_ALL_CODE=$(echo "$GI_ALL" | jq -r '.code // empty'); GI_ALL_SCOPE=$(echo "$GI_ALL" | jq -r '.scope // empty')
+echo "guardian_invite_all_code=$GI_ALL_CODE scope=$GI_ALL_SCOPE"
+[ -n "$GI_ALL_CODE" ] && [ "$GI_ALL_SCOPE" = "all" ] && PASS=$((PASS+1)) && echo "PASS | create all-children guardian invite" || { FAIL=$((FAIL+1)); echo "FAIL | create all-children guardian invite | $GI_ALL"; }
+run "redeem all-children invite" 201 POST /api/v1/guardian-invites/redeem "$G_TOK" "{\"code\":\"$GI_ALL_CODE\"}"
+run "list guardians after all-children" 200 GET "/api/v1/guardians?childId=$CHILD_ID" "$P_TOK"
 
 echo "----- Panic cascade -----"
 PA=$(curl -sS -X POST "$BASE/api/v1/panic/trigger" -H "Authorization: Bearer $C_TOK" -H "Content-Type: application/json" -d "{\"lat\":$CHILD_LAT,\"lng\":$CHILD_LNG}")
