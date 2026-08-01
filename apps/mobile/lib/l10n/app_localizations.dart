@@ -4789,6 +4789,36 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Berlaku {hours} jam'**
   String codeValidForHours(int hours);
+
+  /// No description provided for @empQuickAccessSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Akses cepat saat kondisi darurat'**
+  String get empQuickAccessSubtitle;
+
+  /// No description provided for @reminderCoachmarkTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Coba Pengingat Jadwal'**
+  String get reminderCoachmarkTitle;
+
+  /// No description provided for @reminderCoachmarkBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Atur pengingat rutin buat anak — belajar, tidur, atau jadwal lainnya — dari menu Lainnya.'**
+  String get reminderCoachmarkBody;
+
+  /// No description provided for @coachmarkSkip.
+  ///
+  /// In id, this message translates to:
+  /// **'Lewati'**
+  String get coachmarkSkip;
+
+  /// No description provided for @coachmarkView.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat'**
+  String get coachmarkView;
 }
 
 class _AppLocalizationsDelegate

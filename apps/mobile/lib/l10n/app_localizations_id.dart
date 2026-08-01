@@ -2693,4 +2693,20 @@ class AppLocalizationsId extends AppLocalizations {
   String codeValidForHours(int hours) {
     return 'Berlaku $hours jam';
   }
+
+  @override
+  String get empQuickAccessSubtitle => 'Akses cepat saat kondisi darurat';
+
+  @override
+  String get reminderCoachmarkTitle => 'Coba Pengingat Jadwal';
+
+  @override
+  String get reminderCoachmarkBody =>
+      'Atur pengingat rutin buat anak — belajar, tidur, atau jadwal lainnya — dari menu Lainnya.';
+
+  @override
+  String get coachmarkSkip => 'Lewati';
+
+  @override
+  String get coachmarkView => 'Lihat';
 }

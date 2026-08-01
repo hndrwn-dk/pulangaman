@@ -24,6 +24,8 @@ import 'kabar_models.dart';
 import 'kabar_read_store.dart';
 import 'live_map_screen.dart';
 import 'more_screen.dart';
+import 'reminder_coachmark_overlay.dart';
+import 'reminder_coachmark_store.dart';
 import 'remove_child_sheet.dart';
 import 'sign_in_code_sheet.dart';
 import 'zones_screen.dart';
@@ -471,20 +473,18 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   ),
                 ),
               ),
-              if (_empActivation != null) ...[
-                const SizedBox(height: 14),
-                _EmpActiveBanner(
-                  activation: _empActivation!,
-                  onOpen: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const EmergencyMeetingScreen(),
-                      ),
-                    );
-                    await _loadEmpActivation();
-                  },
-                ),
-              ],
+              const SizedBox(height: 14),
+              _EmpQuickAccessRow(
+                activation: _empActivation,
+                onOpen: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const EmergencyMeetingScreen(),
+                    ),
+                  );
+                  await _loadEmpActivation();
+                },
+              ),
               if (urgent.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 ...urgent.take(2).map(
@@ -1599,37 +1599,47 @@ class _DashedBorderPainter extends CustomPainter {
       oldDelegate.color != color || oldDelegate.radius != radius;
 }
 
-class _EmpActiveBanner extends StatelessWidget {
-  const _EmpActiveBanner({required this.activation, required this.onOpen});
+/// Slim EMP quick-access row on Home. When an alert is live, reuses the
+/// active-banner copy/status instead of the generic quick-access subtitle.
+class _EmpQuickAccessRow extends StatelessWidget {
+  const _EmpQuickAccessRow({required this.activation, required this.onOpen});
 
-  final Map<String, dynamic> activation;
+  final Map<String, dynamic>? activation;
   final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final refresh = visualRefreshOf(context);
-    final children = (activation['children'] as List<dynamic>? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .where((c) => c['notified'] == true)
-        .toList();
-    final arrived = children.where((c) => c['arrived'] == true).length;
-    final pending = children
-        .where((c) => c['arrived'] != true)
-        .map((c) => c['childName'] as String? ?? '')
-        .where((n) => n.isNotEmpty)
-        .toList();
-    final subtitle = children.isEmpty
-        ? l10n.tapToViewStatus
-        : pending.isEmpty
-            ? l10n.allChildrenArrived
-            : l10n.arrivedWaitingSummary(
-                arrived,
-                children.length,
-                pending.join(', '),
-              );
+    final active = activation != null;
+
+    String title = l10n.empTitle;
+    String subtitle = l10n.empQuickAccessSubtitle;
+    if (active) {
+      final children = (activation!['children'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .where((c) => c['notified'] == true)
+          .toList();
+      final arrived = children.where((c) => c['arrived'] == true).length;
+      final pending = children
+          .where((c) => c['arrived'] != true)
+          .map((c) => c['childName'] as String? ?? '')
+          .where((n) => n.isNotEmpty)
+          .toList();
+      title = l10n.empBannerActiveTitle;
+      subtitle = children.isEmpty
+          ? l10n.tapToViewStatus
+          : pending.isEmpty
+              ? l10n.allChildrenArrived
+              : l10n.arrivedWaitingSummary(
+                  arrived,
+                  children.length,
+                  pending.join(', '),
+                );
+    }
 
     final radius = BorderRadius.circular(refresh ? AppRadius.vrCard : 16);
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
 
     return Material(
       color: refresh
@@ -1640,26 +1650,38 @@ class _EmpActiveBanner extends StatelessWidget {
         onTap: onOpen,
         borderRadius: radius,
         child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: refresh
-              ? BoxDecoration(
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: VisualRefreshColors.dangerTintBorder,
-                    width: 0.5,
-                  ),
-                )
-              : null,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: refresh
+                  ? VisualRefreshColors.dangerTintBorder
+                  : AppColors.danger.withValues(alpha: 0.25),
+              width: 0.5,
+            ),
+          ),
           child: Row(
             children: [
-              Icon(
-                refresh
-                    ? Icons.notifications_outlined
-                    : Icons.notifications_active_rounded,
-                color: refresh
-                    ? VisualRefreshColors.danger
-                    : AppColors.danger,
-                size: 22,
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(
+                    refresh ? AppRadius.vrChip : 10,
+                  ),
+                ),
+                child: Icon(
+                  active
+                      ? (refresh
+                          ? Icons.notifications_outlined
+                          : Icons.notifications_active_rounded)
+                      : Icons.groups_rounded,
+                  color: refresh
+                      ? VisualRefreshColors.danger
+                      : AppColors.danger,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1667,15 +1689,16 @@ class _EmpActiveBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l10n.empBannerActiveTitle,
+                      title,
                       style: refresh
                           ? GoogleFonts.fraunces(
                               fontWeight: FontWeight.w600,
-                              fontSize: 16,
+                              fontSize: 15,
                               color: VisualRefreshColors.danger,
                             )
                           : const TextStyle(
                               fontWeight: FontWeight.w900,
+                              fontSize: 15,
                               color: AppColors.danger,
                             ),
                     ),
@@ -1688,9 +1711,7 @@ class _EmpActiveBanner extends StatelessWidget {
                         color: refresh
                             ? VisualRefreshColors.dangerTintText
                             : AppColors.ink,
-                        fontFamily: refresh
-                            ? GoogleFonts.plusJakartaSans().fontFamily
-                            : null,
+                        fontFamily: refresh ? jakarta : null,
                       ),
                     ),
                   ],
@@ -1803,11 +1824,63 @@ class ParentShell extends ConsumerStatefulWidget {
 }
 
 class _ParentShellState extends ConsumerState<ParentShell> {
+  bool _coachmarkEligible = false;
+  bool _coachmarkVisible = false;
+  bool _coachmarkChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadCoachmarkEligibility);
+  }
+
+  Future<void> _loadCoachmarkEligibility() async {
+    final seen =
+        await ref.read(reminderCoachmarkStoreProvider).hasSeen();
+    if (!mounted) return;
+    setState(() {
+      _coachmarkEligible = !seen;
+      _coachmarkChecked = true;
+    });
+  }
+
+  Future<void> _dismissCoachmark({required bool openMore}) async {
+    await ref.read(reminderCoachmarkStoreProvider).markSeen();
+    if (!mounted) return;
+    setState(() {
+      _coachmarkEligible = false;
+      _coachmarkVisible = false;
+    });
+    if (openMore) {
+      ref.read(parentShellTabProvider.notifier).state = 3;
+    }
+  }
+
+  void _syncCoachmarkVisibility({
+    required int tabIndex,
+    required bool hasChildren,
+  }) {
+    if (!_coachmarkChecked || !_coachmarkEligible) return;
+    final shouldShow = tabIndex == 0 && hasChildren;
+    if (shouldShow == _coachmarkVisible) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_coachmarkEligible) return;
+      final stillShould =
+          ref.read(parentShellTabProvider) == 0 &&
+          ref.read(childrenControllerProvider).items.isNotEmpty;
+      if (stillShould != _coachmarkVisible) {
+        setState(() => _coachmarkVisible = stillShould);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(localeControllerProvider);
     final l10n = AppLocalizations.of(context);
     final index = ref.watch(parentShellTabProvider);
+    final children = ref.watch(childrenControllerProvider);
     final refresh = visualRefreshOf(context);
     final pages = [
       const ParentHomeScreen(),
@@ -1815,68 +1888,87 @@ class _ParentShellState extends ConsumerState<ParentShell> {
       const PlacesEntryScreen(),
       const MoreScreen(),
     ];
+
+    _syncCoachmarkVisibility(
+      tabIndex: index,
+      hasChildren: children.items.isNotEmpty,
+    );
+
     return ParentZoneAlertHost(
-      child: Scaffold(
-        body: IndexedStack(index: index, children: pages),
-        bottomNavigationBar: DecoratedBox(
-          decoration: BoxDecoration(
-            color: refresh
-                ? VisualRefreshColors.surface
-                : Colors.white,
-            border: refresh
-                ? const Border(
-                    top: BorderSide(
-                      color: VisualRefreshColors.border,
-                      width: 0.5,
+      child: Stack(
+        children: [
+          Scaffold(
+            body: IndexedStack(index: index, children: pages),
+            bottomNavigationBar: DecoratedBox(
+              decoration: BoxDecoration(
+                color: refresh
+                    ? VisualRefreshColors.surface
+                    : Colors.white,
+                border: refresh
+                    ? const Border(
+                        top: BorderSide(
+                          color: VisualRefreshColors.border,
+                          width: 0.5,
+                        ),
+                      )
+                    : null,
+              ),
+              child: NavigationBar(
+                key: ValueKey('parent-nav-${locale.languageCode}'),
+                selectedIndex: index,
+                onDestinationSelected: (value) {
+                  ref.read(parentShellTabProvider.notifier).state = value;
+                  if (value == 0) {
+                    unawaited(
+                      ref
+                          .read(childrenControllerProvider.notifier)
+                          .refresh(),
+                    );
+                  }
+                },
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.family_restroom_outlined),
+                    selectedIcon: Icon(
+                      refresh
+                          ? Icons.family_restroom_outlined
+                          : Icons.family_restroom,
                     ),
-                  )
-                : null,
+                    label: l10n.navChildrenLabel,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.timer_outlined),
+                    selectedIcon: Icon(
+                      refresh ? Icons.timer_outlined : Icons.timer,
+                    ),
+                    label: l10n.featureScreenTime,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.home_work_outlined),
+                    selectedIcon: Icon(
+                      refresh ? Icons.home_work_outlined : Icons.home_work,
+                    ),
+                    label: l10n.navZonesLabel,
+                  ),
+                  NavigationDestination(
+                    icon: const Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(
+                      refresh ? Icons.grid_view_outlined : Icons.grid_view,
+                    ),
+                    label: l10n.navMoreLabel,
+                  ),
+                ],
+              ),
+            ),
           ),
-          child: NavigationBar(
-            key: ValueKey('parent-nav-${locale.languageCode}'),
-            selectedIndex: index,
-            onDestinationSelected: (value) {
-              ref.read(parentShellTabProvider.notifier).state = value;
-              if (value == 0) {
-                unawaited(
-                  ref.read(childrenControllerProvider.notifier).refresh(),
-                );
-              }
-            },
-            destinations: [
-              NavigationDestination(
-                icon: const Icon(Icons.family_restroom_outlined),
-                selectedIcon: Icon(
-                  refresh
-                      ? Icons.family_restroom_outlined
-                      : Icons.family_restroom,
-                ),
-                label: l10n.navChildrenLabel,
+          if (_coachmarkVisible)
+            Positioned.fill(
+              child: ReminderCoachmarkOverlay(
+                onSkip: () => unawaited(_dismissCoachmark(openMore: false)),
+                onView: () => unawaited(_dismissCoachmark(openMore: true)),
               ),
-              NavigationDestination(
-                icon: const Icon(Icons.timer_outlined),
-                selectedIcon: Icon(
-                  refresh ? Icons.timer_outlined : Icons.timer,
-                ),
-                label: l10n.featureScreenTime,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.home_work_outlined),
-                selectedIcon: Icon(
-                  refresh ? Icons.home_work_outlined : Icons.home_work,
-                ),
-                label: l10n.navZonesLabel,
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.grid_view_outlined),
-                selectedIcon: Icon(
-                  refresh ? Icons.grid_view_outlined : Icons.grid_view,
-                ),
-                label: l10n.navMoreLabel,
-              ),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }

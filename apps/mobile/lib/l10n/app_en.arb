@@ -1178,5 +1178,10 @@
     "placeholders": {
       "hours": { "type": "int" }
     }
-  }
+  },
+  "empQuickAccessSubtitle": "Quick access in an emergency",
+  "reminderCoachmarkTitle": "Try Schedule Reminders",
+  "reminderCoachmarkBody": "Set routine reminders for your child — study, bedtime, or other schedules — from the More menu.",
+  "coachmarkSkip": "Skip",
+  "coachmarkView": "View"
 }

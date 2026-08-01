@@ -2690,4 +2690,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String codeValidForHours(int hours) {
     return 'Valid for $hours hours';
   }
+
+  @override
+  String get empQuickAccessSubtitle => 'Quick access in an emergency';
+
+  @override
+  String get reminderCoachmarkTitle => 'Try Schedule Reminders';
+
+  @override
+  String get reminderCoachmarkBody =>
+      'Set routine reminders for your child — study, bedtime, or other schedules — from the More menu.';
+
+  @override
+  String get coachmarkSkip => 'Skip';
+
+  @override
+  String get coachmarkView => 'View';
 }
