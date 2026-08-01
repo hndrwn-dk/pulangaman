@@ -22,6 +22,7 @@ class _GuardianRef {
     required this.phone,
     required this.status,
     required this.childNames,
+    this.isCoParent = false,
   });
 
   final String id;
@@ -29,6 +30,173 @@ class _GuardianRef {
   final String phone;
   final String status;
   final List<String> childNames;
+  bool isCoParent;
+}
+
+String _guardianAccessLevel(Map<String, dynamic> g) {
+  final raw = g['accessLevel']?.toString() ?? g['access_level']?.toString();
+  return raw == 'co_parent' ? 'co_parent' : 'view';
+}
+
+bool _isCoParentGuardian(Map<String, dynamic> g) =>
+    _guardianAccessLevel(g) == 'co_parent';
+
+Widget _accessLevelBadge(BuildContext context, {required bool coParent, required bool refresh}) {
+  final l10n = AppLocalizations.of(context);
+  final label = coParent ? l10n.coParentBadge : l10n.waliBadge;
+  final bg = coParent
+      ? (refresh ? VisualRefreshColors.routeTint : const Color(0xFFE0E7FF))
+      : (refresh ? VisualRefreshColors.tagMuted : const Color(0xFFE8ECF0));
+  final fg = coParent
+      ? (refresh ? VisualRefreshColors.routeText : const Color(0xFF3730A3))
+      : (refresh ? VisualRefreshColors.textSecondary : AppColors.inkSoft);
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: fg,
+        fontFamily: refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+      ),
+    ),
+  );
+}
+
+Widget _accessLevelPicker({
+  required AppLocalizations l10n,
+  required bool coParent,
+  required ValueChanged<bool> onChanged,
+  required bool refresh,
+}) {
+  final children = <Widget>[
+    Text(
+      l10n.guardianAccessSectionTitle,
+      style: refresh
+          ? GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: VisualRefreshColors.textSecondary,
+            )
+          : const TextStyle(fontWeight: FontWeight.w700),
+    ),
+    const SizedBox(height: 8),
+    _AccessOptionTile(
+      selected: !coParent,
+      title: l10n.guardianAccessView,
+      subtitle: l10n.guardianAccessViewHint,
+      refresh: refresh,
+      onTap: () => onChanged(false),
+    ),
+    const SizedBox(height: 8),
+    _AccessOptionTile(
+      selected: coParent,
+      title: l10n.guardianAccessCoParent,
+      subtitle: l10n.guardianAccessCoParentHint,
+      refresh: refresh,
+      onTap: () => onChanged(true),
+    ),
+  ];
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: children,
+  );
+}
+
+class _AccessOptionTile extends StatelessWidget {
+  const _AccessOptionTile({
+    required this.selected,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.refresh,
+  });
+
+  final bool selected;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool refresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? (refresh ? VisualRefreshColors.accentTint : const Color(0xFFD8F5E8))
+          : (refresh ? VisualRefreshColors.surface : Colors.white),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? (refresh ? VisualRefreshColors.accent : AppColors.teal)
+                  : (refresh ? VisualRefreshColors.border : const Color(0xFFE5E7EB)),
+              width: selected ? 1.4 : 0.5,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                size: 20,
+                color: selected
+                    ? (refresh ? VisualRefreshColors.accent : AppColors.teal)
+                    : (refresh
+                        ? VisualRefreshColors.textTertiary
+                        : AppColors.inkSoft),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        color: refresh ? VisualRefreshColors.textPrimary : null,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: refresh
+                            ? VisualRefreshColors.textSecondary
+                            : AppColors.inkSoft,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 BoxDecoration _hubCardDecoration(bool refresh) {
@@ -208,9 +376,13 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
             phone: g['phone']?.toString() ?? '',
             status: status,
             childNames: [childName],
+            isCoParent: _isCoParentGuardian(g),
           );
         } else if (!existing.childNames.contains(childName)) {
           existing.childNames.add(childName);
+          if (_isCoParentGuardian(g)) existing.isCoParent = true;
+        } else if (_isCoParentGuardian(g)) {
+          existing.isCoParent = true;
         }
       }
     }
@@ -249,6 +421,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController(text: refresh ? '' : '+62');
     final emailCtrl = TextEditingController();
+    var inviteAsCoParent = false;
 
     try {
       final bool? ok;
@@ -366,6 +539,15 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                               decoration: _vrFieldDecoration(),
                             ),
                           ],
+                          const SizedBox(height: 16),
+                          _accessLevelPicker(
+                            l10n: sheetL10n,
+                            coParent: inviteAsCoParent,
+                            refresh: true,
+                            onChanged: (v) => setLocal(() {
+                              inviteAsCoParent = v;
+                            }),
+                          ),
                           const SizedBox(height: 20),
                           SizedBox(
                             height: 52,
@@ -410,76 +592,87 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
               child: StatefulBuilder(
                 builder: (ctx, setLocal) {
                   final sheetL10n = AppLocalizations.of(ctx);
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        channel == 'whatsapp'
-                            ? sheetL10n.inviteViaWhatsApp
-                            : channel == 'email'
-                                ? sheetL10n.inviteViaEmail
-                                : sheetL10n.inviteViaLink,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: selected.id,
-                        decoration:
-                            InputDecoration(labelText: sheetL10n.forChildLabel),
-                        items: children
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c.id,
-                                child: Text(c.name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (id) {
-                          if (id == null) return;
-                          setLocal(() {
-                            selected = children.firstWhere((c) => c.id == id);
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: nameCtrl,
-                        textCapitalization: TextCapitalization.words,
-                        decoration: InputDecoration(
-                          labelText: sheetL10n.guardianNameLabel,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: phoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: sheetL10n.phoneWhatsAppLabel,
-                        ),
-                      ),
-                      if (channel == 'email') ...[
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: sheetL10n.emailOptionalLabel,
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          channel == 'whatsapp'
+                              ? sheetL10n.inviteViaWhatsApp
+                              : channel == 'email'
+                                  ? sheetL10n.inviteViaEmail
+                                  : sheetL10n.inviteViaLink,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 14),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.teal,
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: selected.id,
+                          decoration:
+                              InputDecoration(labelText: sheetL10n.forChildLabel),
+                          items: children
+                              .map(
+                                (c) => DropdownMenuItem(
+                                  value: c.id,
+                                  child: Text(c.name),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (id) {
+                            if (id == null) return;
+                            setLocal(() {
+                              selected = children.firstWhere((c) => c.id == id);
+                            });
+                          },
                         ),
-                        child: Text(sheetL10n.continueLabel),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: nameCtrl,
+                          textCapitalization: TextCapitalization.words,
+                          decoration: InputDecoration(
+                            labelText: sheetL10n.guardianNameLabel,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: phoneCtrl,
+                          keyboardType: TextInputType.phone,
+                          decoration: InputDecoration(
+                            labelText: sheetL10n.phoneWhatsAppLabel,
+                          ),
+                        ),
+                        if (channel == 'email') ...[
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: InputDecoration(
+                              labelText: sheetL10n.emailOptionalLabel,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        _accessLevelPicker(
+                          l10n: sheetL10n,
+                          coParent: inviteAsCoParent,
+                          refresh: false,
+                          onChanged: (v) => setLocal(() {
+                            inviteAsCoParent = v;
+                          }),
+                        ),
+                        const SizedBox(height: 14),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.teal,
+                          ),
+                          child: Text(sheetL10n.continueLabel),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -505,6 +698,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
             'childId': selected.id,
             'guardianName': name,
             'guardianPhone': phone,
+            'accessLevel': inviteAsCoParent ? 'co_parent' : 'view',
           },
         );
         await _loadAll();
@@ -788,6 +982,13 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                                                       : null,
                                                 ),
                                               ),
+                                              const SizedBox(height: 4),
+                                              _accessLevelBadge(
+                                                context,
+                                                coParent: g.isCoParent,
+                                                refresh: refresh,
+                                              ),
+                                              const SizedBox(height: 4),
                                               Text(
                                                 g.status == 'invited'
                                                     ? l10n.waitingWithNames(
@@ -1251,6 +1452,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
     final refresh = visualRefreshOf(context);
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController(text: refresh ? '' : '+62');
+    var inviteAsCoParent = false;
 
     try {
       final bool? ok;
@@ -1263,76 +1465,89 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                 bottom: MediaQuery.viewInsetsOf(ctx).bottom,
               ),
               child: VrSheetShell(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      VrSheetTitle(l10n.inviteGuardian),
-                      const SizedBox(height: 18),
-                      Text(
-                        l10n.guardianNameLabel,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: VisualRefreshColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: nameCtrl,
-                        textCapitalization: TextCapitalization.words,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w600,
-                          color: VisualRefreshColors.textPrimary,
-                        ),
-                        decoration: _vrFieldDecoration(),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        l10n.phoneWhatsAppLabel,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: VisualRefreshColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: phoneCtrl,
-                        keyboardType: TextInputType.phone,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w600,
-                          color: VisualRefreshColors.textPrimary,
-                        ),
-                        decoration: _vrFieldDecoration(
-                          prefixIcon: _vrCountryPrefixChip(
-                            l10n.phoneCountryCode,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        height: 52,
-                        child: FilledButton(
-                          onPressed: () => Navigator.pop(ctx, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: VisualRefreshColors.anchor,
-                            foregroundColor: VisualRefreshColors.background,
-                            elevation: 0,
-                            shape: const StadiumBorder(),
-                          ),
-                          child: Text(
-                            l10n.save,
+                child: StatefulBuilder(
+                  builder: (ctx, setLocal) {
+                    return SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          VrSheetTitle(l10n.inviteGuardian),
+                          const SizedBox(height: 18),
+                          Text(
+                            l10n.guardianNameLabel,
                             style: GoogleFonts.plusJakartaSans(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: VisualRefreshColors.textSecondary,
                             ),
                           ),
-                        ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: nameCtrl,
+                            textCapitalization: TextCapitalization.words,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w600,
+                              color: VisualRefreshColors.textPrimary,
+                            ),
+                            decoration: _vrFieldDecoration(),
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            l10n.phoneWhatsAppLabel,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: VisualRefreshColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w600,
+                              color: VisualRefreshColors.textPrimary,
+                            ),
+                            decoration: _vrFieldDecoration(
+                              prefixIcon: _vrCountryPrefixChip(
+                                l10n.phoneCountryCode,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _accessLevelPicker(
+                            l10n: l10n,
+                            coParent: inviteAsCoParent,
+                            refresh: true,
+                            onChanged: (v) => setLocal(() {
+                              inviteAsCoParent = v;
+                            }),
+                          ),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            height: 52,
+                            child: FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: VisualRefreshColors.anchor,
+                                foregroundColor: VisualRefreshColors.background,
+                                elevation: 0,
+                                shape: const StadiumBorder(),
+                              ),
+                              child: Text(
+                                l10n.save,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             );
@@ -1341,34 +1556,52 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
       } else {
         ok = await showDialog<bool>(
           context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(l10n.inviteGuardian),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(labelText: l10n.guardianNameLabel),
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, setLocal) {
+              return AlertDialog(
+                title: Text(l10n.inviteGuardian),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameCtrl,
+                        decoration:
+                            InputDecoration(labelText: l10n.guardianNameLabel),
+                      ),
+                      TextField(
+                        controller: phoneCtrl,
+                        decoration: InputDecoration(
+                          labelText: l10n.phoneWhatsAppLabel,
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 12),
+                      _accessLevelPicker(
+                        l10n: l10n,
+                        coParent: inviteAsCoParent,
+                        refresh: false,
+                        onChanged: (v) => setLocal(() {
+                          inviteAsCoParent = v;
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
-                TextField(
-                  controller: phoneCtrl,
-                  decoration:
-                      InputDecoration(labelText: l10n.phoneWhatsAppLabel),
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(l10n.cancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-                child: Text(l10n.save),
-              ),
-            ],
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(l10n.cancel),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style:
+                        FilledButton.styleFrom(backgroundColor: AppColors.teal),
+                    child: Text(l10n.save),
+                  ),
+                ],
+              );
+            },
           ),
         );
       }
@@ -1380,6 +1613,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
           'childId': widget.child.id,
           'guardianName': nameCtrl.text.trim(),
           'guardianPhone': _composePhone(phoneCtrl.text, vrPrefixed: refresh),
+          'accessLevel': inviteAsCoParent ? 'co_parent' : 'view',
         });
         await _load();
       } catch (e) {
@@ -1391,6 +1625,62 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
     } finally {
       nameCtrl.dispose();
       phoneCtrl.dispose();
+    }
+  }
+
+  Future<void> _setAccessLevel({
+    required String guardianId,
+    required String name,
+    required String nextLevel,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final promote = nextLevel == 'co_parent';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          promote ? l10n.promoteToCoParentTitle : l10n.demoteToGuardianTitle,
+        ),
+        content: Text(
+          promote
+              ? l10n.promoteToCoParentBody(name)
+              : l10n.demoteToGuardianBody(name),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: visualRefreshOf(context)
+                  ? VisualRefreshColors.anchor
+                  : AppColors.teal,
+            ),
+            child: Text(
+              promote
+                  ? l10n.confirmPromoteCoParent
+                  : l10n.confirmDemoteGuardian,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final api = ref.read(apiClientProvider);
+      await api.patch('/api/v1/guardians/access-level', body: {
+        'childId': widget.child.id,
+        'guardianId': guardianId,
+        'accessLevel': nextLevel,
+      });
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.failedGenericDetail('$e'))),
+      );
     }
   }
 
@@ -1484,6 +1774,12 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                               else ...[
                                 ...active.map((g) {
                                   final status = g['status']?.toString() ?? '';
+                                  final coParent = _isCoParentGuardian(g);
+                                  final name =
+                                      g['name']?.toString() ??
+                                          l10n.guardianFallbackName;
+                                  final guardianId =
+                                      g['guardian_id'] as String;
                                   return Padding(
                                     padding: const EdgeInsets.only(bottom: 10),
                                     child: Container(
@@ -1502,9 +1798,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                                                 ? VisualRefreshColors.accentTint
                                                 : const Color(0xFFDCEBFF),
                                             child: Text(
-                                              _firstLetter(
-                                                g['name']?.toString(),
-                                              ),
+                                              _firstLetter(name),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w900,
                                                 color: refresh
@@ -1521,7 +1815,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  '${g['name']}',
+                                                  name,
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.w900,
                                                     color: refresh
@@ -1535,6 +1829,13 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                                                         : null,
                                                   ),
                                                 ),
+                                                const SizedBox(height: 4),
+                                                _accessLevelBadge(
+                                                  context,
+                                                  coParent: coParent,
+                                                  refresh: refresh,
+                                                ),
+                                                const SizedBox(height: 4),
                                                 Text(
                                                   '${g['phone']} · $status',
                                                   style: TextStyle(
@@ -1555,6 +1856,24 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                                             ),
                                           ),
                                           IconButton(
+                                            tooltip: l10n.changeAccessLevel,
+                                            icon: Icon(
+                                              coParent
+                                                  ? Icons.arrow_downward
+                                                  : Icons.arrow_upward,
+                                              color: refresh
+                                                  ? VisualRefreshColors.accent
+                                                  : AppColors.tealDeep,
+                                            ),
+                                            onPressed: () => _setAccessLevel(
+                                              guardianId: guardianId,
+                                              name: name,
+                                              nextLevel: coParent
+                                                  ? 'view'
+                                                  : 'co_parent',
+                                            ),
+                                          ),
+                                          IconButton(
                                             tooltip: l10n.revokeAccessTooltip,
                                             icon: Icon(
                                               Icons.block,
@@ -1562,9 +1881,8 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                                                   ? VisualRefreshColors.danger
                                                   : AppColors.danger,
                                             ),
-                                            onPressed: () => _revoke(
-                                              g['guardian_id'] as String,
-                                            ),
+                                            onPressed: () =>
+                                                _revoke(guardianId),
                                           ),
                                         ],
                                       ),

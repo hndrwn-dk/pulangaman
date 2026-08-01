@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { canManageChildFeatures } from '../middleware/roles.js';
 import {
   applyPrimaryToChildren,
   activateMeetingPoints,
@@ -21,14 +22,6 @@ import {
 
 export const emergencyMeetingRouter = Router();
 emergencyMeetingRouter.use(requireAuth, rateLimit);
-
-async function assertParentOfChild(parentId: string, childId: string): Promise<boolean> {
-  const link = await pool.query(
-    `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-    [parentId, childId],
-  );
-  return (link.rowCount ?? 0) > 0;
-}
 
 async function assertIsChild(userId: string): Promise<boolean> {
   const role = await pool.query(
@@ -49,7 +42,7 @@ emergencyMeetingRouter.get('/', async (req: AuthedRequest, res, next) => {
     let childId: string;
     if (typeof req.query.childId === 'string' && req.query.childId.length > 0) {
       childId = z.string().uuid().parse(req.query.childId);
-      if (childId !== userId && !(await assertParentOfChild(userId, childId))) {
+      if (childId !== userId && !(await canManageChildFeatures(userId, childId))) {
         res.status(404).json({ error: 'child_not_found' });
         return;
       }
@@ -86,7 +79,7 @@ emergencyMeetingRouter.post('/', async (req: AuthedRequest, res, next) => {
       })
       .parse(req.body);
 
-    if (!(await assertParentOfChild(parentId, body.childId))) {
+    if (!(await canManageChildFeatures(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -121,12 +114,12 @@ emergencyMeetingRouter.post('/apply-to-all', async (req: AuthedRequest, res, nex
       })
       .parse(req.body);
 
-    if (!(await assertParentOfChild(parentId, body.sourceChildId))) {
+    if (!(await canManageChildFeatures(parentId, body.sourceChildId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
     for (const id of body.targetChildIds) {
-      if (!(await assertParentOfChild(parentId, id))) {
+      if (!(await canManageChildFeatures(parentId, id))) {
         res.status(404).json({ error: 'child_not_found', childId: id });
         return;
       }
@@ -241,7 +234,7 @@ emergencyMeetingRouter.get('/:childId/status', async (req: AuthedRequest, res, n
     }
 
     const childId = z.string().uuid().parse(req.params.childId);
-    if (childId !== userId && !(await assertParentOfChild(userId, childId))) {
+    if (childId !== userId && !(await canManageChildFeatures(userId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -263,7 +256,7 @@ emergencyMeetingRouter.put('/:id', async (req: AuthedRequest, res, next) => {
 
     const id = z.string().uuid().parse(req.params.id);
     const existing = await getPointById(id);
-    if (!existing || !(await assertParentOfChild(parentId, existing.child_id))) {
+    if (!existing || !(await canManageChildFeatures(parentId, existing.child_id))) {
       res.status(404).json({ error: 'not_found' });
       return;
     }
@@ -310,7 +303,7 @@ emergencyMeetingRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
 
     const id = z.string().uuid().parse(req.params.id);
     const existing = await getPointById(id);
-    if (!existing || !(await assertParentOfChild(parentId, existing.child_id))) {
+    if (!existing || !(await canManageChildFeatures(parentId, existing.child_id))) {
       res.status(404).json({ error: 'not_found' });
       return;
     }

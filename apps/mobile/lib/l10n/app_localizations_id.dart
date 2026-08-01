@@ -2469,6 +2469,75 @@ class AppLocalizationsId extends AppLocalizations {
   String get revokeAccessTooltip => 'Cabut akses';
 
   @override
+  String get guardianAccessView => 'Wali (lihat saja)';
+
+  @override
+  String get guardianAccessCoParent => 'Co-parent';
+
+  @override
+  String get guardianAccessSectionTitle => 'Tingkat akses';
+
+  @override
+  String get guardianAccessViewHint =>
+      'Bisa melihat lokasi dan peringatan. Tidak bisa mengubah zona, pengingat, atau titik kumpul.';
+
+  @override
+  String get guardianAccessCoParentHint =>
+      'Akses kelola sama seperti kamu untuk zona, pengingat, Mode Maghrib, dan titik kumpul darurat. Tidak bisa menghapus anak atau mengubah kode masuk.';
+
+  @override
+  String get coParentBadge => 'Co-parent';
+
+  @override
+  String get waliBadge => 'Wali';
+
+  @override
+  String get promoteToCoParentTitle => 'Jadikan co-parent?';
+
+  @override
+  String promoteToCoParentBody(String name) {
+    return '$name bisa mengedit zona, pengingat, Mode Maghrib, dan titik kumpul darurat untuk anak ini.';
+  }
+
+  @override
+  String get demoteToGuardianTitle => 'Ubah ke lihat saja?';
+
+  @override
+  String demoteToGuardianBody(String name) {
+    return '$name tetap wali, tetapi tidak lagi bisa mengedit zona, pengingat, atau titik kumpul.';
+  }
+
+  @override
+  String get changeAccessLevel => 'Ubah akses';
+
+  @override
+  String get confirmPromoteCoParent => 'Jadikan co-parent';
+
+  @override
+  String get confirmDemoteGuardian => 'Jadikan lihat saja';
+
+  @override
+  String get coParentManageTitle => 'Alat co-parent';
+
+  @override
+  String get coParentManageSubtitle =>
+      'Kelola pengaturan untuk anak yang kamu dampingi sebagai co-parent';
+
+  @override
+  String get inviteAsCoParent => 'Undang sebagai co-parent';
+
+  @override
+  String get inviteAsGuardian => 'Undang sebagai wali';
+
+  @override
+  String get coParentInviteLabel => 'Undangan ini untuk co-parent';
+
+  @override
+  String fromParentWithAccess(String parent, String access) {
+    return 'Dari $parent · $access';
+  }
+
+  @override
   String get alertAcknowledged => 'Peringatan direspons';
 
   @override

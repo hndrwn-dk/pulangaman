@@ -5,6 +5,7 @@ import { childLocationKey, getRedis } from '../redis/client.js';
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { canManageChildFeatures, isParentOfChild } from '../middleware/roles.js';
 import { createChildCustomToken, ensureFirebaseUser } from '../firebase/admin.js';
 import {
   buildActivityTimeline,
@@ -31,14 +32,6 @@ const emergencyContactSchema = z.object({
   phone: z.string().min(8).max(20),
   priority: z.number().int().min(1).max(20).default(1),
 });
-
-async function assertParentOfChild(parentId: string, childId: string): Promise<boolean> {
-  const link = await pool.query(
-    `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-    [parentId, childId],
-  );
-  return (link.rowCount ?? 0) > 0;
-}
 
 function resolveBatteryAlert(input: {
   batteryLevel: number | null;
@@ -159,12 +152,26 @@ childrenRouter.get('/', async (req: AuthedRequest, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT u.id, u.name, u.phone, cp.grade, cp.commute_status, cp.last_seen_at
+      `SELECT u.id, u.name, u.phone, cp.grade, cp.commute_status, cp.last_seen_at,
+              'primary'::text AS access
        FROM parent_children pc
        JOIN users u ON u.id = pc.child_id
        LEFT JOIN child_profiles cp ON cp.user_id = u.id
        WHERE pc.parent_id = $1
-       ORDER BY u.name`,
+       UNION
+       SELECT u.id, u.name, u.phone, cp.grade, cp.commute_status, cp.last_seen_at,
+              'co_parent'::text AS access
+       FROM child_approved_guardians cag
+       JOIN users u ON u.id = cag.child_id
+       LEFT JOIN child_profiles cp ON cp.user_id = u.id
+       WHERE cag.guardian_id = $1
+         AND cag.status = 'active'
+         AND cag.access_level = 'co_parent'
+         AND NOT EXISTS (
+           SELECT 1 FROM parent_children pc2
+           WHERE pc2.parent_id = $1 AND pc2.child_id = cag.child_id
+         )
+       ORDER BY name`,
       [parentId],
     );
 
@@ -183,7 +190,7 @@ childrenRouter.get('/:id/location/history', async (req: AuthedRequest, res, next
       return;
     }
 
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await canManageChildFeatures(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -239,7 +246,7 @@ childrenRouter.get('/:id/activity', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await canManageChildFeatures(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -330,7 +337,7 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await canManageChildFeatures(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -492,7 +499,7 @@ childrenRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await isParentOfChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -521,7 +528,7 @@ childrenRouter.post('/:id/emergency-contacts', async (req: AuthedRequest, res, n
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await isParentOfChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -554,7 +561,7 @@ childrenRouter.get('/:id/emergency-contacts', async (req: AuthedRequest, res, ne
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await isParentOfChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }

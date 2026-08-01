@@ -67,6 +67,19 @@ class ApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+  }) {
+    return _send(
+      () => _client.patch(
+        Uri.parse('$baseUrl$path'),
+        headers: _headers,
+        body: body == null ? null : jsonEncode(body),
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, String>? query,

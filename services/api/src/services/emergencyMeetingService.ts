@@ -315,10 +315,15 @@ export async function activateMeetingPoints(params: {
   }
 
   const children = await pool.query<{ id: string; name: string }>(
-    `SELECT u.id, u.name
-     FROM parent_children pc
-     JOIN users u ON u.id = pc.child_id
-     WHERE pc.parent_id = $1
+    `SELECT u.id, u.name FROM (
+       SELECT child_id FROM parent_children WHERE parent_id = $1
+       UNION
+       SELECT child_id FROM child_approved_guardians
+       WHERE guardian_id = $1
+         AND status = 'active'
+         AND access_level = 'co_parent'
+     ) managed
+     JOIN users u ON u.id = managed.child_id
      ORDER BY u.name`,
     [params.parentId],
   );
@@ -613,10 +618,21 @@ export async function getActiveAlertForChild(childId: string): Promise<{
   }>(
     `SELECT a.id, a.note, a.activated_at, a.targets
      FROM emergency_meeting_activations a
-     JOIN parent_children pc
-       ON pc.parent_id = a.parent_id AND pc.child_id = $1
      WHERE a.resolved_at IS NULL
        AND a.activated_at > now() - interval '6 hours'
+       AND (
+         EXISTS (
+           SELECT 1 FROM parent_children pc
+           WHERE pc.parent_id = a.parent_id AND pc.child_id = $1
+         )
+         OR EXISTS (
+           SELECT 1 FROM child_approved_guardians cag
+           WHERE cag.guardian_id = a.parent_id
+             AND cag.child_id = $1
+             AND cag.status = 'active'
+             AND cag.access_level = 'co_parent'
+         )
+       )
      ORDER BY a.activated_at DESC
      LIMIT 8`,
     [childId],

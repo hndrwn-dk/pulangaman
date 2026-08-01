@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { canManageChildFeatures } from '../middleware/roles.js';
 
 export const zonesRouter = Router();
 
@@ -17,14 +18,6 @@ const zoneSchema = z.object({
   name: z.string().max(120).optional(),
 });
 
-async function assertParentOfChild(parentId: string, childId: string): Promise<boolean> {
-  const link = await pool.query(
-    `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-    [parentId, childId],
-  );
-  return (link.rowCount ?? 0) > 0;
-}
-
 zonesRouter.post('/', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -34,7 +27,7 @@ zonesRouter.post('/', async (req: AuthedRequest, res, next) => {
     }
 
     const body = zoneSchema.parse(req.body);
-    if (!(await assertParentOfChild(parentId, body.childId))) {
+    if (!(await canManageChildFeatures(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -82,7 +75,7 @@ zonesRouter.get('/', async (req: AuthedRequest, res, next) => {
     if (typeof req.query.childId === 'string' && req.query.childId.length > 0) {
       childId = z.string().uuid().parse(req.query.childId);
       if (childId !== userId) {
-        if (!(await assertParentOfChild(userId, childId))) {
+        if (!(await canManageChildFeatures(userId, childId))) {
           res.status(404).json({ error: 'child_not_found' });
           return;
         }
@@ -139,7 +132,7 @@ zonesRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
       res.status(404).json({ error: 'zone_not_found' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, zone.rows[0].child_id))) {
+    if (!(await canManageChildFeatures(parentId, zone.rows[0].child_id))) {
       res.status(404).json({ error: 'zone_not_found' });
       return;
     }

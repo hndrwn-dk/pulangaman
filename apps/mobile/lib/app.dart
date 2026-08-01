@@ -28,11 +28,7 @@ class PulangAmanApp extends ConsumerWidget {
       if (prev?.languageCode == next.languageCode) return;
       unawaited(_syncNativeAppLocale(next.languageCode));
     });
-    // Parent/child (and login) always use Visual Refresh. Guardian keeps classic.
-    final useVisualRefreshTheme = !auth.isAuthenticated ||
-        auth.role == AppRole.parent ||
-        auth.role == AppRole.child;
-
+    // Visual Refresh is always on for all roles.
     // Key forces a fresh navigator when auth flips, so logout leaves
     // pushed routes (e.g. Pengaturan Akun) and shows LoginScreen cleanly.
     // Locale is included so chrome (bottom nav / headers) never sticks on a
@@ -48,9 +44,7 @@ class PulangAmanApp extends ConsumerWidget {
     return MaterialApp(
       title: 'PulangAman',
       debugShowCheckedModeBanner: false,
-      theme: useVisualRefreshTheme
-          ? buildVisualRefreshTheme(buildAppTheme())
-          : buildAppTheme(),
+      theme: buildVisualRefreshTheme(buildAppTheme()),
       // Keep native time pickers on 24-hour (matches Maghrib / "Home by HH:mm").
       builder: (context, child) {
         return MediaQuery(

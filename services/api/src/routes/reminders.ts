@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { canManageChildFeatures } from '../middleware/roles.js';
 import { sendFcmToUser } from '../services/fcm.js';
 import { broadcastToRoom, childRoom } from '../ws/server.js';
 
@@ -25,14 +26,6 @@ const upsertSchema = z.object({
   enabled: z.boolean().default(true),
   templateKey: z.enum(['study', 'bedtime']).nullable().optional(),
 });
-
-async function assertParentOfChild(parentId: string, childId: string): Promise<boolean> {
-  const link = await pool.query(
-    `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-    [parentId, childId],
-  );
-  return (link.rowCount ?? 0) > 0;
-}
 
 function mapReminder(row: {
   id: string;
@@ -119,7 +112,7 @@ remindersRouter.get('/:childId', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await canManageChildFeatures(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -145,7 +138,7 @@ remindersRouter.post('/:childId', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, childId))) {
+    if (!(await canManageChildFeatures(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -203,7 +196,7 @@ remindersRouter.put('/:id', async (req: AuthedRequest, res, next) => {
       res.status(404).json({ error: 'reminder_not_found' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, existing.rows[0].child_id))) {
+    if (!(await canManageChildFeatures(parentId, existing.rows[0].child_id))) {
       res.status(404).json({ error: 'reminder_not_found' });
       return;
     }
@@ -269,7 +262,7 @@ remindersRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
       res.status(404).json({ error: 'reminder_not_found' });
       return;
     }
-    if (!(await assertParentOfChild(parentId, existing.rows[0].child_id))) {
+    if (!(await canManageChildFeatures(parentId, existing.rows[0].child_id))) {
       res.status(404).json({ error: 'reminder_not_found' });
       return;
     }

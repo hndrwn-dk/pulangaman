@@ -5,15 +5,23 @@ import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { config } from '../config.js';
 import { guardianPresenceKey, getRedis } from '../redis/client.js';
+import {
+  canManageChildFeatures,
+  listFeatureManagedChildren,
+  type GuardianAccessLevel,
+} from '../middleware/roles.js';
 
 export const guardiansRouter = Router();
 
 guardiansRouter.use(requireAuth, rateLimit);
 
+const accessLevelSchema = z.enum(['view', 'co_parent']);
+
 const inviteSchema = z.object({
   childId: z.string().uuid(),
   guardianPhone: z.string().min(8).max(20),
   guardianName: z.string().min(1).max(120),
+  accessLevel: accessLevelSchema.default('view'),
 });
 
 const presenceSchema = z.object({
@@ -37,11 +45,7 @@ guardiansRouter.post('/invite', async (req: AuthedRequest, res, next) => {
     }
 
     const body = inviteSchema.parse(req.body);
-    const link = await pool.query(
-      `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-      [parentId, body.childId],
-    );
-    if (link.rowCount === 0) {
+    if (!(await canManageChildFeatures(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -82,22 +86,31 @@ guardiansRouter.post('/invite', async (req: AuthedRequest, res, next) => {
       );
       await client.query(
         `INSERT INTO child_approved_guardians
-           (child_id, guardian_id, approved_by_parent_id, status)
-         VALUES ($1, $2, $3, 'invited')
+           (child_id, guardian_id, approved_by_parent_id, status, access_level)
+         VALUES ($1, $2, $3, 'invited', $4::guardian_access_level)
          ON CONFLICT (child_id, guardian_id) DO UPDATE
            SET status = 'invited',
                approved_by_parent_id = EXCLUDED.approved_by_parent_id,
+               access_level = EXCLUDED.access_level,
                updated_at = now()`,
-        [body.childId, guardianId, parentId],
+        [body.childId, guardianId, parentId, body.accessLevel],
       );
       await client.query(
         `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
          VALUES ($1, $2, 'guardian.invited', $3::jsonb)`,
-        [parentId, body.childId, JSON.stringify({ guardianId })],
+        [
+          parentId,
+          body.childId,
+          JSON.stringify({ guardianId, accessLevel: body.accessLevel }),
+        ],
       );
 
       await client.query('COMMIT');
-      res.status(201).json({ guardianId, status: 'invited' });
+      res.status(201).json({
+        guardianId,
+        status: 'invited',
+        accessLevel: body.accessLevel,
+      });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -164,11 +177,16 @@ guardiansRouter.post('/accept', async (req: AuthedRequest, res, next) => {
         [guardianId],
       );
 
-      const result = await client.query(
+      const result = await client.query<{
+        child_id: string;
+        guardian_id: string;
+        status: string;
+        access_level: GuardianAccessLevel;
+      }>(
         `UPDATE child_approved_guardians
          SET status = 'active', updated_at = now()
          WHERE child_id = $1 AND guardian_id = $2 AND status = 'invited'
-         RETURNING child_id, guardian_id, status`,
+         RETURNING child_id, guardian_id, status, access_level`,
         [body.childId, guardianId],
       );
       if (result.rowCount === 0) {
@@ -180,11 +198,21 @@ guardiansRouter.post('/accept', async (req: AuthedRequest, res, next) => {
       await client.query(
         `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
          VALUES ($1, $2, 'guardian.accepted', $3::jsonb)`,
-        [guardianId, body.childId, JSON.stringify({ guardianId })],
+        [
+          guardianId,
+          body.childId,
+          JSON.stringify({
+            guardianId,
+            accessLevel: result.rows[0].access_level,
+          }),
+        ],
       );
 
       await client.query('COMMIT');
-      res.json(result.rows[0]);
+      res.json({
+        ...result.rows[0],
+        accessLevel: result.rows[0].access_level,
+      });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -211,12 +239,14 @@ guardiansRouter.post('/revoke', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    const link = await pool.query(
-      `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-      [parentId, body.childId],
-    );
-    if (link.rowCount === 0) {
+    if (!(await canManageChildFeatures(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
+      return;
+    }
+
+    // Co-parents may not revoke themselves via this endpoint (primary can).
+    if (body.guardianId === parentId) {
+      res.status(400).json({ error: 'cannot_revoke_self' });
       return;
     }
 
@@ -224,7 +254,7 @@ guardiansRouter.post('/revoke', async (req: AuthedRequest, res, next) => {
       `UPDATE child_approved_guardians
        SET status = 'revoked', updated_at = now()
        WHERE child_id = $1 AND guardian_id = $2 AND status IN ('invited', 'active')
-       RETURNING child_id, guardian_id, status`,
+       RETURNING child_id, guardian_id, status, access_level`,
       [body.childId, body.guardianId],
     );
     if (result.rowCount === 0) {
@@ -244,6 +274,73 @@ guardiansRouter.post('/revoke', async (req: AuthedRequest, res, next) => {
   }
 });
 
+guardiansRouter.patch('/access-level', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const body = z
+      .object({
+        childId: z.string().uuid(),
+        guardianId: z.string().uuid(),
+        accessLevel: accessLevelSchema,
+      })
+      .parse(req.body);
+
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    if (!(await canManageChildFeatures(parentId, body.childId))) {
+      res.status(404).json({ error: 'child_not_found' });
+      return;
+    }
+
+    if (body.guardianId === parentId) {
+      res.status(400).json({ error: 'cannot_change_own_access' });
+      return;
+    }
+
+    const result = await pool.query<{
+      child_id: string;
+      guardian_id: string;
+      status: string;
+      access_level: GuardianAccessLevel;
+    }>(
+      `UPDATE child_approved_guardians
+       SET access_level = $3::guardian_access_level, updated_at = now()
+       WHERE child_id = $1
+         AND guardian_id = $2
+         AND status IN ('invited', 'active')
+       RETURNING child_id, guardian_id, status, access_level`,
+      [body.childId, body.guardianId, body.accessLevel],
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: 'guardian_not_found' });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, 'guardian.access_level_changed', $3::jsonb)`,
+      [
+        parentId,
+        body.childId,
+        JSON.stringify({
+          guardianId: body.guardianId,
+          accessLevel: body.accessLevel,
+        }),
+      ],
+    );
+
+    res.json({
+      ...result.rows[0],
+      accessLevel: result.rows[0].access_level,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 guardiansRouter.get('/', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -253,17 +350,14 @@ guardiansRouter.get('/', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    const link = await pool.query(
-      `SELECT 1 FROM parent_children WHERE parent_id = $1 AND child_id = $2`,
-      [parentId, childId],
-    );
-    if (link.rowCount === 0) {
+    if (!(await canManageChildFeatures(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
 
     const result = await pool.query(
-      `SELECT cag.guardian_id, cag.status, u.name, u.phone, gp.status AS guardian_status
+      `SELECT cag.guardian_id, cag.status, cag.access_level, u.name, u.phone,
+              gp.status AS guardian_status
        FROM child_approved_guardians cag
        JOIN users u ON u.id = cag.guardian_id
        LEFT JOIN guardian_profiles gp ON gp.user_id = cag.guardian_id
@@ -272,7 +366,28 @@ guardiansRouter.get('/', async (req: AuthedRequest, res, next) => {
       [childId],
     );
 
-    res.json({ guardians: result.rows });
+    res.json({
+      guardians: result.rows.map((row) => ({
+        ...row,
+        accessLevel: row.access_level as GuardianAccessLevel,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Children this user can manage as primary parent or co_parent (feature screens). */
+guardiansRouter.get('/children', async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+
+    const children = await listFeatureManagedChildren(userId);
+    res.json({ children });
   } catch (error) {
     next(error);
   }
@@ -287,7 +402,8 @@ guardiansRouter.get('/invites', async (req: AuthedRequest, res, next) => {
     }
 
     const result = await pool.query(
-      `SELECT cag.child_id, cag.status, u.name AS child_name, p.name AS parent_name
+      `SELECT cag.child_id, cag.status, cag.access_level, u.name AS child_name,
+              p.name AS parent_name
        FROM child_approved_guardians cag
        JOIN users u ON u.id = cag.child_id
        JOIN users p ON p.id = cag.approved_by_parent_id
@@ -295,7 +411,12 @@ guardiansRouter.get('/invites', async (req: AuthedRequest, res, next) => {
        ORDER BY cag.created_at DESC`,
       [guardianId],
     );
-    res.json({ invites: result.rows });
+    res.json({
+      invites: result.rows.map((row) => ({
+        ...row,
+        accessLevel: row.access_level as GuardianAccessLevel,
+      })),
+    });
   } catch (error) {
     next(error);
   }

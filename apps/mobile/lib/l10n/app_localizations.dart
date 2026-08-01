@@ -4436,6 +4436,126 @@ abstract class AppLocalizations {
   /// **'Cabut akses'**
   String get revokeAccessTooltip;
 
+  /// No description provided for @guardianAccessView.
+  ///
+  /// In id, this message translates to:
+  /// **'Wali (lihat saja)'**
+  String get guardianAccessView;
+
+  /// No description provided for @guardianAccessCoParent.
+  ///
+  /// In id, this message translates to:
+  /// **'Co-parent'**
+  String get guardianAccessCoParent;
+
+  /// No description provided for @guardianAccessSectionTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tingkat akses'**
+  String get guardianAccessSectionTitle;
+
+  /// No description provided for @guardianAccessViewHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Bisa melihat lokasi dan peringatan. Tidak bisa mengubah zona, pengingat, atau titik kumpul.'**
+  String get guardianAccessViewHint;
+
+  /// No description provided for @guardianAccessCoParentHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Akses kelola sama seperti kamu untuk zona, pengingat, Mode Maghrib, dan titik kumpul darurat. Tidak bisa menghapus anak atau mengubah kode masuk.'**
+  String get guardianAccessCoParentHint;
+
+  /// No description provided for @coParentBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'Co-parent'**
+  String get coParentBadge;
+
+  /// No description provided for @waliBadge.
+  ///
+  /// In id, this message translates to:
+  /// **'Wali'**
+  String get waliBadge;
+
+  /// No description provided for @promoteToCoParentTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadikan co-parent?'**
+  String get promoteToCoParentTitle;
+
+  /// No description provided for @promoteToCoParentBody.
+  ///
+  /// In id, this message translates to:
+  /// **'{name} bisa mengedit zona, pengingat, Mode Maghrib, dan titik kumpul darurat untuk anak ini.'**
+  String promoteToCoParentBody(String name);
+
+  /// No description provided for @demoteToGuardianTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah ke lihat saja?'**
+  String get demoteToGuardianTitle;
+
+  /// No description provided for @demoteToGuardianBody.
+  ///
+  /// In id, this message translates to:
+  /// **'{name} tetap wali, tetapi tidak lagi bisa mengedit zona, pengingat, atau titik kumpul.'**
+  String demoteToGuardianBody(String name);
+
+  /// No description provided for @changeAccessLevel.
+  ///
+  /// In id, this message translates to:
+  /// **'Ubah akses'**
+  String get changeAccessLevel;
+
+  /// No description provided for @confirmPromoteCoParent.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadikan co-parent'**
+  String get confirmPromoteCoParent;
+
+  /// No description provided for @confirmDemoteGuardian.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadikan lihat saja'**
+  String get confirmDemoteGuardian;
+
+  /// No description provided for @coParentManageTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Alat co-parent'**
+  String get coParentManageTitle;
+
+  /// No description provided for @coParentManageSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kelola pengaturan untuk anak yang kamu dampingi sebagai co-parent'**
+  String get coParentManageSubtitle;
+
+  /// No description provided for @inviteAsCoParent.
+  ///
+  /// In id, this message translates to:
+  /// **'Undang sebagai co-parent'**
+  String get inviteAsCoParent;
+
+  /// No description provided for @inviteAsGuardian.
+  ///
+  /// In id, this message translates to:
+  /// **'Undang sebagai wali'**
+  String get inviteAsGuardian;
+
+  /// No description provided for @coParentInviteLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Undangan ini untuk co-parent'**
+  String get coParentInviteLabel;
+
+  /// No description provided for @fromParentWithAccess.
+  ///
+  /// In id, this message translates to:
+  /// **'Dari {parent} · {access}'**
+  String fromParentWithAccess(String parent, String access);
+
   /// No description provided for @alertAcknowledged.
   ///
   /// In id, this message translates to:

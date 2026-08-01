@@ -2467,6 +2467,75 @@ class AppLocalizationsEn extends AppLocalizations {
   String get revokeAccessTooltip => 'Revoke access';
 
   @override
+  String get guardianAccessView => 'Guardian (view)';
+
+  @override
+  String get guardianAccessCoParent => 'Co-parent';
+
+  @override
+  String get guardianAccessSectionTitle => 'Access level';
+
+  @override
+  String get guardianAccessViewHint =>
+      'Can see location and alerts. Cannot change zones, reminders, or meeting points.';
+
+  @override
+  String get guardianAccessCoParentHint =>
+      'Same manage access as you for zones, reminders, Safe Home Time, and emergency meeting points. Cannot remove the child or change login codes.';
+
+  @override
+  String get coParentBadge => 'Co-parent';
+
+  @override
+  String get waliBadge => 'Guardian';
+
+  @override
+  String get promoteToCoParentTitle => 'Promote to co-parent?';
+
+  @override
+  String promoteToCoParentBody(String name) {
+    return '$name will be able to edit zones, reminders, Safe Home Time, and emergency meeting points for this child.';
+  }
+
+  @override
+  String get demoteToGuardianTitle => 'Change to view-only?';
+
+  @override
+  String demoteToGuardianBody(String name) {
+    return '$name will keep guardian access but will no longer be able to edit zones, reminders, or meeting points.';
+  }
+
+  @override
+  String get changeAccessLevel => 'Change access';
+
+  @override
+  String get confirmPromoteCoParent => 'Promote';
+
+  @override
+  String get confirmDemoteGuardian => 'Make view-only';
+
+  @override
+  String get coParentManageTitle => 'Co-parent tools';
+
+  @override
+  String get coParentManageSubtitle =>
+      'Manage settings for children you co-parent';
+
+  @override
+  String get inviteAsCoParent => 'Invite as co-parent';
+
+  @override
+  String get inviteAsGuardian => 'Invite as guardian';
+
+  @override
+  String get coParentInviteLabel => 'This invite is for a co-parent';
+
+  @override
+  String fromParentWithAccess(String parent, String access) {
+    return 'From $parent · $access';
+  }
+
+  @override
   String get alertAcknowledged => 'Alert acknowledged';
 
   @override

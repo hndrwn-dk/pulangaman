@@ -1049,6 +1049,42 @@
   "phoneCountryCode": "+62",
   "accessPerChildSection": "ACCESS PER CHILD",
   "revokeAccessTooltip": "Revoke access",
+  "guardianAccessView": "Guardian (view)",
+  "guardianAccessCoParent": "Co-parent",
+  "guardianAccessSectionTitle": "Access level",
+  "guardianAccessViewHint": "Can see location and alerts. Cannot change zones, reminders, or meeting points.",
+  "guardianAccessCoParentHint": "Same manage access as you for zones, reminders, Safe Home Time, and emergency meeting points. Cannot remove the child or change login codes.",
+  "coParentBadge": "Co-parent",
+  "waliBadge": "Guardian",
+  "promoteToCoParentTitle": "Promote to co-parent?",
+  "promoteToCoParentBody": "{name} will be able to edit zones, reminders, Safe Home Time, and emergency meeting points for this child.",
+  "@promoteToCoParentBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "demoteToGuardianTitle": "Change to view-only?",
+  "demoteToGuardianBody": "{name} will keep guardian access but will no longer be able to edit zones, reminders, or meeting points.",
+  "@demoteToGuardianBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "changeAccessLevel": "Change access",
+  "confirmPromoteCoParent": "Promote",
+  "confirmDemoteGuardian": "Make view-only",
+  "coParentManageTitle": "Co-parent tools",
+  "coParentManageSubtitle": "Manage settings for children you co-parent",
+  "inviteAsCoParent": "Invite as co-parent",
+  "inviteAsGuardian": "Invite as guardian",
+  "coParentInviteLabel": "This invite is for a co-parent",
+  "fromParentWithAccess": "From {parent} · {access}",
+  "@fromParentWithAccess": {
+    "placeholders": {
+      "parent": { "type": "String" },
+      "access": { "type": "String" }
+    }
+  },
   "alertAcknowledged": "Alert acknowledged",
   "alertAcknowledgedCascadeStopped": "Alert acknowledged. Cascade stopped.",
   "alertLabelWithId": "Alert {id}",

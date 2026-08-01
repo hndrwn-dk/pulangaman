@@ -1485,6 +1485,42 @@
   "phoneCountryCode": "+62",
   "accessPerChildSection": "AKSES PER ANAK",
   "revokeAccessTooltip": "Cabut akses",
+  "guardianAccessView": "Wali (lihat saja)",
+  "guardianAccessCoParent": "Co-parent",
+  "guardianAccessSectionTitle": "Tingkat akses",
+  "guardianAccessViewHint": "Bisa melihat lokasi dan peringatan. Tidak bisa mengubah zona, pengingat, atau titik kumpul.",
+  "guardianAccessCoParentHint": "Akses kelola sama seperti kamu untuk zona, pengingat, Mode Maghrib, dan titik kumpul darurat. Tidak bisa menghapus anak atau mengubah kode masuk.",
+  "coParentBadge": "Co-parent",
+  "waliBadge": "Wali",
+  "promoteToCoParentTitle": "Jadikan co-parent?",
+  "promoteToCoParentBody": "{name} bisa mengedit zona, pengingat, Mode Maghrib, dan titik kumpul darurat untuk anak ini.",
+  "@promoteToCoParentBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "demoteToGuardianTitle": "Ubah ke lihat saja?",
+  "demoteToGuardianBody": "{name} tetap wali, tetapi tidak lagi bisa mengedit zona, pengingat, atau titik kumpul.",
+  "@demoteToGuardianBody": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "changeAccessLevel": "Ubah akses",
+  "confirmPromoteCoParent": "Jadikan co-parent",
+  "confirmDemoteGuardian": "Jadikan lihat saja",
+  "coParentManageTitle": "Alat co-parent",
+  "coParentManageSubtitle": "Kelola pengaturan untuk anak yang kamu dampingi sebagai co-parent",
+  "inviteAsCoParent": "Undang sebagai co-parent",
+  "inviteAsGuardian": "Undang sebagai wali",
+  "coParentInviteLabel": "Undangan ini untuk co-parent",
+  "fromParentWithAccess": "Dari {parent} · {access}",
+  "@fromParentWithAccess": {
+    "placeholders": {
+      "parent": { "type": "String" },
+      "access": { "type": "String" }
+    }
+  },
   "alertAcknowledged": "Peringatan direspons",
   "alertAcknowledgedCascadeStopped": "Peringatan direspons. Cascade dihentikan.",
   "alertLabelWithId": "Peringatan {id}",
