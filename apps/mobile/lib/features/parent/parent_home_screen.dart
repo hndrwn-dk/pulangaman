@@ -54,6 +54,8 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
   Map<String, dynamic>? _activitySummary;
   Map<String, dynamic>? _empActivation;
   Timer? _locationPoll;
+  Map<String, dynamic>? _digestBanner;
+  String? _digestBannerDismissedId;
 
   @override
   void initState() {
@@ -67,6 +69,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       await _loadLocations();
       await _loadEmpActivation();
       await _connectWs();
+      await _checkWeeklyDigest();
       _locationPoll?.cancel();
       _locationPoll = Timer.periodic(
         const Duration(seconds: 20),
@@ -112,6 +115,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       unawaited(_loadMessages());
       unawaited(_loadLocations());
       unawaited(_connectWs());
+      unawaited(_checkWeeklyDigest());
     }
   }
 
@@ -264,6 +268,10 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
       unawaited(_loadMessages());
       return;
     }
+    if (event == 'parent:weekly_digest') {
+      unawaited(_onWeeklyDigestEvent(payload));
+      return;
+    }
     if (event != 'child:message') return;
     final msg = ChildKabarMessage.fromJson({
       'id': payload['id'] ??
@@ -374,6 +382,80 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     });
   }
 
+  Future<void> _checkWeeklyDigest() async {
+    try {
+      final data =
+          await ref.read(apiClientProvider).get('/api/v1/weekly-digest/latest');
+      final digest = data['digest'];
+      if (digest is! Map<String, dynamic>) return;
+      final id = digest['id'] as String?;
+      if (id == null || id == _digestBannerDismissedId) return;
+      if (digest['openedAt'] != null) return;
+      if (!mounted) return;
+      setState(() => _digestBanner = digest);
+    } catch (_) {}
+  }
+
+  Future<void> _onWeeklyDigestEvent(Map<String, dynamic> payload) async {
+    final id = payload['digestId'] as String? ?? payload['id'] as String?;
+    if (id == null || id == _digestBannerDismissedId) return;
+    if (!mounted) return;
+    setState(() {
+      _digestBanner = {
+        'id': id,
+        'primaryChildId': payload['primaryChildId'],
+        'title': payload['title'],
+        'body': payload['body'],
+        'weekStartDate': payload['weekStartDate'],
+        'openedAt': null,
+      };
+    });
+  }
+
+  Future<void> _openDigestChildDetail() async {
+    final banner = _digestBanner;
+    if (banner == null) return;
+    final digestId = banner['id'] as String?;
+    final childId = banner['primaryChildId'] as String?;
+    final children = ref.read(childrenControllerProvider).items;
+    ChildSummary? child;
+    if (childId != null) {
+      for (final c in children) {
+        if (c.id == childId) {
+          child = c;
+          break;
+        }
+      }
+    }
+    child ??= children.isNotEmpty ? children.first : null;
+    if (digestId != null) {
+      try {
+        await ref
+            .read(apiClientProvider)
+            .post('/api/v1/weekly-digest/$digestId/opened');
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _digestBannerDismissedId = digestId;
+      _digestBanner = null;
+    });
+    if (child != null) _openChildDetail(child);
+  }
+
+  void _dismissDigestBanner() {
+    final id = _digestBanner?['id'] as String?;
+    setState(() {
+      _digestBannerDismissedId = id;
+      _digestBanner = null;
+    });
+    if (id != null) {
+      unawaited(
+        ref.read(apiClientProvider).post('/api/v1/weekly-digest/$id/opened'),
+      );
+    }
+  }
+
   Future<void> _editChildGender(ChildSummary child) async {
     final current =
         _genders[child.id] ?? ChildGenderStore.guessFromName(child.name);
@@ -473,6 +555,18 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                   ),
                 ),
               ),
+              if (_digestBanner != null) ...[
+                const SizedBox(height: 14),
+                _WeeklyDigestBanner(
+                  title: (_digestBanner!['title'] as String?) ??
+                      l10n.weeklyDigestBannerTitle,
+                  body: (_digestBanner!['body'] as String?) ?? '',
+                  actionLabel: l10n.weeklyDigestBannerAction,
+                  dismissLabel: l10n.weeklyDigestBannerDismiss,
+                  onOpen: () => unawaited(_openDigestChildDetail()),
+                  onDismiss: _dismissDigestBanner,
+                ),
+              ],
               const SizedBox(height: 14),
               _EmpQuickAccessRow(
                 activation: _empActivation,
@@ -1722,6 +1816,122 @@ class _EmpQuickAccessRow extends StatelessWidget {
                 color: refresh
                     ? VisualRefreshColors.textTertiary
                     : AppColors.inkSoft,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeeklyDigestBanner extends StatelessWidget {
+  const _WeeklyDigestBanner({
+    required this.title,
+    required this.body,
+    required this.actionLabel,
+    required this.dismissLabel,
+    required this.onOpen,
+    required this.onDismiss,
+  });
+
+  final String title;
+  final String body;
+  final String actionLabel;
+  final String dismissLabel;
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    return Material(
+      color: refresh
+          ? VisualRefreshColors.surface
+          : const Color(0xFFE8F6F1),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 4, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: refresh
+                      ? VisualRefreshColors.weatherTint
+                      : AppColors.teal.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.insights_outlined,
+                  color: refresh
+                      ? VisualRefreshColors.anchor
+                      : AppColors.tealDeep,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        color: refresh
+                            ? VisualRefreshColors.textPrimary
+                            : AppColors.tealDeep,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
+                      ),
+                    ),
+                    if (body.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        body,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                          color: refresh
+                              ? VisualRefreshColors.textSecondary
+                              : AppColors.inkSoft,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Text(
+                      actionLabel,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: refresh
+                            ? VisualRefreshColors.anchor
+                            : AppColors.tealDeep,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: dismissLabel,
+                onPressed: onDismiss,
+                icon: Icon(
+                  Icons.close,
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
+                ),
               ),
             ],
           ),

@@ -2714,6 +2714,36 @@ abstract class AppLocalizations {
   /// **'Rajin {streak} hari berturut-turut'**
   String streakDaysLabel(int streak);
 
+  /// No description provided for @streakCelebrationTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'{days} Hari Berturut-turut!'**
+  String streakCelebrationTitle(int days);
+
+  /// No description provided for @streakCelebrationBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Kamu jaga waktu layar sesuai target selama {days} hari. Mantap! +{points} poin'**
+  String streakCelebrationBody(int days, int points);
+
+  /// No description provided for @weeklyDigestBannerTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Ringkasan minggu ini'**
+  String get weeklyDigestBannerTitle;
+
+  /// No description provided for @weeklyDigestBannerAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat detail'**
+  String get weeklyDigestBannerAction;
+
+  /// No description provided for @weeklyDigestBannerDismiss.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup'**
+  String get weeklyDigestBannerDismiss;
+
   /// No description provided for @earnExampleHint.
   ///
   /// In id, this message translates to:

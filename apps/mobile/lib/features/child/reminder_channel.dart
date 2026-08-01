@@ -38,12 +38,16 @@ class ReminderChannel {
     required String body,
     String style = 'fullscreen',
     bool? visualRefresh,
+    String? mood,
+    String? accent,
   }) async {
     await _channel.invokeMethod<void>('previewNow', {
       'title': title,
       'body': body,
       'style': style,
       if (visualRefresh != null) 'visualRefresh': visualRefresh,
+      if (mood != null) 'mood': mood,
+      if (accent != null) 'accent': accent,
     });
   }
 

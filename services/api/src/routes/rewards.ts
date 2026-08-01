@@ -6,6 +6,10 @@ import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { isParentOfChild } from '../middleware/roles.js';
 import { awardReward } from '../services/rewards.js';
+import {
+  ackStreakCelebration,
+  getPendingStreakCelebration,
+} from '../services/streakCelebration.js';
 
 export const rewardsRouter = Router();
 rewardsRouter.use(requireAuth, rateLimit);
@@ -13,6 +17,37 @@ rewardsRouter.use(requireAuth, rateLimit);
 async function canView(userId: string, childId: string): Promise<boolean> {
   return userId === childId || isParentOfChild(userId, childId);
 }
+
+rewardsRouter.get('/:childId/streak-celebration/pending', async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    const childId = z.string().uuid().parse(req.params.childId);
+    if (!userId || userId !== childId) {
+      res.status(403).json({ error: 'child_self_required' });
+      return;
+    }
+    const pending = await getPendingStreakCelebration(childId);
+    res.json({ celebration: pending });
+  } catch (error) {
+    next(error);
+  }
+});
+
+rewardsRouter.post('/:childId/streak-celebration/:celebrationId/ack', async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    const childId = z.string().uuid().parse(req.params.childId);
+    const celebrationId = z.string().uuid().parse(req.params.celebrationId);
+    if (!userId || userId !== childId) {
+      res.status(403).json({ error: 'child_self_required' });
+      return;
+    }
+    const ok = await ackStreakCelebration(childId, celebrationId);
+    res.json({ acked: ok });
+  } catch (error) {
+    next(error);
+  }
+});
 
 rewardsRouter.get('/:childId', async (req: AuthedRequest, res, next) => {
   try {

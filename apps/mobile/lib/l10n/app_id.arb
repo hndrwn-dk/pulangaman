@@ -840,6 +840,28 @@
       }
     }
   },
+  "streakCelebrationTitle": "{days} Hari Berturut-turut!",
+  "@streakCelebrationTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "streakCelebrationBody": "Kamu jaga waktu layar sesuai target selama {days} hari. Mantap! +{points} poin",
+  "@streakCelebrationBody": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "weeklyDigestBannerTitle": "Ringkasan minggu ini",
+  "weeklyDigestBannerAction": "Lihat detail",
+  "weeklyDigestBannerDismiss": "Tutup",
   "earnExampleHint": "Contoh: tiba di sekolah +10 poin",
   "weeklyStreakTitle": "Streak Minggu Ini",
   "screenTimeMonitorSubtitle": "Pantau penggunaan harian",

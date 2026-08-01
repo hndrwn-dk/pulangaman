@@ -216,6 +216,8 @@ class MainActivity : FlutterActivity() {
                         val style = call.argument<String>("style") ?: "fullscreen"
                         val visualRefresh = call.argument<Boolean>("visualRefresh")
                             ?: VisualRefreshPrefs.isEnabled(this)
+                        val mood = call.argument<String>("mood")
+                        val accent = call.argument<String>("accent")
                         val intent = Intent(this, ReminderFullScreenActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                             putExtra(ReminderReceiver.EXTRA_TITLE, title)
@@ -225,6 +227,12 @@ class MainActivity : FlutterActivity() {
                                 ReminderFullScreenActivity.EXTRA_VISUAL_REFRESH,
                                 visualRefresh,
                             )
+                            if (mood != null) {
+                                putExtra(ReminderFullScreenActivity.EXTRA_MOOD, mood)
+                            }
+                            if (accent != null) {
+                                putExtra(ReminderFullScreenActivity.EXTRA_ACCENT, accent)
+                            }
                         }
                         startActivity(intent)
                         result.success(true)

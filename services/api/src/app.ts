@@ -28,6 +28,7 @@ import { placesRouter } from './routes/places.js';
 import { homeByRouter } from './routes/homeBy.js';
 import { tripsRouter } from './routes/trips.js';
 import { emergencyMeetingRouter } from './routes/emergencyMeetingPoints.js';
+import { weeklyDigestRouter } from './routes/weeklyDigest.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,7 @@ export function createApp() {
   app.use('/api/v1/home-by', homeByRouter);
   app.use('/api/v1/trips', tripsRouter);
   app.use('/api/v1/emergency-meeting-points', emergencyMeetingRouter);
+  app.use('/api/v1/weekly-digest', weeklyDigestRouter);
 
   // Phase 3 light school admin UI (static).
   app.use(

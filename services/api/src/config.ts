@@ -43,6 +43,9 @@ const envSchema = z.object({
   MAGHRIB_FALLBACK_HOUR: z.coerce.number().int().min(0).max(23).default(18),
   MAGHRIB_FALLBACK_MINUTE: z.coerce.number().int().min(0).max(59).default(0),
   CHILD_ACK_EXTENSION_MINUTES: z.coerce.number().int().min(5).max(120).default(30),
+  // Sunday 19:00 Asia/Jakarta — poll often enough to catch the hour window.
+  WEEKLY_DIGEST_INTERVAL_MS: z.coerce.number().default(300_000),
+  WEEKLY_DIGEST_HOUR: z.coerce.number().int().min(0).max(23).default(19),
 });
 
 const parsed = envSchema.safeParse(process.env);

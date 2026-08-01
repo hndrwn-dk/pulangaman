@@ -6,6 +6,7 @@ import { attachWebSocketServer } from './ws/server.js';
 import { startLocationPurgeJob } from './jobs/purgeLocations.js';
 import { startUsageTelemetryPurgeJob } from './jobs/purgeUsageTelemetry.js';
 import { startHomeByCheckJob } from './jobs/homeByCheck.js';
+import { startWeeklyDigestJob } from './jobs/weeklyDigest.js';
 
 initFirebase();
 
@@ -15,6 +16,7 @@ attachWebSocketServer(server);
 startLocationPurgeJob();
 startUsageTelemetryPurgeJob();
 startHomeByCheckJob();
+startWeeklyDigestJob();
 
 server.listen(config.PORT, () => {
   console.log(`PulangAman API listening on :${config.PORT}`);

@@ -79,6 +79,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   bool _empScreenOpen = false;
   /// Activations the child already stood down — ignore late WS/FCM/poll echoes.
   final Set<String> _empResolvedIds = {};
+  String? _streakCelebrationShownId;
+  bool _streakCelebrationInFlight = false;
 
   @override
   void initState() {
@@ -93,6 +95,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     Future.microtask(_pollTrip);
     Future.microtask(_pollEmergencyMeeting);
     Future.microtask(_pollEmpPoint);
+    Future.microtask(_checkPendingStreakCelebration);
     _panicStatusPoll = Timer.periodic(
       const Duration(seconds: 5),
       (_) => unawaited(_pollPanicStatus()),
@@ -129,6 +132,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       // (closing the native fullscreen also resumes the app).
       unawaited(_pollEmergencyMeeting());
       unawaited(_pollEmpPoint());
+      unawaited(_checkPendingStreakCelebration());
     }
   }
 
@@ -233,6 +237,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
             ? l10n.panicAckedByParent
             : l10n.panicResolvedSafe,
       ));
+      return;
+    }
+    if (event == 'streak:celebration' || event == 'reward:earned') {
+      if (event == 'streak:celebration') {
+        unawaited(_showStreakCelebrationFromPayload(payload));
+      } else {
+        unawaited(_loadRewards());
+      }
     }
   }
 
@@ -1030,6 +1042,89 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     } catch (_) {}
   }
 
+  Future<void> _checkPendingStreakCelebration() async {
+    final userId = ref.read(authControllerProvider).userId;
+    if (userId == null) return;
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/rewards/$userId/streak-celebration/pending');
+      final celebration = data['celebration'];
+      if (celebration is Map<String, dynamic>) {
+        await _presentStreakCelebration(celebration);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _showStreakCelebrationFromPayload(
+    Map<String, dynamic> payload,
+  ) async {
+    final celebration = <String, dynamic>{
+      'id': payload['celebrationId'] ?? payload['id'],
+      'milestoneDays': payload['milestoneDays'],
+      'pointsAwarded': payload['pointsAwarded'],
+      'accent': payload['accent'],
+      'titleId': payload['titleId'],
+      'bodyId': payload['bodyId'],
+      'titleEn': payload['titleEn'],
+      'bodyEn': payload['bodyEn'],
+    };
+    await _presentStreakCelebration(celebration);
+    unawaited(_loadRewards());
+  }
+
+  Future<void> _presentStreakCelebration(Map<String, dynamic> celebration) async {
+    if (!mounted || _streakCelebrationInFlight) return;
+    final id = celebration['id'] as String?;
+    if (id == null || id == _streakCelebrationShownId) return;
+    // Don't stack on an active EMP full-screen moment.
+    if (_empActive != null || _empScreenOpen) return;
+
+    final days = (celebration['milestoneDays'] as num?)?.toInt() ?? 0;
+    final points = (celebration['pointsAwarded'] as num?)?.toInt() ?? 0;
+    if (days <= 0) return;
+
+    final locale = ref.read(localeControllerProvider).languageCode;
+    final isEn = locale == 'en';
+    final l10n = AppLocalizations.of(context);
+    final title = (isEn
+            ? celebration['titleEn'] as String?
+            : celebration['titleId'] as String?) ??
+        l10n.streakCelebrationTitle(days);
+    final body = (isEn
+            ? celebration['bodyEn'] as String?
+            : celebration['bodyId'] as String?) ??
+        l10n.streakCelebrationBody(days, points);
+
+    final mood = switch (days) {
+      30 || 14 => 'streak_medal',
+      7 => 'streak_trophy',
+      _ => 'streak_star',
+    };
+    final accent = (celebration['accent'] as String?) == 'gold' ? 'gold' : 'routine';
+
+    _streakCelebrationInFlight = true;
+    _streakCelebrationShownId = id;
+    try {
+      await _reminderChannel.previewNow(
+        title: title,
+        body: body,
+        style: 'fullscreen',
+        visualRefresh: true,
+        mood: mood,
+        accent: accent,
+      );
+      await ref.read(apiClientProvider).post(
+            '/api/v1/rewards/${ref.read(authControllerProvider).userId}/streak-celebration/$id/ack',
+          );
+      unawaited(_loadRewards());
+    } catch (_) {
+      _streakCelebrationShownId = null;
+    } finally {
+      _streakCelebrationInFlight = false;
+    }
+  }
+
   Future<void> _startTracking() async {
     final permission = await Geolocator.requestPermission();
     if (permission == LocationPermission.denied ||
@@ -1172,10 +1267,14 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
         'usageAccessGranted': _usageAccess,
         'accessibilityEnabled': _accessibility,
       });
-      await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
+      final result = await ref.read(apiClientProvider).post('/api/v1/telemetry/batch', body: {
         'installationId': installationId,
         'events': events,
       });
+      final celebration = result['streakCelebration'];
+      if (celebration is Map<String, dynamic>) {
+        unawaited(_presentStreakCelebration(celebration));
+      }
       return true;
     } catch (_) {
       return false;

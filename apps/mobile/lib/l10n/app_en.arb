@@ -491,6 +491,28 @@
   "totalPointsForChild": "{name}'s Total Points",
   "noStreakYet": "No daily streak yet",
   "streakDaysLabel": "{streak}-day streak going strong",
+  "streakCelebrationTitle": "{days}-Day Streak!",
+  "@streakCelebrationTitle": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "streakCelebrationBody": "You've kept your screen time on target for {days} days. Nice work! +{points} points",
+  "@streakCelebrationBody": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "points": {
+        "type": "int"
+      }
+    }
+  },
+  "weeklyDigestBannerTitle": "This week's summary",
+  "weeklyDigestBannerAction": "View details",
+  "weeklyDigestBannerDismiss": "Dismiss",
   "earnExampleHint": "Example: arriving at school +10 points",
   "weeklyStreakTitle": "This Week's Streak",
   "screenTimeMonitorSubtitle": "Monitor daily usage",

@@ -23,7 +23,7 @@ class ReminderHeroView @JvmOverloads constructor(
     attrs: AttributeSet? = null,
 ) : View(context, attrs) {
 
-    enum class Mood { SLEEP, STUDY, EMP, DEFAULT }
+    enum class Mood { SLEEP, STUDY, EMP, DEFAULT, STREAK_STAR, STREAK_TROPHY, STREAK_MEDAL }
 
     var mood: Mood = Mood.DEFAULT
         set(value) {
@@ -78,6 +78,9 @@ class ReminderHeroView @JvmOverloads constructor(
             Mood.SLEEP -> drawSleep(canvas, cx, cy, r)
             Mood.STUDY -> drawStudy(canvas, cx, cy, r)
             Mood.EMP -> drawEmp(canvas, cx, cy, r)
+            Mood.STREAK_STAR -> drawStreakStar(canvas, cx, cy, r)
+            Mood.STREAK_TROPHY -> drawStreakTrophy(canvas, cx, cy, r, withRibbon = false)
+            Mood.STREAK_MEDAL -> drawStreakTrophy(canvas, cx, cy, r, withRibbon = true)
             Mood.DEFAULT -> drawDefault(canvas, cx, cy, r)
         }
     }
@@ -205,6 +208,85 @@ class ReminderHeroView @JvmOverloads constructor(
             RectF(cx - r * 0.5f, cy + r * 0.58f, cx + r * 0.5f, cy + r * 0.92f),
             soft,
         )
+    }
+
+    private fun drawStreakStar(canvas: Canvas, cx: Float, cy: Float, r: Float) {
+        soft.color = if (visualRefresh) illustrationBg else 0x28FFFFFF
+        soft.alpha = if (visualRefresh) 220 else 40
+        canvas.drawCircle(cx, cy, r * 1.12f, soft)
+
+        star.color = momentAccent
+        drawStar(canvas, cx, cy, r * 0.42f)
+
+        star.color = 0xFFFFF4C8.toInt()
+        drawStar(canvas, cx + r * 0.72f, cy - r * 0.55f, r * 0.1f)
+        drawStar(canvas, cx - r * 0.7f, cy - r * 0.2f, r * 0.07f)
+        drawStar(canvas, cx + r * 0.55f, cy + r * 0.55f, r * 0.06f)
+        drawStar(canvas, cx - r * 0.5f, cy + r * 0.6f, r * 0.05f)
+    }
+
+    private fun drawStreakTrophy(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        r: Float,
+        withRibbon: Boolean,
+    ) {
+        soft.color = if (visualRefresh) illustrationBg else 0x28FFFFFF
+        soft.alpha = if (visualRefresh) 220 else 40
+        canvas.drawCircle(cx, cy, r * 1.12f, soft)
+
+        accent.color = momentAccent
+        // Cup body
+        canvas.drawRoundRect(
+            RectF(cx - r * 0.32f, cy - r * 0.35f, cx + r * 0.32f, cy + r * 0.2f),
+            r * 0.08f,
+            r * 0.08f,
+            accent,
+        )
+        // Stem + base
+        canvas.drawRect(cx - r * 0.08f, cy + r * 0.18f, cx + r * 0.08f, cy + r * 0.42f, accent)
+        canvas.drawRoundRect(
+            RectF(cx - r * 0.28f, cy + r * 0.4f, cx + r * 0.28f, cy + r * 0.55f),
+            r * 0.06f,
+            r * 0.06f,
+            accent,
+        )
+        // Handles
+        stroke.color = momentAccent
+        stroke.strokeWidth = r * 0.07f
+        stroke.strokeCap = Paint.Cap.ROUND
+        canvas.drawArc(
+            RectF(cx - r * 0.55f, cy - r * 0.28f, cx - r * 0.18f, cy + r * 0.12f),
+            90f,
+            180f,
+            false,
+            stroke,
+        )
+        canvas.drawArc(
+            RectF(cx + r * 0.18f, cy - r * 0.28f, cx + r * 0.55f, cy + r * 0.12f),
+            -90f,
+            180f,
+            false,
+            stroke,
+        )
+
+        if (withRibbon) {
+            soft.color = 0xFFFFF4C8.toInt()
+            path.reset()
+            path.moveTo(cx - r * 0.2f, cy - r * 0.55f)
+            path.lineTo(cx, cy - r * 0.35f)
+            path.lineTo(cx + r * 0.2f, cy - r * 0.55f)
+            path.lineTo(cx + r * 0.12f, cy - r * 0.22f)
+            path.lineTo(cx - r * 0.12f, cy - r * 0.22f)
+            path.close()
+            canvas.drawPath(path, soft)
+            // Medal disc overlay for 30-day
+            accent.color = momentAccent
+            canvas.drawCircle(cx, cy - r * 0.05f, r * 0.18f, accent)
+            disc.color = canvasBg
+            canvas.drawCircle(cx, cy - r * 0.05f, r * 0.08f, disc)
+        }
     }
 
     private fun drawStar(canvas: Canvas, x: Float, y: Float, size: Float) {

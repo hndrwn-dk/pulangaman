@@ -54,8 +54,11 @@ class ReminderFullScreenActivity : ComponentActivity() {
         val body = intent.getStringExtra(ReminderReceiver.EXTRA_BODY) ?: ""
         val visualRefresh = intent.getBooleanExtra(EXTRA_VISUAL_REFRESH, VisualRefreshPrefs.isEnabled(this))
         val english = AppLocalePrefs.isEnglish(this)
-        val mood = moodFor(title, body)
-        val accent = accentFor(mood, visualRefresh)
+        val moodOverride = intent.getStringExtra(EXTRA_MOOD)
+        val accentOverride = intent.getStringExtra(EXTRA_ACCENT)
+        val mood = moodFromOverride(moodOverride) ?: moodFor(title, body)
+        val accent = accentFromOverride(accentOverride, visualRefresh)
+            ?: accentFor(mood, visualRefresh)
         val bg = if (visualRefresh) BG_VR else BG_CLASSIC
 
         val root = FrameLayout(this).apply {
@@ -191,6 +194,28 @@ class ReminderFullScreenActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    private fun moodFromOverride(raw: String?): ReminderHeroView.Mood? {
+        return when (raw?.lowercase()) {
+            "sleep" -> ReminderHeroView.Mood.SLEEP
+            "study" -> ReminderHeroView.Mood.STUDY
+            "emp" -> ReminderHeroView.Mood.EMP
+            "streak", "streak_star" -> ReminderHeroView.Mood.STREAK_STAR
+            "streak_trophy" -> ReminderHeroView.Mood.STREAK_TROPHY
+            "streak_medal" -> ReminderHeroView.Mood.STREAK_MEDAL
+            "default" -> ReminderHeroView.Mood.DEFAULT
+            else -> null
+        }
+    }
+
+    private fun accentFromOverride(raw: String?, visualRefresh: Boolean): Int? {
+        if (!visualRefresh || raw.isNullOrBlank()) return null
+        return when (raw.lowercase()) {
+            "routine", "green" -> ACCENT_STREAK_ROUTINE
+            "gold" -> ACCENT_STREAK_GOLD
+            else -> null
+        }
+    }
+
     private fun moodFor(title: String, body: String): ReminderHeroView.Mood {
         val t = "$title $body".lowercase()
         return when {
@@ -204,6 +229,18 @@ class ReminderFullScreenActivity : ComponentActivity() {
                 ReminderHeroView.Mood.SLEEP
             listOf("belajar", "study", "baca", "pekerjaan rumah", "pr ").any { t.contains(it) } ->
                 ReminderHeroView.Mood.STUDY
+            listOf(
+                "hari berturut",
+                "day streak",
+                "-day streak",
+                "streak",
+            ).any { t.contains(it) } -> {
+                when {
+                    listOf("30", "14").any { t.contains(it) } -> ReminderHeroView.Mood.STREAK_MEDAL
+                    t.contains("7") || t.contains("trophy") -> ReminderHeroView.Mood.STREAK_TROPHY
+                    else -> ReminderHeroView.Mood.STREAK_STAR
+                }
+            }
             else -> ReminderHeroView.Mood.DEFAULT
         }
     }
@@ -214,6 +251,10 @@ class ReminderFullScreenActivity : ComponentActivity() {
             ReminderHeroView.Mood.SLEEP -> ACCENT_SLEEP
             ReminderHeroView.Mood.STUDY -> ACCENT_STUDY
             ReminderHeroView.Mood.EMP -> ACCENT_EMP
+            ReminderHeroView.Mood.STREAK_STAR -> ACCENT_STREAK_ROUTINE
+            ReminderHeroView.Mood.STREAK_TROPHY,
+            ReminderHeroView.Mood.STREAK_MEDAL,
+            -> ACCENT_STREAK_GOLD
             ReminderHeroView.Mood.DEFAULT -> ACCENT_CUSTOM
         }
     }
@@ -243,6 +284,8 @@ class ReminderFullScreenActivity : ComponentActivity() {
     companion object {
         const val ACTION_DISMISS = "com.tursinalabs.pulangaman.DISMISS_FULLSCREEN_ALERT"
         const val EXTRA_VISUAL_REFRESH = "visual_refresh"
+        const val EXTRA_MOOD = "mood"
+        const val EXTRA_ACCENT = "accent"
         private const val BG_CLASSIC = 0xFF0B2E28.toInt()
         private const val BG_VR = 0xFF16362C.toInt()
         private const val ILLUSTRATION_BG = 0xFF2C4C41.toInt()
@@ -253,5 +296,9 @@ class ReminderFullScreenActivity : ComponentActivity() {
         private const val ACCENT_STUDY = 0xFF4A9F6C.toInt()
         private const val ACCENT_CUSTOM = 0xFF7C9A8B.toInt()
         private const val ACCENT_EMP = 0xFFD6875C.toInt()
+        /** Accent-tint green — routine-positive tier (3-day streak). */
+        private const val ACCENT_STREAK_ROUTINE = 0xFF4A9F6C.toInt()
+        /** Warm celebratory gold (7 / 14 / 30-day streak). */
+        private const val ACCENT_STREAK_GOLD = 0xFFE8B94D.toInt()
     }
 }

@@ -1467,6 +1467,25 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String streakCelebrationTitle(int days) {
+    return '$days Hari Berturut-turut!';
+  }
+
+  @override
+  String streakCelebrationBody(int days, int points) {
+    return 'Kamu jaga waktu layar sesuai target selama $days hari. Mantap! +$points poin';
+  }
+
+  @override
+  String get weeklyDigestBannerTitle => 'Ringkasan minggu ini';
+
+  @override
+  String get weeklyDigestBannerAction => 'Lihat detail';
+
+  @override
+  String get weeklyDigestBannerDismiss => 'Tutup';
+
+  @override
   String get earnExampleHint => 'Contoh: tiba di sekolah +10 poin';
 
   @override

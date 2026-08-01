@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { checkAndCelebrateStreak } from '../services/streakCelebration.js';
 
 export const telemetryRouter = Router();
 telemetryRouter.use(requireAuth, rateLimit);
@@ -92,7 +93,34 @@ telemetryRouter.post('/batch', async (req: AuthedRequest, res, next) => {
       `UPDATE child_devices SET last_seen_at = now() WHERE id = $1`,
       [device.rows[0].id],
     );
-    res.status(202).json({ accepted, received: body.events.length });
+
+    // Under-limit streak milestones — fire after usage lands (idempotent).
+    let streakCelebration: Awaited<ReturnType<typeof checkAndCelebrateStreak>> =
+      null;
+    if (accepted > 0) {
+      try {
+        streakCelebration = await checkAndCelebrateStreak(childId);
+      } catch (err) {
+        console.error('streak_celebration_check_failed', childId, err);
+      }
+    }
+
+    res.status(202).json({
+      accepted,
+      received: body.events.length,
+      streakCelebration: streakCelebration
+        ? {
+            id: streakCelebration.id,
+            milestoneDays: streakCelebration.milestoneDays,
+            pointsAwarded: streakCelebration.pointsAwarded,
+            accent: streakCelebration.accent,
+            titleId: streakCelebration.titleId,
+            bodyId: streakCelebration.bodyId,
+            titleEn: streakCelebration.titleEn,
+            bodyEn: streakCelebration.bodyEn,
+          }
+        : null,
+    });
   } catch (error) {
     next(error);
   }
