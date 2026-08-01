@@ -224,7 +224,9 @@ BoxDecoration _hubCardDecoration(bool refresh) {
 
 /// Hub Wali Terpercaya (dari tab Lainnya).
 class GuardiansEntryScreen extends ConsumerStatefulWidget {
-  const GuardiansEntryScreen({super.key});
+  const GuardiansEntryScreen({super.key, this.readOnly = false});
+
+  final bool readOnly;
 
   @override
   ConsumerState<GuardiansEntryScreen> createState() =>
@@ -335,7 +337,12 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
 
   Future<void> _openChild(ChildSummary child) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GuardiansScreen(child: child)),
+      MaterialPageRoute(
+        builder: (_) => GuardiansScreen(
+          child: child,
+          readOnly: widget.readOnly,
+        ),
+      ),
     );
     await _loadAll();
   }
@@ -1020,25 +1027,26 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: FilledButton.icon(
-                              onPressed: () => _createInviteCode(),
-                              icon: const Icon(Icons.qr_code_2_rounded),
-                              label: Text(l10n.createGuardianInviteCode),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: refresh
-                                    ? VisualRefreshColors.anchor
-                                    : AppColors.teal,
-                                foregroundColor: refresh
-                                    ? VisualRefreshColors.background
-                                    : Colors.white,
-                                elevation: 0,
-                                shape: const StadiumBorder(),
+                          if (!widget.readOnly)
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: FilledButton.icon(
+                                onPressed: () => _createInviteCode(),
+                                icon: const Icon(Icons.qr_code_2_rounded),
+                                label: Text(l10n.createGuardianInviteCode),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: refresh
+                                      ? VisualRefreshColors.anchor
+                                      : AppColors.teal,
+                                  foregroundColor: refresh
+                                      ? VisualRefreshColors.background
+                                      : Colors.white,
+                                  elevation: 0,
+                                  shape: const StadiumBorder(),
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -1228,9 +1236,14 @@ class _ChildAccessRow extends StatelessWidget {
 
 /// Detail wali untuk satu anak.
 class GuardiansScreen extends ConsumerStatefulWidget {
-  const GuardiansScreen({super.key, required this.child});
+  const GuardiansScreen({
+    super.key,
+    required this.child,
+    this.readOnly = false,
+  });
 
   final ChildSummary child;
+  final bool readOnly;
 
   @override
   ConsumerState<GuardiansScreen> createState() => _GuardiansScreenState();
@@ -1510,7 +1523,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
     return Scaffold(
       backgroundColor:
           refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
-      floatingActionButton: refresh
+      floatingActionButton: (refresh || widget.readOnly)
           ? null
           : FloatingActionButton.extended(
               onPressed: _invite,
@@ -1540,9 +1553,10 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                       ? PaVrEmptyState(
                           icon: Icons.person_add_alt_1_rounded,
                           message: l10n.noGuardiansForChild,
-                          actionLabel: l10n.inviteGuardian,
+                          actionLabel:
+                              widget.readOnly ? null : l10n.inviteGuardian,
                           actionIcon: Icons.person_add_alt_1_rounded,
-                          onAction: _invite,
+                          onAction: widget.readOnly ? null : _invite,
                         )
                       : RefreshIndicator(
                           color: refresh
@@ -1655,41 +1669,43 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
                                               ],
                                             ),
                                           ),
-                                          IconButton(
-                                            tooltip: l10n.changeAccessLevel,
-                                            icon: Icon(
-                                              coParent
-                                                  ? Icons.arrow_downward
-                                                  : Icons.arrow_upward,
-                                              color: refresh
-                                                  ? VisualRefreshColors.accent
-                                                  : AppColors.tealDeep,
+                                          if (!widget.readOnly) ...[
+                                            IconButton(
+                                              tooltip: l10n.changeAccessLevel,
+                                              icon: Icon(
+                                                coParent
+                                                    ? Icons.arrow_downward
+                                                    : Icons.arrow_upward,
+                                                color: refresh
+                                                    ? VisualRefreshColors.accent
+                                                    : AppColors.tealDeep,
+                                              ),
+                                              onPressed: () => _setAccessLevel(
+                                                guardianId: guardianId,
+                                                name: name,
+                                                nextLevel: coParent
+                                                    ? 'view'
+                                                    : 'co_parent',
+                                              ),
                                             ),
-                                            onPressed: () => _setAccessLevel(
-                                              guardianId: guardianId,
-                                              name: name,
-                                              nextLevel: coParent
-                                                  ? 'view'
-                                                  : 'co_parent',
+                                            IconButton(
+                                              tooltip: l10n.revokeAccessTooltip,
+                                              icon: Icon(
+                                                Icons.block,
+                                                color: refresh
+                                                    ? VisualRefreshColors.danger
+                                                    : AppColors.danger,
+                                              ),
+                                              onPressed: () =>
+                                                  _revoke(guardianId),
                                             ),
-                                          ),
-                                          IconButton(
-                                            tooltip: l10n.revokeAccessTooltip,
-                                            icon: Icon(
-                                              Icons.block,
-                                              color: refresh
-                                                  ? VisualRefreshColors.danger
-                                                  : AppColors.danger,
-                                            ),
-                                            onPressed: () =>
-                                                _revoke(guardianId),
-                                          ),
+                                          ],
                                         ],
                                       ),
                                     ),
                                   );
                                 }),
-                                if (refresh) ...[
+                                if (refresh && !widget.readOnly) ...[
                                   const SizedBox(height: 12),
                                   SizedBox(
                                     width: double.infinity,

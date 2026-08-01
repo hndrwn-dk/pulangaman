@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { canManageChildFeatures } from '../middleware/roles.js';
+import { canManageChildFeatures, canViewChild } from '../middleware/roles.js';
 import { applyAckForChild } from '../services/homeByService.js';
 import { jakartaDateString } from '../services/homeByLogic.js';
 
@@ -97,7 +97,7 @@ homeByRouter.get('/:childId', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -210,9 +210,9 @@ homeByRouter.get('/:childId/today', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    const isParent = await canManageChildFeatures(userId, childId);
+    const canView = await canViewChild(userId, childId);
     const isSelf = userId === childId && (await assertIsChild(userId));
-    if (!isParent && !isSelf) {
+    if (!canView && !isSelf) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -250,7 +250,7 @@ homeByRouter.get('/:childId/skip-dates', async (req: AuthedRequest, res, next) =
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }

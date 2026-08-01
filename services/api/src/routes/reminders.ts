@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { canManageChildFeatures } from '../middleware/roles.js';
+import { canManageChildFeatures, canViewChild } from '../middleware/roles.js';
 import { sendFcmToUser } from '../services/fcm.js';
 import { broadcastToRoom, childRoom } from '../ws/server.js';
 
@@ -112,7 +112,7 @@ remindersRouter.get('/:childId', async (req: AuthedRequest, res, next) => {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }

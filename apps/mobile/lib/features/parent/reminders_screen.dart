@@ -89,6 +89,7 @@ class RemindersScreen extends ConsumerStatefulWidget {
     super.key,
     this.initialChildId,
     this.lockChild = false,
+    this.readOnly = false,
     this.prefillTitle,
     this.prefillBody,
     this.prefillHour,
@@ -101,6 +102,9 @@ class RemindersScreen extends ConsumerStatefulWidget {
 
   /// When true with [initialChildId], hide the child picker.
   final bool lockChild;
+
+  /// When true, hide create / edit / delete / toggle controls.
+  final bool readOnly;
 
   /// Optional draft values when opening the custom reminder sheet.
   final String? prefillTitle;
@@ -1137,50 +1141,52 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                         ),
                       ],
                       const SizedBox(height: 18),
-                      Text(l10n.sectionQuickAdd, style: sectionLabelStyle),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 44,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            _QuickChip(
-                              refresh: refresh,
-                              icon: Icons.menu_book_rounded,
-                              label: l10n.reminderStudyChipLabel,
-                              onTap: () => _createPreset(
-                                templateKey: ReminderTemplateKeys.study,
-                                title: l10n.reminderStudyPresetTitle,
-                                body: l10n.reminderStudyPresetBody,
-                                hour: ReminderTemplates.defaultHour(
-                                  ReminderTemplateKeys.study,
-                                ),
-                                minute: ReminderTemplates.defaultMinute(
-                                  ReminderTemplateKeys.study,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _QuickChip(
-                              refresh: refresh,
-                              icon: Icons.bedtime_rounded,
-                              label: l10n.reminderSleepChipLabel,
-                              onTap: () => _createPreset(
-                                templateKey: ReminderTemplateKeys.bedtime,
-                                title: l10n.reminderSleepPresetTitle,
-                                body: l10n.reminderSleepPresetBody,
-                                hour: ReminderTemplates.defaultHour(
-                                  ReminderTemplateKeys.bedtime,
-                                ),
-                                minute: ReminderTemplates.defaultMinute(
-                                  ReminderTemplateKeys.bedtime,
+                      if (!widget.readOnly) ...[
+                        Text(l10n.sectionQuickAdd, style: sectionLabelStyle),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 44,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              _QuickChip(
+                                refresh: refresh,
+                                icon: Icons.menu_book_rounded,
+                                label: l10n.reminderStudyChipLabel,
+                                onTap: () => _createPreset(
+                                  templateKey: ReminderTemplateKeys.study,
+                                  title: l10n.reminderStudyPresetTitle,
+                                  body: l10n.reminderStudyPresetBody,
+                                  hour: ReminderTemplates.defaultHour(
+                                    ReminderTemplateKeys.study,
+                                  ),
+                                  minute: ReminderTemplates.defaultMinute(
+                                    ReminderTemplateKeys.study,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              _QuickChip(
+                                refresh: refresh,
+                                icon: Icons.bedtime_rounded,
+                                label: l10n.reminderSleepChipLabel,
+                                onTap: () => _createPreset(
+                                  templateKey: ReminderTemplateKeys.bedtime,
+                                  title: l10n.reminderSleepPresetTitle,
+                                  body: l10n.reminderSleepPresetBody,
+                                  hour: ReminderTemplates.defaultHour(
+                                    ReminderTemplateKeys.bedtime,
+                                  ),
+                                  minute: ReminderTemplates.defaultMinute(
+                                    ReminderTemplateKeys.bedtime,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 22),
+                        const SizedBox(height: 22),
+                      ],
                       Row(
                         children: [
                           Expanded(
@@ -1198,28 +1204,29 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                                     ),
                             ),
                           ),
-                          TextButton(
-                            onPressed: _showCustomDialog,
-                            style: TextButton.styleFrom(
-                              foregroundColor: refresh
-                                  ? VisualRefreshColors.accent
-                                  : AppColors.teal,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
+                          if (!widget.readOnly)
+                            TextButton(
+                              onPressed: _showCustomDialog,
+                              style: TextButton.styleFrom(
+                                foregroundColor: refresh
+                                    ? VisualRefreshColors.accent
+                                    : AppColors.teal,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: Text(
-                              l10n.reminderAddShort,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontFamily: refresh
-                                    ? GoogleFonts.plusJakartaSans().fontFamily
-                                    : null,
+                              child: Text(
+                                l10n.reminderAddShort,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: refresh
+                                      ? GoogleFonts.plusJakartaSans().fontFamily
+                                      : null,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -1283,10 +1290,18 @@ class _RemindersScreenState extends ConsumerState<RemindersScreen> {
                               icon: _iconForReminder(item),
                               iconBg: _iconBgForReminder(item),
                               iconFg: _iconFgForReminder(item),
-                              onToggle: (v) => _toggleEnabled(item, v),
-                              onEdit: () =>
-                                  unawaited(_showCustomDialog(existing: item)),
-                              onDelete: () => unawaited(_delete(item)),
+                              readOnly: widget.readOnly,
+                              onToggle: widget.readOnly
+                                  ? null
+                                  : (v) => _toggleEnabled(item, v),
+                              onEdit: widget.readOnly
+                                  ? null
+                                  : () => unawaited(
+                                        _showCustomDialog(existing: item),
+                                      ),
+                              onDelete: widget.readOnly
+                                  ? null
+                                  : () => unawaited(_delete(item)),
                             ),
                           );
                         }),
@@ -1572,9 +1587,10 @@ class _ReminderCard extends StatelessWidget {
     required this.icon,
     required this.iconBg,
     required this.iconFg,
-    required this.onToggle,
-    required this.onEdit,
-    required this.onDelete,
+    this.onToggle,
+    this.onEdit,
+    this.onDelete,
+    this.readOnly = false,
     this.refresh = false,
   });
 
@@ -1585,9 +1601,10 @@ class _ReminderCard extends StatelessWidget {
   final IconData icon;
   final Color iconBg;
   final Color iconFg;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final ValueChanged<bool>? onToggle;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final bool readOnly;
   final bool refresh;
 
   @override
@@ -1670,53 +1687,55 @@ class _ReminderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
-            decoration: BoxDecoration(
-              color: refresh
-                  ? VisualRefreshColors.warmTint
-                  : const Color(0xFFF3F5F7),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                _CardAction(
-                  refresh: refresh,
-                  icon: Icons.edit_outlined,
-                  label: l10n.editAction,
-                  onTap: onEdit,
-                ),
-                Container(
-                  width: 1,
-                  height: 22,
-                  color: refresh
-                      ? VisualRefreshColors.border
-                      : const Color(0xFFE2E6EA),
-                ),
-                _CardAction(
-                  refresh: refresh,
-                  icon: Icons.delete_outline_rounded,
-                  label: l10n.delete,
-                  onTap: onDelete,
-                  danger: true,
-                ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Switch.adaptive(
-                    value: item.enabled,
-                    activeThumbColor: Colors.white,
-                    activeTrackColor: refresh
-                        ? VisualRefreshColors.accent
-                        : AppColors.teal,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    onChanged: onToggle,
+          if (!readOnly) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+              decoration: BoxDecoration(
+                color: refresh
+                    ? VisualRefreshColors.warmTint
+                    : const Color(0xFFF3F5F7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  _CardAction(
+                    refresh: refresh,
+                    icon: Icons.edit_outlined,
+                    label: l10n.editAction,
+                    onTap: onEdit ?? () {},
                   ),
-                ),
-              ],
+                  Container(
+                    width: 1,
+                    height: 22,
+                    color: refresh
+                        ? VisualRefreshColors.border
+                        : const Color(0xFFE2E6EA),
+                  ),
+                  _CardAction(
+                    refresh: refresh,
+                    icon: Icons.delete_outline_rounded,
+                    label: l10n.delete,
+                    onTap: onDelete ?? () {},
+                    danger: true,
+                  ),
+                  const Spacer(),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Switch.adaptive(
+                      value: item.enabled,
+                      activeThumbColor: Colors.white,
+                      activeTrackColor: refresh
+                          ? VisualRefreshColors.accent
+                          : AppColors.teal,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: onToggle,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

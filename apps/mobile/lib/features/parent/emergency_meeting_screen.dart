@@ -15,9 +15,14 @@ import 'children_controller.dart';
 import 'zones_screen.dart';
 
 class EmergencyMeetingScreen extends ConsumerStatefulWidget {
-  const EmergencyMeetingScreen({super.key, this.lockedChild});
+  const EmergencyMeetingScreen({
+    super.key,
+    this.lockedChild,
+    this.readOnly = false,
+  });
 
   final ChildSummary? lockedChild;
+  final bool readOnly;
 
   @override
   ConsumerState<EmergencyMeetingScreen> createState() =>
@@ -675,20 +680,32 @@ class _EmergencyMeetingScreenState
                               const SizedBox(height: 12),
                             ],
                             if (_primary == null)
-                              _EmptyCard(
-                                childName:
-                                    showChips ? (selectedName ?? '') : null,
-                                onAdd: () => unawaited(_pickAndSavePrimary()),
-                              )
+                              widget.readOnly
+                                  ? _EmptyCard(
+                                      childName: showChips
+                                          ? (selectedName ?? '')
+                                          : null,
+                                      onAdd: null,
+                                    )
+                                  : _EmptyCard(
+                                      childName: showChips
+                                          ? (selectedName ?? '')
+                                          : null,
+                                      onAdd: () =>
+                                          unawaited(_pickAndSavePrimary()),
+                                    )
                             else
                               _PrimaryCard(
                                 point: _primary!,
                                 mapPosition: _pointLatLng(),
                                 childName: selectedName ?? '',
                                 distanceLabel: distanceLabel,
-                                onEdit: () =>
-                                    unawaited(_pickAndSavePrimary()),
-                                onDelete: () => unawaited(_deletePrimary()),
+                                onEdit: widget.readOnly
+                                    ? null
+                                    : () => unawaited(_pickAndSavePrimary()),
+                                onDelete: widget.readOnly
+                                    ? null
+                                    : () => unawaited(_deletePrimary()),
                               ),
                             if (_activation != null) ...[
                               const SizedBox(height: 16),
@@ -696,10 +713,14 @@ class _EmergencyMeetingScreenState
                                 activation: _activation!,
                                 busy: _deactivating,
                                 onRefresh: () => unawaited(_pollActivation()),
-                                onDeactivate: () => unawaited(_deactivate()),
+                                onDeactivate: widget.readOnly
+                                    ? null
+                                    : () => unawaited(_deactivate()),
                               ),
                             ],
-                            if (showActivate && _activation == null) ...[
+                            if (!widget.readOnly &&
+                                showActivate &&
+                                _activation == null) ...[
                               const SizedBox(height: 20),
                               Divider(
                                 height: 1,
@@ -1046,7 +1067,7 @@ class _ActiveActivationCard extends StatelessWidget {
   final Map<String, dynamic> activation;
   final bool busy;
   final VoidCallback onRefresh;
-  final VoidCallback onDeactivate;
+  final VoidCallback? onDeactivate;
 
   static String _clock(String? iso) {
     final at = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
@@ -1167,34 +1188,35 @@ class _ActiveActivationCard extends StatelessWidget {
             _ChildProgressRow(child: children[i]),
           ],
           const SizedBox(height: 12),
-          FilledButton.icon(
-            key: const Key('emp_deactivate_button'),
-            onPressed: busy ? null : onDeactivate,
-            style: FilledButton.styleFrom(
-              backgroundColor: refresh
-                  ? VisualRefreshColors.anchor
-                  : AppColors.tealDeep,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: refresh
-                  ? const StadiumBorder()
-                  : RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-            ),
-            icon: const Icon(Icons.check_circle_outline, size: 18),
-            label: Text(
-              busy ? '...' : l10n.empDeactivate,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14.5,
-                fontFamily: refresh
-                    ? GoogleFonts.plusJakartaSans().fontFamily
-                    : null,
+          if (onDeactivate != null)
+            FilledButton.icon(
+              key: const Key('emp_deactivate_button'),
+              onPressed: busy ? null : onDeactivate,
+              style: FilledButton.styleFrom(
+                backgroundColor: refresh
+                    ? VisualRefreshColors.anchor
+                    : AppColors.tealDeep,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: refresh
+                    ? const StadiumBorder()
+                    : RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+              ),
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: Text(
+                busy ? '...' : l10n.empDeactivate,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.5,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1598,11 +1620,11 @@ class _EmpSaveDialogState extends State<_EmpSaveDialog> {
 }
 
 class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.onAdd, this.childName});
+  const _EmptyCard({this.onAdd, this.childName});
 
   /// When null, shows the generic empty copy (first-time setup, no chips yet).
   final String? childName;
-  final VoidCallback onAdd;
+  final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) {
@@ -1616,7 +1638,7 @@ class _EmptyCard extends StatelessWidget {
       return PaVrEmptyState(
         icon: Icons.place_outlined,
         message: emptyText,
-        actionLabel: l10n.empAdd,
+        actionLabel: onAdd == null ? null : l10n.empAdd,
         actionIcon: Icons.add_rounded,
         onAction: onAdd,
       );
@@ -1648,11 +1670,13 @@ class _EmptyCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: 14),
-          FilledButton(
-            onPressed: onAdd,
-            child: Text(l10n.empAdd),
-          ),
+          if (onAdd != null) ...[
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: onAdd,
+              child: Text(l10n.empAdd),
+            ),
+          ],
         ],
       ),
     );
@@ -1663,8 +1687,8 @@ class _PrimaryCard extends StatelessWidget {
   const _PrimaryCard({
     required this.point,
     required this.childName,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
     this.mapPosition,
     this.distanceLabel,
   });
@@ -1673,8 +1697,8 @@ class _PrimaryCard extends StatelessWidget {
   final String childName;
   final LatLng? mapPosition;
   final String? distanceLabel;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   static bool get _inWidgetTest =>
       Platform.environment.containsKey('FLUTTER_TEST');
@@ -1824,61 +1848,65 @@ class _PrimaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: Text(l10n.empEdit),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: refresh
-                        ? VisualRefreshColors.textPrimary
-                        : AppColors.ink,
-                    side: BorderSide(
-                      color: refresh
-                          ? VisualRefreshColors.border
-                          : const Color(0xFFD5DBE0),
-                      width: refresh ? 0.5 : 1,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        refresh ? 999 : 12,
+          if (onEdit != null || onDelete != null)
+            Row(
+              children: [
+                if (onEdit != null)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: Text(l10n.empEdit),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: refresh
+                            ? VisualRefreshColors.textPrimary
+                            : AppColors.ink,
+                        side: BorderSide(
+                          color: refresh
+                              ? VisualRefreshColors.border
+                              : const Color(0xFFD5DBE0),
+                          width: refresh ? 0.5 : 1,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            refresh ? 999 : 12,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                key: const Key('emp_delete_button'),
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline, size: 18),
-                label: Text(l10n.empDelete),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: refresh
-                      ? VisualRefreshColors.danger
-                      : AppColors.danger,
-                  side: BorderSide(
-                    color: refresh
-                        ? VisualRefreshColors.danger.withValues(alpha: 0.45)
-                        : AppColors.danger.withValues(alpha: 0.45),
-                    width: refresh ? 0.5 : 1,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(
-                      refresh ? 999 : 12,
+                if (onEdit != null && onDelete != null)
+                  const SizedBox(width: 10),
+                if (onDelete != null)
+                  OutlinedButton.icon(
+                    key: const Key('emp_delete_button'),
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: Text(l10n.empDelete),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: refresh
+                          ? VisualRefreshColors.danger
+                          : AppColors.danger,
+                      side: BorderSide(
+                        color: refresh
+                            ? VisualRefreshColors.danger.withValues(alpha: 0.45)
+                            : AppColors.danger.withValues(alpha: 0.45),
+                        width: refresh ? 0.5 : 1,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          refresh ? 999 : 12,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

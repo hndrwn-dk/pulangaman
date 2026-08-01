@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { canManageChildFeatures } from '../middleware/roles.js';
+import { canManageChildFeatures, canViewChild } from '../middleware/roles.js';
 
 export const zonesRouter = Router();
 
@@ -75,7 +75,7 @@ zonesRouter.get('/', async (req: AuthedRequest, res, next) => {
     if (typeof req.query.childId === 'string' && req.query.childId.length > 0) {
       childId = z.string().uuid().parse(req.query.childId);
       if (childId !== userId) {
-        if (!(await canManageChildFeatures(userId, childId))) {
+        if (!(await canViewChild(userId, childId))) {
           res.status(404).json({ error: 'child_not_found' });
           return;
         }

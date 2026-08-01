@@ -7,7 +7,8 @@ import { config } from '../config.js';
 import { guardianPresenceKey, getRedis } from '../redis/client.js';
 import {
   canManageChildFeatures,
-  listFeatureManagedChildren,
+  canViewChild,
+  listViewableChildren,
   type GuardianAccessLevel,
 } from '../middleware/roles.js';
 
@@ -350,7 +351,7 @@ guardiansRouter.get('/', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -377,7 +378,7 @@ guardiansRouter.get('/', async (req: AuthedRequest, res, next) => {
   }
 });
 
-/** Children this user can manage as primary parent or co_parent (feature screens). */
+/** Children this user can view as primary parent or any active guardian. */
 guardiansRouter.get('/children', async (req: AuthedRequest, res, next) => {
   try {
     const userId = req.auth?.userId;
@@ -386,8 +387,19 @@ guardiansRouter.get('/children', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    const children = await listFeatureManagedChildren(userId);
-    res.json({ children });
+    const children = await listViewableChildren(userId);
+    res.json({
+      children: children.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        grade: c.grade,
+        commute_status: c.commute_status,
+        last_seen_at: c.last_seen_at,
+        access: c.access,
+        accessLevel: c.accessLevel,
+      })),
+    });
   } catch (error) {
     next(error);
   }

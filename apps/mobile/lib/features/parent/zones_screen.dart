@@ -44,11 +44,22 @@ class PlaceHit {
 
 /// Tab Zona: hub Zona Aman (bottom nav tetap di ParentShell).
 class PlacesEntryScreen extends ConsumerWidget {
-  const PlacesEntryScreen({super.key});
+  const PlacesEntryScreen({
+    super.key,
+    this.lockedChild,
+    this.readOnly = false,
+  });
+
+  final ChildSummary? lockedChild;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return const PlacesHubScreen();
+    return PlacesHubScreen(
+      lockedChild: lockedChild,
+      readOnly: readOnly,
+      showBack: lockedChild != null || readOnly,
+    );
   }
 }
 
@@ -69,10 +80,12 @@ class PlacesHubScreen extends ConsumerStatefulWidget {
     super.key,
     this.lockedChild,
     this.showBack = false,
+    this.readOnly = false,
   });
 
   final ChildSummary? lockedChild;
   final bool showBack;
+  final bool readOnly;
 
   @override
   ConsumerState<PlacesHubScreen> createState() => _PlacesHubScreenState();
@@ -1074,29 +1087,30 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                         style: sectionTitleStyle,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () =>
-                          setState(() => _editMode = !_editMode),
-                      style: TextButton.styleFrom(
-                        foregroundColor: refresh
-                            ? VisualRefreshColors.accent
-                            : AppColors.teal,
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(
-                        _editMode ? l10n.doneAction : l10n.editChevron,
-                        style: TextStyle(
-                          fontWeight: refresh
-                              ? FontWeight.w600
-                              : FontWeight.w800,
-                          fontFamily: refresh
-                              ? GoogleFonts.plusJakartaSans().fontFamily
-                              : null,
+                    if (!widget.readOnly)
+                      TextButton(
+                        onPressed: () =>
+                            setState(() => _editMode = !_editMode),
+                        style: TextButton.styleFrom(
+                          foregroundColor: refresh
+                              ? VisualRefreshColors.accent
+                              : AppColors.teal,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          _editMode ? l10n.doneAction : l10n.editChevron,
+                          style: TextStyle(
+                            fontWeight: refresh
+                                ? FontWeight.w600
+                                : FontWeight.w800,
+                            fontFamily: refresh
+                                ? GoogleFonts.plusJakartaSans().fontFamily
+                                : null,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -1133,20 +1147,22 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                           title: _displayTitle(z, l10n),
                           subtitle: _displaySubtitle(z, l10n),
                           type: type,
-                          editMode: _editMode,
+                          editMode: !widget.readOnly && _editMode,
                           onTap: () {
+                            if (widget.readOnly) return;
                             if (_editMode) {
                               _deleteZone(z);
                             } else if (type == 'home' || type == 'school') {
                               _addBySearch(type);
                             }
                           },
-                          onDelete:
-                              _editMode ? () => _deleteZone(z) : null,
+                          onDelete: (!widget.readOnly && _editMode)
+                              ? () => _deleteZone(z)
+                              : null,
                         ),
                       );
                     }),
-                    if (!_editMode)
+                    if (!widget.readOnly && !_editMode)
                       ...missingSlots.map((slot) {
                         final isHome = slot == 'home';
                         return Padding(
@@ -1186,12 +1202,15 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       progress:
                           (_trip!['progress'] as num?)?.toDouble() ?? 0,
                       status: _trip!['status'] as String?,
-                      onStart: _trip!['status'] == 'planned'
+                      onStart: (!widget.readOnly &&
+                              _trip!['status'] == 'planned')
                           ? () => unawaited(_startTrip())
                           : null,
-                      onCancel: () => unawaited(_cancelTrip()),
+                      onCancel: widget.readOnly
+                          ? null
+                          : () => unawaited(_cancelTrip()),
                     )
-                  else
+                  else if (!widget.readOnly)
                     Material(
                       color: Colors.transparent,
                       child: InkWell(
@@ -1242,10 +1261,11 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                     ),
                 ],
                 const SizedBox(height: 18),
-                _DashedAddButton(
-                  label: l10n.addNewPlaceLabel,
-                  onTap: selected == null ? () {} : _showAddMenu,
-                ),
+                if (!widget.readOnly)
+                  _DashedAddButton(
+                    label: l10n.addNewPlaceLabel,
+                    onTap: selected == null ? () {} : _showAddMenu,
+                  ),
               ],
             ],
           ),

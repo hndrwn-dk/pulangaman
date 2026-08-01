@@ -5,7 +5,11 @@ import { childLocationKey, getRedis } from '../redis/client.js';
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { canManageChildFeatures, isParentOfChild } from '../middleware/roles.js';
+import {
+  canViewChild,
+  isParentOfChild,
+  listViewableChildren,
+} from '../middleware/roles.js';
 import { createChildCustomToken, ensureFirebaseUser } from '../firebase/admin.js';
 import {
   buildActivityTimeline,
@@ -151,31 +155,8 @@ childrenRouter.get('/', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    const result = await pool.query(
-      `SELECT u.id, u.name, u.phone, cp.grade, cp.commute_status, cp.last_seen_at,
-              'primary'::text AS access
-       FROM parent_children pc
-       JOIN users u ON u.id = pc.child_id
-       LEFT JOIN child_profiles cp ON cp.user_id = u.id
-       WHERE pc.parent_id = $1
-       UNION
-       SELECT u.id, u.name, u.phone, cp.grade, cp.commute_status, cp.last_seen_at,
-              'co_parent'::text AS access
-       FROM child_approved_guardians cag
-       JOIN users u ON u.id = cag.child_id
-       LEFT JOIN child_profiles cp ON cp.user_id = u.id
-       WHERE cag.guardian_id = $1
-         AND cag.status = 'active'
-         AND cag.access_level = 'co_parent'
-         AND NOT EXISTS (
-           SELECT 1 FROM parent_children pc2
-           WHERE pc2.parent_id = $1 AND pc2.child_id = cag.child_id
-         )
-       ORDER BY name`,
-      [parentId],
-    );
-
-    res.json({ children: result.rows });
+    const children = await listViewableChildren(parentId);
+    res.json({ children });
   } catch (error) {
     next(error);
   }
@@ -190,7 +171,7 @@ childrenRouter.get('/:id/location/history', async (req: AuthedRequest, res, next
       return;
     }
 
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -246,7 +227,7 @@ childrenRouter.get('/:id/activity', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -337,7 +318,7 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    if (!(await canManageChildFeatures(parentId, childId))) {
+    if (!(await canViewChild(parentId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }

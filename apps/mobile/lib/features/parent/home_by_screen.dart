@@ -35,10 +35,13 @@ class _HomeBySnapshot {
 }
 
 class HomeByScreen extends ConsumerStatefulWidget {
-  const HomeByScreen({super.key, this.lockedChild});
+  const HomeByScreen({super.key, this.lockedChild, this.readOnly = false});
 
   /// When set (from child detail), the child picker is hidden.
   final ChildSummary? lockedChild;
+
+  /// When true, settings are displayed but not editable.
+  final bool readOnly;
 
   @override
   ConsumerState<HomeByScreen> createState() => _HomeByScreenState();
@@ -467,26 +470,33 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                               _ModeTile(
                                 selected: _mode == 'off',
                                 title: l10n.homeByModeOff,
-                                onTap: () => setState(() => _mode = 'off'),
+                                onTap: widget.readOnly
+                                    ? null
+                                    : () => setState(() => _mode = 'off'),
                               ),
                               _ModeTile(
                                 selected: _mode == 'maghrib',
                                 title: l10n.homeByModeMaghrib,
                                 subtitle: l10n.homeByModeMaghribHint,
                                 featuredIcon: Icons.nights_stay_rounded,
-                                onTap: () =>
-                                    setState(() => _mode = 'maghrib'),
+                                onTap: widget.readOnly
+                                    ? null
+                                    : () => setState(() => _mode = 'maghrib'),
                               ),
                               _ModeTile(
                                 selected: _mode == 'custom',
                                 title: l10n.homeByModeCustom,
-                                onTap: () => setState(() => _mode = 'custom'),
+                                onTap: widget.readOnly
+                                    ? null
+                                    : () => setState(() => _mode = 'custom'),
                               ),
                               if (_mode == 'custom') ...[
                                 const SizedBox(height: 8),
                                 _TimePickRow(
                                   label: _fmtHm(_customHour, _customMinute),
-                                  onTap: () => _pickTime(weekend: false),
+                                  onTap: widget.readOnly
+                                      ? null
+                                      : () => _pickTime(weekend: false),
                                 ),
                               ],
                             ],
@@ -538,9 +548,11 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                   inactiveColor: refresh
                                       ? VisualRefreshColors.tagMuted
                                       : null,
-                                  onChanged: (v) => setState(
-                                    () => _graceMinutes = v.round(),
-                                  ),
+                                  onChanged: widget.readOnly
+                                      ? null
+                                      : (v) => setState(
+                                            () => _graceMinutes = v.round(),
+                                          ),
                                 ),
                               ],
                             ),
@@ -563,23 +575,29 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                   selected: _weekendMode == 'off',
                                   title: l10n.homeByWeekendOff,
                                   featuredIcon: Icons.nights_stay_rounded,
-                                  onTap: () => setState(
-                                    () => _weekendMode = 'off',
-                                  ),
+                                  onTap: widget.readOnly
+                                      ? null
+                                      : () => setState(
+                                            () => _weekendMode = 'off',
+                                          ),
                                 ),
                                 _ModeTile(
                                   selected: _weekendMode == 'same',
                                   title: l10n.homeByWeekendSame,
-                                  onTap: () => setState(
-                                    () => _weekendMode = 'same',
-                                  ),
+                                  onTap: widget.readOnly
+                                      ? null
+                                      : () => setState(
+                                            () => _weekendMode = 'same',
+                                          ),
                                 ),
                                 _ModeTile(
                                   selected: _weekendMode == 'custom',
                                   title: l10n.homeByWeekendCustom,
-                                  onTap: () => setState(
-                                    () => _weekendMode = 'custom',
-                                  ),
+                                  onTap: widget.readOnly
+                                      ? null
+                                      : () => setState(
+                                            () => _weekendMode = 'custom',
+                                          ),
                                 ),
                                 if (_weekendMode == 'custom')
                                   _TimePickRow(
@@ -587,7 +605,9 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                       _weekendHour,
                                       _weekendMinute,
                                     ),
-                                    onTap: () => _pickTime(weekend: true),
+                                    onTap: widget.readOnly
+                                        ? null
+                                        : () => _pickTime(weekend: true),
                                   ),
                               ],
                             ),
@@ -616,32 +636,33 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                         ),
                                       ),
                                     ),
-                                    TextButton(
-                                      onPressed: _addSkipDate,
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: refresh
-                                            ? VisualRefreshColors.accent
-                                            : null,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 4,
-                                        ),
-                                        minimumSize: Size.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      child: Text(
-                                        l10n.homeBySkipDatesAdd,
-                                        style: TextStyle(
-                                          fontWeight: refresh
-                                              ? FontWeight.w600
-                                              : FontWeight.w800,
-                                          fontFamily: refresh
-                                              ? GoogleFonts.plusJakartaSans()
-                                                  .fontFamily
+                                    if (!widget.readOnly)
+                                      TextButton(
+                                        onPressed: _addSkipDate,
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: refresh
+                                              ? VisualRefreshColors.accent
                                               : null,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                          ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize
+                                              .shrinkWrap,
+                                        ),
+                                        child: Text(
+                                          l10n.homeBySkipDatesAdd,
+                                          style: TextStyle(
+                                            fontWeight: refresh
+                                                ? FontWeight.w600
+                                                : FontWeight.w800,
+                                            fontFamily: refresh
+                                                ? GoogleFonts.plusJakartaSans()
+                                                    .fontFamily
+                                                : null,
+                                          ),
                                         ),
                                       ),
-                                    ),
                                   ],
                                 ),
                                 if (_skipDates.isEmpty)
@@ -679,20 +700,22 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                               : null,
                                         ),
                                       ),
-                                      trailing: IconButton(
-                                        icon: Icon(
-                                          Icons.close_rounded,
-                                          color: refresh
-                                              ? VisualRefreshColors
-                                                  .textSecondary
-                                              : null,
-                                        ),
-                                        onPressed: id.isEmpty
-                                            ? null
-                                            : () => unawaited(
-                                                  _removeSkip(id),
-                                                ),
-                                      ),
+                                      trailing: widget.readOnly
+                                          ? null
+                                          : IconButton(
+                                              icon: Icon(
+                                                Icons.close_rounded,
+                                                color: refresh
+                                                    ? VisualRefreshColors
+                                                        .textSecondary
+                                                    : null,
+                                              ),
+                                              onPressed: id.isEmpty
+                                                  ? null
+                                                  : () => unawaited(
+                                                        _removeSkip(id),
+                                                      ),
+                                            ),
                                     );
                                   }),
                               ],
@@ -777,6 +800,7 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        if (!widget.readOnly)
                         SizedBox(
                           width: double.infinity,
                           height: refresh ? 56 : null,
@@ -858,7 +882,7 @@ class _ModeTile extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData? featuredIcon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1043,10 +1067,10 @@ class _VrChildChip extends StatelessWidget {
 }
 
 class _TimePickRow extends StatelessWidget {
-  const _TimePickRow({required this.label, required this.onTap});
+  const _TimePickRow({required this.label, this.onTap});
 
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

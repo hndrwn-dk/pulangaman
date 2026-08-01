@@ -2851,4 +2851,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get coachmarkView => 'View';
+
+  @override
+  String get coParentAccessPill => 'CO-PARENT ACCESS';
+
+  @override
+  String get viewOnlyAccessPill => 'VIEW-ONLY ACCESS';
+
+  @override
+  String guardianCoParentInfoBanner(String name) {
+    return 'You have co-parent access to $name. View location, manage tools below.';
+  }
+
+  @override
+  String guardianViewOnlyInfoBanner(String name) {
+    return 'You have view-only access to $name. See location and safety info below.';
+  }
+
+  @override
+  String get sectionManageLabel => 'MANAGE';
+
+  @override
+  String get sectionViewLabel => 'VIEW';
+
+  @override
+  String get sectionAccountLabel => 'ACCOUNT';
+
+  @override
+  String get viewPillLabel => 'View';
+
+  @override
+  String get guardianAccountTitle => 'Account';
+
+  @override
+  String get guardianAccountInviteSubtitle =>
+      'Redeem an invite code for another child';
+
+  @override
+  String get guardianNoLinkedChildren =>
+      'No linked children yet. Redeem an invite code from Account.';
 }

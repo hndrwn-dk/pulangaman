@@ -2855,4 +2855,43 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get coachmarkView => 'Lihat';
+
+  @override
+  String get coParentAccessPill => 'AKSES CO-PARENT';
+
+  @override
+  String get viewOnlyAccessPill => 'AKSES LIHAT SAJA';
+
+  @override
+  String guardianCoParentInfoBanner(String name) {
+    return 'Anda punya akses co-parent ke $name. Lihat lokasi, kelola alat di bawah.';
+  }
+
+  @override
+  String guardianViewOnlyInfoBanner(String name) {
+    return 'Anda punya akses lihat saja ke $name. Lihat lokasi dan info keselamatan di bawah.';
+  }
+
+  @override
+  String get sectionManageLabel => 'KELOLA';
+
+  @override
+  String get sectionViewLabel => 'LIHAT';
+
+  @override
+  String get sectionAccountLabel => 'AKUN';
+
+  @override
+  String get viewPillLabel => 'Lihat';
+
+  @override
+  String get guardianAccountTitle => 'Akun';
+
+  @override
+  String get guardianAccountInviteSubtitle =>
+      'Tukarkan kode undangan untuk anak lain';
+
+  @override
+  String get guardianNoLinkedChildren =>
+      'Belum ada anak terhubung. Tukarkan kode undangan dari Akun.';
 }

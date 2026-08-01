@@ -1720,5 +1720,26 @@
   "reminderCoachmarkTitle": "Coba Pengingat Jadwal",
   "reminderCoachmarkBody": "Atur pengingat rutin buat anak — belajar, tidur, atau jadwal lainnya — dari menu Lainnya.",
   "coachmarkSkip": "Lewati",
-  "coachmarkView": "Lihat"
+  "coachmarkView": "Lihat",
+  "coParentAccessPill": "AKSES CO-PARENT",
+  "viewOnlyAccessPill": "AKSES LIHAT SAJA",
+  "guardianCoParentInfoBanner": "Anda punya akses co-parent ke {name}. Lihat lokasi, kelola alat di bawah.",
+  "@guardianCoParentInfoBanner": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "guardianViewOnlyInfoBanner": "Anda punya akses lihat saja ke {name}. Lihat lokasi dan info keselamatan di bawah.",
+  "@guardianViewOnlyInfoBanner": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "sectionManageLabel": "KELOLA",
+  "sectionViewLabel": "LIHAT",
+  "sectionAccountLabel": "AKUN",
+  "viewPillLabel": "Lihat",
+  "guardianAccountTitle": "Akun",
+  "guardianAccountInviteSubtitle": "Tukarkan kode undangan untuk anak lain",
+  "guardianNoLinkedChildren": "Belum ada anak terhubung. Tukarkan kode undangan dari Akun."
 }

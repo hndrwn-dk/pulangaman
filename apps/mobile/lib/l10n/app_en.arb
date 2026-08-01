@@ -1284,5 +1284,26 @@
   "reminderCoachmarkTitle": "Try Schedule Reminders",
   "reminderCoachmarkBody": "Set routine reminders for your child — study, bedtime, or other schedules — from the More menu.",
   "coachmarkSkip": "Skip",
-  "coachmarkView": "View"
+  "coachmarkView": "View",
+  "coParentAccessPill": "CO-PARENT ACCESS",
+  "viewOnlyAccessPill": "VIEW-ONLY ACCESS",
+  "guardianCoParentInfoBanner": "You have co-parent access to {name}. View location, manage tools below.",
+  "@guardianCoParentInfoBanner": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "guardianViewOnlyInfoBanner": "You have view-only access to {name}. See location and safety info below.",
+  "@guardianViewOnlyInfoBanner": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "sectionManageLabel": "MANAGE",
+  "sectionViewLabel": "VIEW",
+  "sectionAccountLabel": "ACCOUNT",
+  "viewPillLabel": "View",
+  "guardianAccountTitle": "Account",
+  "guardianAccountInviteSubtitle": "Redeem an invite code for another child",
+  "guardianNoLinkedChildren": "No linked children yet. Redeem an invite code from Account."
 }

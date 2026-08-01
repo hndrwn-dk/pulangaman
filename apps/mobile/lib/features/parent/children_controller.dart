@@ -12,6 +12,7 @@ class ChildSummary {
     this.phone,
     this.lastSeenAt,
     this.commuteStatus,
+    this.access,
   });
 
   final String id;
@@ -20,7 +21,18 @@ class ChildSummary {
   final String? lastSeenAt;
   final String? commuteStatus;
 
+  /// `primary` | `co_parent` | `view` from list endpoints; null when unknown.
+  final String? access;
+
+  bool get canManageFeatures =>
+      access == 'primary' || access == 'co_parent';
+
+  bool get isViewOnlyAccess => access == 'view';
+
   factory ChildSummary.fromJson(Map<String, dynamic> json) {
+    final rawAccess = json['access']?.toString() ??
+        json['accessLevel']?.toString() ??
+        json['access_level']?.toString();
     return ChildSummary(
       id: json['id'] as String,
       name: json['name'] as String,
@@ -28,6 +40,7 @@ class ChildSummary {
       lastSeenAt: json['last_seen_at']?.toString() ?? json['lastSeenAt']?.toString(),
       commuteStatus:
           json['commute_status'] as String? ?? json['commuteStatus'] as String?,
+      access: rawAccess,
     );
   }
 
@@ -37,6 +50,7 @@ class ChildSummary {
         'phone': phone,
         'last_seen_at': lastSeenAt,
         'commute_status': commuteStatus,
+        if (access != null) 'access': access,
       };
 }
 

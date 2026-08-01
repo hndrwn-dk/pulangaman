@@ -4,20 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import '../../core/day_period.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/parse_coord.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
+import '../parent/child_avatar.dart';
+import '../parent/child_home_map_card.dart';
 import '../parent/children_controller.dart';
 import '../parent/emergency_meeting_alert_screen.dart';
 import '../parent/emergency_meeting_screen.dart';
 import '../parent/guardians_screen.dart';
 import '../parent/home_by_screen.dart';
+import '../parent/live_map_screen.dart';
 import '../parent/reminders_screen.dart';
-import '../parent/vr_sheet_chrome.dart';
 import '../parent/zones_screen.dart';
+import 'guardian_account_screen.dart';
 
 class GuardianHomeScreen extends ConsumerStatefulWidget {
   const GuardianHomeScreen({super.key});
@@ -28,20 +33,44 @@ class GuardianHomeScreen extends ConsumerStatefulWidget {
 
 class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
   final _ws = WsClient();
-  List<Map<String, dynamic>> _invites = [];
-  List<ChildSummary> _coParentChildren = [];
+  List<ChildSummary> _children = [];
+  String? _selectedChildId;
+  final Map<String, LatLng> _positions = {};
+  final Map<String, int?> _batteryLevels = {};
+  final Map<String, bool> _batteryCharging = {};
+  final Map<String, bool> _staleByChild = {};
+  final Map<String, DateTime?> _updatedAt = {};
+  final Map<String, ChildGender> _genders = {};
+  Timer? _locationPoll;
   String? _alertId;
-  String? _childId;
+  String? _alertChildId;
+  bool _loadingChildren = true;
+
+  ChildSummary? get _selected {
+    if (_children.isEmpty) return null;
+    return _children.firstWhere(
+      (c) => c.id == _selectedChildId,
+      orElse: () => _children.first,
+    );
+  }
+
+  bool get _canManageSelected {
+    final c = _selected;
+    if (c == null) return false;
+    return c.canManageFeatures;
+  }
 
   @override
   void initState() {
     super.initState();
     Future.microtask(_bootstrap);
+    _locationPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+      unawaited(_loadLocations());
+    });
   }
 
   Future<void> _bootstrap() async {
-    await _loadInvites();
-    await _loadCoParentChildren();
+    await _loadChildren();
     final auth = ref.read(authControllerProvider);
     final token = auth.token;
     final userId = auth.userId;
@@ -49,39 +78,110 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
       await _ws.connect(token);
       _ws.addHandler(_onWs);
       _ws.subscribe('guardian:$userId');
+      _syncChildSubscriptions();
     }
     await ref.read(apiClientProvider).post('/api/v1/guardians/presence', body: {
       'status': 'ONLINE',
     });
+    await _loadLocations();
   }
 
-  Future<void> _loadCoParentChildren() async {
+  Future<void> _loadChildren() async {
     try {
       final api = ref.read(apiClientProvider);
       final data = await api.get('/api/v1/guardians/children');
       final list = (data['children'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
-          .where((c) => c['access']?.toString() == 'co_parent')
           .map(ChildSummary.fromJson)
           .toList();
       if (!mounted) return;
-      setState(() => _coParentChildren = list);
+      setState(() {
+        _children = list;
+        _loadingChildren = false;
+        if (list.isNotEmpty &&
+            (_selectedChildId == null ||
+                !list.any((c) => c.id == _selectedChildId))) {
+          _selectedChildId = list.first.id;
+        }
+      });
       if (list.isNotEmpty) {
-        // Warm childrenController so Zones / EMP / Reminders / Home-by work.
         await ref.read(childrenControllerProvider.notifier).bootstrap();
+        await _loadGenders();
+        _syncChildSubscriptions();
       }
-    } catch (_) {}
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingChildren = false);
+    }
+  }
+
+  Future<void> _loadGenders() async {
+    for (final c in _children) {
+      _genders[c.id] = await ChildGenderStore.instance.get(c.id);
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _syncChildSubscriptions() {
+    for (final c in _children) {
+      _ws.subscribe('child:${c.id}');
+    }
+  }
+
+  Future<void> _loadLocations() async {
+    if (_children.isEmpty) return;
+    final api = ref.read(apiClientProvider);
+    for (final c in _children) {
+      try {
+        final data = await api.get('/api/v1/children/${c.id}/location');
+        final loc = data['location'] as Map<String, dynamic>?;
+        if (loc == null) continue;
+        final lat = parseCoord(loc['lat']);
+        final lng = parseCoord(loc['lng']);
+        if (lat == null || lng == null) continue;
+        final recorded = loc['recordedAt']?.toString() ??
+            loc['timestamp']?.toString();
+        if (!mounted) return;
+        setState(() {
+          _positions[c.id] = LatLng(lat, lng);
+          _batteryLevels[c.id] = data['batteryLevel'] as int? ??
+              (loc['batteryLevel'] as num?)?.toInt();
+          _batteryCharging[c.id] = data['batteryCharging'] == true ||
+              loc['batteryCharging'] == true;
+          _staleByChild[c.id] = data['isStale'] == true;
+          _updatedAt[c.id] =
+              recorded != null ? DateTime.tryParse(recorded)?.toLocal() : null;
+        });
+      } catch (_) {}
+    }
   }
 
   void _onWs(String event, Map<String, dynamic> payload) {
     if (event == 'guardian:alert_notify') {
       setState(() {
         _alertId = payload['alertId'] as String?;
-        _childId = payload['childId'] as String?;
+        _alertChildId = payload['childId'] as String?;
       });
     }
     if (event == 'guardian:emergency_meeting_alert') {
       unawaited(_openEmergencyMeeting(payload));
+    }
+    if (event == 'child:location_update') {
+      final childId = payload['childId']?.toString();
+      final lat = parseCoord(payload['lat']);
+      final lng = parseCoord(payload['lng']);
+      if (childId == null || lat == null || lng == null) return;
+      setState(() {
+        _positions[childId] = LatLng(lat, lng);
+        _staleByChild[childId] = false;
+        _updatedAt[childId] = DateTime.now();
+        if (payload['batteryLevel'] is num) {
+          _batteryLevels[childId] = (payload['batteryLevel'] as num).toInt();
+        }
+        if (payload.containsKey('batteryCharging')) {
+          _batteryCharging[childId] = payload['batteryCharging'] == true;
+        }
+      });
     }
   }
 
@@ -107,75 +207,6 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _loadInvites() async {
-    try {
-      final api = ref.read(apiClientProvider);
-      final data = await api.get('/api/v1/guardians/invites');
-      setState(() {
-        _invites = (data['invites'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>();
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _accept(String childId) async {
-    final api = ref.read(apiClientProvider);
-    await api.post('/api/v1/guardians/accept', body: {'childId': childId});
-    await _loadInvites();
-    await _loadCoParentChildren();
-  }
-
-  Future<void> _redeemInviteCode() async {
-    final l10n = AppLocalizations.of(context);
-    final refresh = visualRefreshOf(context);
-
-    // Sheet/dialog owns its TextEditingController so it is not disposed while
-    // the modal route is still animating out (that caused a red-screen assert).
-    final String? code = refresh
-        ? await showVrModalBottomSheet<String>(
-            context: context,
-            builder: (ctx) => const _EnterGuardianInviteCodeSheet(),
-          )
-        : await showDialog<String>(
-            context: context,
-            builder: (ctx) => const _EnterGuardianInviteCodeDialog(),
-          );
-
-    if (code == null || !mounted) return;
-    final trimmed = code.trim();
-    if (trimmed.length < 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
-      );
-      return;
-    }
-
-    try {
-      final data = await ref.read(apiClientProvider).post(
-        '/api/v1/guardian-invites/redeem',
-        body: {'code': trimmed},
-      );
-      await _loadInvites();
-      await _loadCoParentChildren();
-      if (!mounted) return;
-      final childName = data['childName']?.toString() ?? '';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            childName.isEmpty
-                ? l10n.acceptInvite
-                : l10n.guardianInviteRedeemed(childName),
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
-      );
-    }
   }
 
   Future<void> _ack() async {
@@ -204,8 +235,20 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     });
   }
 
+  String _initials(String? name) {
+    final parts = (name ?? '').trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return 'G';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
+
+  void _openTool({required Widget screen}) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
   @override
   void dispose() {
+    _locationPoll?.cancel();
     _ws.removeHandler(_onWs);
     unawaited(_ws.disconnect());
     super.dispose();
@@ -216,255 +259,511 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authControllerProvider);
     final refresh = visualRefreshOf(context);
+    final selected = _selected;
+    final canManage = _canManageSelected;
+    final period = dayPeriodFor();
 
     return Scaffold(
       backgroundColor:
-          refresh ? VisualRefreshColors.background : null,
-      appBar: AppBar(
-        title: Text('${l10n.brand} · ${auth.name ?? ''}'),
-        actions: [
-          IconButton(
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            l10n.guardianGuidance,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: refresh
-                      ? VisualRefreshColors.textSecondary
-                      : AppColors.ink.withValues(alpha: 0.85),
-                  fontFamily:
-                      refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+          refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: refresh ? VisualRefreshColors.accent : AppColors.teal,
+          onRefresh: () async {
+            await _loadChildren();
+            await _loadLocations();
+          },
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            children: [
+              _GuardianHeader(
+                greeting: period.greeting(l10n),
+                greetingIcon: period.icon,
+                name: auth.name ?? l10n.greetingDefaultName,
+                initials: _initials(auth.name),
+                accessPill: canManage
+                    ? l10n.coParentAccessPill
+                    : l10n.viewOnlyAccessPill,
+                showAccessPill: selected != null,
+                onAccount: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const GuardianAccountScreen(),
+                  ),
                 ),
-          ),
-          if (_coParentChildren.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text(
-              l10n.coParentManageTitle,
-              style: refresh
-                  ? GoogleFonts.fraunces(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      color: VisualRefreshColors.textPrimary,
-                    )
-                  : Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              l10n.coParentManageSubtitle,
-              style: TextStyle(
-                color: refresh
-                    ? VisualRefreshColors.textSecondary
-                    : AppColors.inkSoft,
-                fontFamily:
-                    refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+                onLogout: () =>
+                    ref.read(authControllerProvider.notifier).logout(),
               ),
-            ),
-            const SizedBox(height: 12),
-            _CoParentToolTile(
-              refresh: refresh,
-              icon: Icons.map_outlined,
-              title: l10n.zonesTitle,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const PlacesEntryScreen(),
-                ),
-              ),
-            ),
-            _CoParentToolTile(
-              refresh: refresh,
-              icon: Icons.emergency_share_outlined,
-              title: l10n.empTitle,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const EmergencyMeetingScreen(),
-                ),
-              ),
-            ),
-            _CoParentToolTile(
-              refresh: refresh,
-              icon: Icons.alarm_outlined,
-              title: l10n.remindersTitle,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const RemindersScreen()),
-              ),
-            ),
-            _CoParentToolTile(
-              refresh: refresh,
-              icon: Icons.home_outlined,
-              title: l10n.homeByTitle,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const HomeByScreen()),
-              ),
-            ),
-            _CoParentToolTile(
-              refresh: refresh,
-              icon: Icons.people_outline,
-              title: l10n.guardiansTitle,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const GuardiansEntryScreen(),
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          Text(
-            l10n.activeAlerts,
-            style: refresh
-                ? GoogleFonts.fraunces(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: VisualRefreshColors.textPrimary,
-                  )
-                : Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          if (_alertId == null)
-            Text(
-              l10n.noActiveAlerts,
-              style: TextStyle(
-                color: refresh
-                    ? VisualRefreshColors.textSecondary
-                    : null,
-              ),
-            )
-          else ...[
-            Card(
-              color: refresh
-                  ? VisualRefreshColors.dangerTint
-                  : const Color(0xFFFEE4E2),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(l10n.alertLabelWithId(_alertId!)),
-                    if (_childId != null) Text(l10n.childIdLabel(_childId!)),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: _ack,
-                      child: Text(l10n.ackAlert),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: _shareLocation,
-                      child: Text(l10n.shareLocation),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: _needBackup,
-                      child: Text(l10n.needBackup),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 24),
-          Text(
-            l10n.invitesSectionTitle,
-            style: refresh
-                ? GoogleFonts.fraunces(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: VisualRefreshColors.textPrimary,
-                  )
-                : Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          if (_invites.isEmpty)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+              const SizedBox(height: 18),
+              if (_loadingChildren)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_children.isEmpty)
                 Text(
-                  l10n.noInvites,
+                  l10n.guardianNoLinkedChildren,
                   style: TextStyle(
                     color: refresh
                         ? VisualRefreshColors.textSecondary
-                        : null,
+                        : AppColors.inkSoft,
+                  ),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.childLocationSectionTitle,
+                        style: refresh
+                            ? GoogleFonts.fraunces(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: VisualRefreshColors.textPrimary,
+                              )
+                            : Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    if (selected != null)
+                      TextButton(
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => LiveMapScreen(child: selected),
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: refresh
+                              ? VisualRefreshColors.accent
+                              : AppColors.teal,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          l10n.viewMapAction,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontFamily: refresh
+                                ? GoogleFonts.plusJakartaSans().fontFamily
+                                : null,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                if (_children.length > 1) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _children.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final c = _children[i];
+                        final selectedChip = c.id == selected?.id;
+                        final online = !(_staleByChild[c.id] ?? true) &&
+                            _positions.containsKey(c.id);
+                        return _ChildChip(
+                          name: c.name,
+                          selected: selectedChip,
+                          online: online,
+                          onTap: () => setState(() => _selectedChildId = c.id),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                if (selected != null) ...[
+                  const SizedBox(height: 12),
+                  ChildHomeMapCard(
+                    child: selected,
+                    gender: _genders[selected.id] ??
+                        ChildGenderStore.guessFromName(selected.name),
+                    position: _positions[selected.id],
+                    batteryLevel: _batteryLevels[selected.id],
+                    batteryCharging: _batteryCharging[selected.id] ?? false,
+                    stale: _staleByChild[selected.id] ?? true,
+                    updatedAt: _updatedAt[selected.id],
+                    onOpenMap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => LiveMapScreen(child: selected),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _AccessInfoBanner(
+                    canManage: canManage,
+                    childName: selected.name,
+                  ),
+                  const SizedBox(height: 22),
+                  _SectionLabel(
+                    canManage
+                        ? l10n.sectionManageLabel
+                        : l10n.sectionViewLabel,
+                  ),
+                  const SizedBox(height: 10),
+                  _ToolRow(
+                    icon: Icons.map_outlined,
+                    title: l10n.zonesTitle,
+                    canManage: canManage,
+                    onTap: () => _openTool(
+                      screen: PlacesEntryScreen(
+                        lockedChild: selected,
+                        readOnly: !canManage,
+                      ),
+                    ),
+                  ),
+                  _ToolRow(
+                    icon: Icons.emergency_share_outlined,
+                    title: l10n.empTitle,
+                    canManage: canManage,
+                    onTap: () => _openTool(
+                      screen: EmergencyMeetingScreen(
+                        lockedChild: selected,
+                        readOnly: !canManage,
+                      ),
+                    ),
+                  ),
+                  _ToolRow(
+                    icon: Icons.alarm_outlined,
+                    title: l10n.remindersTitle,
+                    canManage: canManage,
+                    onTap: () => _openTool(
+                      screen: RemindersScreen(
+                        initialChildId: selected.id,
+                        lockChild: true,
+                        readOnly: !canManage,
+                      ),
+                    ),
+                  ),
+                  _ToolRow(
+                    icon: Icons.home_outlined,
+                    title: l10n.homeByTitle,
+                    canManage: canManage,
+                    onTap: () => _openTool(
+                      screen: HomeByScreen(
+                        lockedChild: selected,
+                        readOnly: !canManage,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _SectionLabel(l10n.sectionAccountLabel),
+                  const SizedBox(height: 10),
+                  _ToolRow(
+                    icon: Icons.people_outline,
+                    title: l10n.guardiansTitle,
+                    canManage: canManage,
+                    onTap: () => _openTool(
+                      screen: GuardiansEntryScreen(readOnly: !canManage),
+                    ),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 24),
+              Text(
+                l10n.activeAlerts,
+                style: refresh
+                    ? GoogleFonts.fraunces(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        color: VisualRefreshColors.textPrimary,
+                      )
+                    : Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              if (_alertId == null)
+                _AlertsEmptyState(message: l10n.noActiveAlerts)
+              else
+                Card(
+                  color: refresh
+                      ? VisualRefreshColors.dangerTint
+                      : const Color(0xFFFEE4E2),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(l10n.alertLabelWithId(_alertId!)),
+                        if (_alertChildId != null)
+                          Text(l10n.childIdLabel(_alertChildId!)),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: _ack,
+                          child: Text(l10n.ackAlert),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: _shareLocation,
+                          child: Text(l10n.shareLocation),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton(
+                          onPressed: _needBackup,
+                          child: Text(l10n.needBackup),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _redeemInviteCode,
-                  icon: const Icon(Icons.vpn_key_outlined),
-                  label: Text(l10n.enterGuardianInviteCode),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: refresh
-                        ? VisualRefreshColors.anchor
-                        : AppColors.teal,
-                    side: BorderSide(
-                      color: refresh
-                          ? VisualRefreshColors.border
-                          : AppColors.teal,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GuardianHeader extends StatelessWidget {
+  const _GuardianHeader({
+    required this.greeting,
+    required this.greetingIcon,
+    required this.name,
+    required this.initials,
+    required this.accessPill,
+    required this.showAccessPill,
+    required this.onAccount,
+    required this.onLogout,
+  });
+
+  final String greeting;
+  final IconData greetingIcon;
+  final String name;
+  final String initials;
+  final String accessPill;
+  final bool showAccessPill;
+  final VoidCallback onAccount;
+  final VoidCallback onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: refresh
+                ? VisualRefreshColors.weatherTint
+                : VisualRefreshColors.accentTint,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            greetingIcon,
+            color: refresh
+                ? VisualRefreshColors.anchor
+                : VisualRefreshColors.accent,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$greeting,',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
+                  fontFamily:
+                      refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+                ),
+              ),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: refresh
+                    ? GoogleFonts.fraunces(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.4,
+                        color: VisualRefreshColors.textPrimary,
+                      )
+                    : const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
+                      ),
+              ),
+              if (showAccessPill) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: VisualRefreshColors.tagMuted,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    accessPill,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      color: VisualRefreshColors.textTertiary,
                     ),
                   ),
                 ),
               ],
-            )
-          else ...[
-            ..._invites.map(
-              (invite) {
-                final access = invite['accessLevel']?.toString() ??
-                    invite['access_level']?.toString() ??
-                    'view';
-                final accessLabel = access == 'co_parent'
-                    ? l10n.guardianAccessCoParent
-                    : l10n.guardianAccessView;
-                return ListTile(
-                  title: Text('${invite['child_name']}'),
-                  subtitle: Text(
-                    l10n.fromParentWithAccess(
-                      '${invite['parent_name']}',
-                      accessLabel,
+            ],
+          ),
+        ),
+        Column(
+          children: [
+            Row(
+              children: [
+                Material(
+                  color: refresh ? VisualRefreshColors.surface : Colors.white,
+                  shape: CircleBorder(
+                    side: BorderSide(
+                      color: refresh
+                          ? VisualRefreshColors.border
+                          : const Color(0xFFE2E6EA),
+                      width: 0.5,
                     ),
                   ),
-                  trailing: FilledButton(
-                    onPressed: () => _accept(invite['child_id'] as String),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: refresh
-                          ? VisualRefreshColors.anchor
-                          : AppColors.teal,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onAccount,
+                    child: const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Icon(Icons.notifications_none_rounded, size: 22),
                     ),
-                    child: Text(l10n.acceptInvite),
                   ),
-                );
-              },
+                ),
+                const SizedBox(width: 8),
+                Material(
+                  color: VisualRefreshColors.anchor,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onAccount,
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Center(
+                        child: Text(
+                          initials,
+                          style: GoogleFonts.plusJakartaSans(
+                            color: VisualRefreshColors.background,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: _redeemInviteCode,
-              icon: const Icon(Icons.vpn_key_outlined, size: 18),
-              label: Text(l10n.enterGuardianInviteCode),
+            IconButton(
+              onPressed: onLogout,
+              icon: Icon(
+                Icons.logout,
+                size: 20,
+                color: VisualRefreshColors.textTertiary,
+              ),
+              visualDensity: VisualDensity.compact,
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AccessInfoBanner extends StatelessWidget {
+  const _AccessInfoBanner({
+    required this.canManage,
+    required this.childName,
+  });
+
+  final bool canManage;
+  final String childName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final message = canManage
+        ? l10n.guardianCoParentInfoBanner(childName)
+        : l10n.guardianViewOnlyInfoBanner(childName);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.accentTint,
+        borderRadius: BorderRadius.circular(AppRadius.vrCard),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 20,
+            color: VisualRefreshColors.accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13.5,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+                color: VisualRefreshColors.textPrimary,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _CoParentToolTile extends StatelessWidget {
-  const _CoParentToolTile({
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.4,
+        color: VisualRefreshColors.textTertiary,
+      ),
+    );
+  }
+}
+
+class _ToolRow extends StatelessWidget {
+  const _ToolRow({
     required this.icon,
     required this.title,
+    required this.canManage,
     required this.onTap,
-    required this.refresh,
   });
 
   final IconData icon;
   final String title;
+  final bool canManage;
   final VoidCallback onTap;
-  final bool refresh;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -481,22 +780,21 @@ class _CoParentToolTile extends StatelessWidget {
               border: refresh
                   ? Border.all(color: VisualRefreshColors.border, width: 0.5)
                   : null,
-              boxShadow: refresh
-                  ? null
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
             ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  color: refresh ? VisualRefreshColors.accent : AppColors.teal,
-                ),
+                if (canManage)
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: VisualRefreshColors.accentTint,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: VisualRefreshColors.accent),
+                  )
+                else
+                  Icon(icon, color: VisualRefreshColors.textSecondary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -510,12 +808,28 @@ class _CoParentToolTile extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: refresh
-                      ? VisualRefreshColors.textTertiary
-                      : AppColors.inkSoft,
-                ),
+                if (canManage)
+                  Icon(
+                    Icons.chevron_right,
+                    color: VisualRefreshColors.textTertiary,
+                  )
+                else
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: VisualRefreshColors.tagMuted,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      l10n.viewPillLabel,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: VisualRefreshColors.textSecondary,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -525,102 +839,61 @@ class _CoParentToolTile extends StatelessWidget {
   }
 }
 
-/// Owns the invite-code [TextEditingController] for the VR bottom-sheet lifetime.
-class _EnterGuardianInviteCodeSheet extends StatefulWidget {
-  const _EnterGuardianInviteCodeSheet();
+class _ChildChip extends StatelessWidget {
+  const _ChildChip({
+    required this.name,
+    required this.selected,
+    required this.online,
+    required this.onTap,
+  });
 
-  @override
-  State<_EnterGuardianInviteCodeSheet> createState() =>
-      _EnterGuardianInviteCodeSheetState();
-}
-
-class _EnterGuardianInviteCodeSheetState
-    extends State<_EnterGuardianInviteCodeSheet> {
-  final _codeCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _codeCtrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    Navigator.pop(context, _codeCtrl.text.trim());
-  }
+  final String name;
+  final bool selected;
+  final bool online;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: VrSheetShell(
-        child: SingleChildScrollView(
-          child: Column(
+    return Material(
+      color: selected
+          ? VisualRefreshColors.anchor
+          : VisualRefreshColors.surface,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: selected
+                ? null
+                : Border.all(color: VisualRefreshColors.border, width: 0.5),
+          ),
+          child: Row(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              VrSheetTitle(l10n.enterGuardianInviteCode),
-              const SizedBox(height: 10),
-              VrSheetBody(l10n.enterGuardianInviteCodeHint),
-              const SizedBox(height: 18),
-              TextField(
-                controller: _codeCtrl,
-                autofocus: true,
-                textCapitalization: TextCapitalization.characters,
-                onSubmitted: (_) => _submit(),
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                  fontSize: 20,
-                  color: VisualRefreshColors.textPrimary,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'ABC123',
-                  filled: true,
-                  fillColor: VisualRefreshColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: VisualRefreshColors.border,
-                      width: 0.5,
-                    ),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: VisualRefreshColors.border,
-                      width: 0.5,
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(
-                      color: VisualRefreshColors.accent,
-                      width: 1.2,
-                    ),
-                  ),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: online
+                      ? (selected
+                          ? VisualRefreshColors.background
+                          : VisualRefreshColors.accent)
+                      : VisualRefreshColors.textTertiary,
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 52,
-                child: FilledButton(
-                  onPressed: _submit,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: VisualRefreshColors.anchor,
-                    foregroundColor: VisualRefreshColors.background,
-                    elevation: 0,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: Text(
-                    l10n.acceptInvite,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
+              const SizedBox(width: 8),
+              Text(
+                name,
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                  color: selected
+                      ? VisualRefreshColors.background
+                      : VisualRefreshColors.textPrimary,
                 ),
               ),
             ],
@@ -631,55 +904,47 @@ class _EnterGuardianInviteCodeSheetState
   }
 }
 
-/// Owns the invite-code [TextEditingController] for the legacy dialog lifetime.
-class _EnterGuardianInviteCodeDialog extends StatefulWidget {
-  const _EnterGuardianInviteCodeDialog();
+class _AlertsEmptyState extends StatelessWidget {
+  const _AlertsEmptyState({required this.message});
 
-  @override
-  State<_EnterGuardianInviteCodeDialog> createState() =>
-      _EnterGuardianInviteCodeDialogState();
-}
-
-class _EnterGuardianInviteCodeDialogState
-    extends State<_EnterGuardianInviteCodeDialog> {
-  final _codeCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _codeCtrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    Navigator.pop(context, _codeCtrl.text.trim());
-  }
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l10n.enterGuardianInviteCode),
-      content: TextField(
-        controller: _codeCtrl,
-        autofocus: true,
-        textCapitalization: TextCapitalization.characters,
-        onSubmitted: (_) => _submit(),
-        decoration: InputDecoration(
-          labelText: l10n.inviteCodeLabel,
-          hintText: l10n.enterGuardianInviteCodeHint,
-        ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        color: VisualRefreshColors.tagMuted,
+        borderRadius: BorderRadius.circular(AppRadius.vrCard),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.cancel),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          style: FilledButton.styleFrom(backgroundColor: AppColors.teal),
-          child: Text(l10n.acceptInvite),
-        ),
-      ],
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: VisualRefreshColors.accentTint,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              size: 16,
+              color: VisualRefreshColors.accent,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                color: VisualRefreshColors.textSecondary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

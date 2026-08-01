@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
-import { canManageChildFeatures } from '../middleware/roles.js';
+import { canManageChildFeatures, canViewChild } from '../middleware/roles.js';
 import {
   applyPrimaryToChildren,
   activateMeetingPoints,
@@ -42,7 +42,7 @@ emergencyMeetingRouter.get('/', async (req: AuthedRequest, res, next) => {
     let childId: string;
     if (typeof req.query.childId === 'string' && req.query.childId.length > 0) {
       childId = z.string().uuid().parse(req.query.childId);
-      if (childId !== userId && !(await canManageChildFeatures(userId, childId))) {
+      if (childId !== userId && !(await canViewChild(userId, childId))) {
         res.status(404).json({ error: 'child_not_found' });
         return;
       }
@@ -234,7 +234,7 @@ emergencyMeetingRouter.get('/:childId/status', async (req: AuthedRequest, res, n
     }
 
     const childId = z.string().uuid().parse(req.params.childId);
-    if (childId !== userId && !(await canManageChildFeatures(userId, childId))) {
+    if (childId !== userId && !(await canViewChild(userId, childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }

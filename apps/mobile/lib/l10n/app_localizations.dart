@@ -5059,6 +5059,72 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Lihat'**
   String get coachmarkView;
+
+  /// No description provided for @coParentAccessPill.
+  ///
+  /// In id, this message translates to:
+  /// **'AKSES CO-PARENT'**
+  String get coParentAccessPill;
+
+  /// No description provided for @viewOnlyAccessPill.
+  ///
+  /// In id, this message translates to:
+  /// **'AKSES LIHAT SAJA'**
+  String get viewOnlyAccessPill;
+
+  /// No description provided for @guardianCoParentInfoBanner.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda punya akses co-parent ke {name}. Lihat lokasi, kelola alat di bawah.'**
+  String guardianCoParentInfoBanner(String name);
+
+  /// No description provided for @guardianViewOnlyInfoBanner.
+  ///
+  /// In id, this message translates to:
+  /// **'Anda punya akses lihat saja ke {name}. Lihat lokasi dan info keselamatan di bawah.'**
+  String guardianViewOnlyInfoBanner(String name);
+
+  /// No description provided for @sectionManageLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'KELOLA'**
+  String get sectionManageLabel;
+
+  /// No description provided for @sectionViewLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'LIHAT'**
+  String get sectionViewLabel;
+
+  /// No description provided for @sectionAccountLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'AKUN'**
+  String get sectionAccountLabel;
+
+  /// No description provided for @viewPillLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Lihat'**
+  String get viewPillLabel;
+
+  /// No description provided for @guardianAccountTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun'**
+  String get guardianAccountTitle;
+
+  /// No description provided for @guardianAccountInviteSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Tukarkan kode undangan untuk anak lain'**
+  String get guardianAccountInviteSubtitle;
+
+  /// No description provided for @guardianNoLinkedChildren.
+  ///
+  /// In id, this message translates to:
+  /// **'Belum ada anak terhubung. Tukarkan kode undangan dari Akun.'**
+  String get guardianNoLinkedChildren;
 }
 
 class _AppLocalizationsDelegate
