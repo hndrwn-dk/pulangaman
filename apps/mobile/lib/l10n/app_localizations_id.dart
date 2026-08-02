@@ -2893,5 +2893,5 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get guardianNoLinkedChildren =>
-      'Belum ada anak terhubung. Buka Akun untuk memasukkan kode undangan.';
+      'Belum ada anak terhubung. Masukkan kode undangan untuk menghubungkan anak.';
 }

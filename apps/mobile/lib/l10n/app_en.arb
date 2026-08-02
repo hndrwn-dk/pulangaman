@@ -1305,5 +1305,5 @@
   "viewPillLabel": "View",
   "guardianAccountTitle": "Account",
   "guardianAccountInviteSubtitle": "Enter the invite code from the primary parent to link a child",
-  "guardianNoLinkedChildren": "No linked children yet. Open Account to enter an invite code."
+  "guardianNoLinkedChildren": "No linked children yet. Enter an invite code to link a child."
 }

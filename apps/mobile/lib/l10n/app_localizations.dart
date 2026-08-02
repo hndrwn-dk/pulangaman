@@ -5123,7 +5123,7 @@ abstract class AppLocalizations {
   /// No description provided for @guardianNoLinkedChildren.
   ///
   /// In id, this message translates to:
-  /// **'Belum ada anak terhubung. Buka Akun untuk memasukkan kode undangan.'**
+  /// **'Belum ada anak terhubung. Masukkan kode undangan untuk menghubungkan anak.'**
   String get guardianNoLinkedChildren;
 }
 

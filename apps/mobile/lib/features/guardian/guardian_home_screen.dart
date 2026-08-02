@@ -146,15 +146,46 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     }));
   }
 
-  void _openAccount() {
+  void _openInviteRedeem() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => GuardianAccountScreen(
-          // Only first-time (no children) may redeem an invite.
-          allowRedeemInvite: _children.isEmpty,
+        builder: (_) => const GuardianAccountScreen(
+          allowRedeemInvite: true,
         ),
       ),
+    ).then((_) {
+      if (mounted) unawaited(_loadChildren());
+    });
+  }
+
+  Future<void> _confirmLogout() async {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.logout),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: refresh
+                    ? VisualRefreshColors.danger
+                    : AppColors.coral,
+              ),
+              child: Text(l10n.logout),
+            ),
+          ],
+        );
+      },
     );
+    if (ok != true || !mounted) return;
+    await ref.read(authControllerProvider.notifier).logout();
   }
 
   Future<void> _loadChildren() async {
@@ -331,13 +362,6 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     });
   }
 
-  String _initials(String? name) {
-    final parts = (name ?? '').trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return 'G';
-    if (parts.length == 1) return parts.first[0].toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
-  }
-
   void _openTool({required Widget screen}) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
@@ -378,14 +402,13 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 greeting: period.greeting(l10n),
                 greetingIcon: period.icon,
                 name: auth.name ?? l10n.greetingDefaultName,
-                initials: _initials(auth.name),
                 accessPill: canManage
                     ? l10n.coParentAccessPill
                     : l10n.viewOnlyAccessPill,
                 showAccessPill: selected != null,
                 notificationCount: unreadCount,
                 onNotifications: () => _openInbox(),
-                onAccount: _openAccount,
+                onLogout: () => unawaited(_confirmLogout()),
               ),
               const SizedBox(height: 18),
               if (_loadingChildren)
@@ -393,7 +416,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                   padding: EdgeInsets.symmetric(vertical: 48),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_children.isEmpty)
+              else if (_children.isEmpty) ...[
                 Text(
                   l10n.guardianNoLinkedChildren,
                   style: TextStyle(
@@ -401,7 +424,24 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                         ? VisualRefreshColors.textSecondary
                         : AppColors.inkSoft,
                   ),
-                )
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: _openInviteRedeem,
+                  icon: const Icon(Icons.vpn_key_outlined),
+                  label: Text(l10n.enterGuardianInviteCode),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor:
+                        refresh ? VisualRefreshColors.anchor : AppColors.teal,
+                    side: BorderSide(
+                      color: refresh
+                          ? VisualRefreshColors.border
+                          : AppColors.teal,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ]
               else ...[
                 Row(
                   children: [
@@ -553,12 +593,6 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                       screen: const GuardiansEntryScreen(readOnly: true),
                     ),
                   ),
-                  _ToolRow(
-                    icon: Icons.manage_accounts_outlined,
-                    title: l10n.guardianAccountTitle,
-                    canManage: true,
-                    onTap: _openAccount,
-                  ),
                 ],
               ],
               const SizedBox(height: 24),
@@ -620,23 +654,21 @@ class _GuardianHeader extends StatelessWidget {
     required this.greeting,
     required this.greetingIcon,
     required this.name,
-    required this.initials,
     required this.accessPill,
     required this.showAccessPill,
     required this.notificationCount,
     required this.onNotifications,
-    required this.onAccount,
+    required this.onLogout,
   });
 
   final String greeting;
   final IconData greetingIcon;
   final String name;
-  final String initials;
   final String accessPill;
   final bool showAccessPill;
   final int notificationCount;
   final VoidCallback onNotifications;
-  final VoidCallback onAccount;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -778,23 +810,27 @@ class _GuardianHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Material(
-              color: VisualRefreshColors.anchor,
-              shape: const CircleBorder(),
+              color: refresh ? VisualRefreshColors.surface : Colors.white,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: refresh
+                      ? VisualRefreshColors.border
+                      : const Color(0xFFE2E6EA),
+                  width: 0.5,
+                ),
+              ),
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: onAccount,
+                onTap: onLogout,
                 child: SizedBox(
                   width: 40,
                   height: 40,
-                  child: Center(
-                    child: Text(
-                      initials,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: VisualRefreshColors.background,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
+                  child: Icon(
+                    refresh ? Icons.logout_outlined : Icons.logout,
+                    size: 20,
+                    color: refresh
+                        ? VisualRefreshColors.textPrimary
+                        : null,
                   ),
                 ),
               ),

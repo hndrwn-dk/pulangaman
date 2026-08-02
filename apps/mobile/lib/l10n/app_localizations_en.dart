@@ -2896,5 +2896,5 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guardianNoLinkedChildren =>
-      'No linked children yet. Open Account to enter an invite code.';
+      'No linked children yet. Enter an invite code to link a child.';
 }
