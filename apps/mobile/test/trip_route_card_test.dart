@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pulangaman/features/parent/trip_route_card.dart';
+import 'package:pulangaman/l10n/app_localizations.dart';
 
 void main() {
   testWidgets('TripRouteCard fills progress bar partially', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('id'),
+        home: const Scaffold(
           body: TripRouteCard(
             fromLabel: 'Sekolah',
             toLabel: 'Mall',
@@ -32,6 +36,9 @@ void main() {
     var started = false;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('id'),
         home: Scaffold(
           body: TripRouteCard(
             fromLabel: 'Rumah',

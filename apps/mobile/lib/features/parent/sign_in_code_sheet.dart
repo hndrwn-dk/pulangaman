@@ -48,11 +48,9 @@ class SignInCodeSheet extends StatelessWidget {
   final String? body;
   final String? shareMessage;
 
-  static String formatSpacedCode(String raw) {
-    final cleaned = raw.replaceAll(RegExp(r'\s+'), '').toUpperCase();
-    if (cleaned.length <= 3) return cleaned;
-    final mid = (cleaned.length / 2).ceil();
-    return '${cleaned.substring(0, mid)} ${cleaned.substring(mid)}';
+  /// Uppercase continuous invite code for display (no spaces).
+  static String formatDisplayCode(String raw) {
+    return raw.replaceAll(RegExp(r'\s+'), '').toUpperCase();
   }
 
   static String expiryLabel(AppLocalizations l10n, DateTime? expiresAt) {
@@ -66,7 +64,7 @@ class SignInCodeSheet extends StatelessWidget {
 
   Future<void> _copy(BuildContext context) async {
     final l10n = AppLocalizations.of(context);
-    await Clipboard.setData(ClipboardData(text: code.trim()));
+    await Clipboard.setData(ClipboardData(text: formatDisplayCode(code)));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(l10n.codeCopiedSnack)),
@@ -82,7 +80,7 @@ class SignInCodeSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final spaced = formatSpacedCode(code);
+    final displayCode = formatDisplayCode(code);
     final canShare = shareMessage != null && shareMessage!.trim().isNotEmpty;
 
     return VrSheetShell(
@@ -114,7 +112,7 @@ class SignInCodeSheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                spaced,
+                displayCode,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 32,

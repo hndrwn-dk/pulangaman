@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulangaman/core/day_period.dart';
+import 'package:pulangaman/l10n/app_localizations_id.dart';
 
 void main() {
   test('dayPeriodFor maps morning midday afternoon night bands', () {
@@ -10,7 +11,8 @@ void main() {
   });
 
   test('each period exposes a distinct greeting and icon', () {
-    final greetings = DayPeriod.values.map((p) => p.greetingId).toSet();
+    final l10n = AppLocalizationsId();
+    final greetings = DayPeriod.values.map((p) => p.greeting(l10n)).toSet();
     final icons = DayPeriod.values.map((p) => p.icon).toSet();
     expect(greetings.length, DayPeriod.values.length);
     expect(icons.length, DayPeriod.values.length);

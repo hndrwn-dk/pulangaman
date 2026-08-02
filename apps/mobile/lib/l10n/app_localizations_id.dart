@@ -2458,6 +2458,14 @@ class AppLocalizationsId extends AppLocalizations {
       'Kode undangan tidak valid atau sudah kedaluwarsa';
 
   @override
+  String get guardianInviteAlreadyLinked =>
+      'Akun ini sudah terhubung. Minta orang tua utama untuk menambah anak.';
+
+  @override
+  String get guardianInviteRedeemFailed =>
+      'Gagal memakai kode undangan. Coba lagi.';
+
+  @override
   String get shareCodeAction => 'Bagikan kode';
 
   @override
@@ -2894,4 +2902,35 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get guardianNoLinkedChildren =>
       'Belum ada anak terhubung. Masukkan kode undangan untuk menghubungkan anak.';
+
+  @override
+  String get guardianToolZonesLabel => 'Zona';
+
+  @override
+  String get guardianToolMeetingLabel => 'Kumpul';
+
+  @override
+  String get guardianToolRemindersLabel => 'Pengingat';
+
+  @override
+  String get guardianToolHomeTimeLabel => 'Jam pulang';
+
+  @override
+  String get guardianToolZonesSub => 'Zona aman';
+
+  @override
+  String get guardianToolMeetingSub => 'EMP';
+
+  @override
+  String get guardianToolRemindersSub => 'Jadwal';
+
+  @override
+  String get guardianToolHomeTimeSub => 'Pulang aman';
+
+  @override
+  String get guardianEmpActiveBannerTitle => 'Titik kumpul aktif';
+
+  @override
+  String get guardianEmpActiveBannerBody =>
+      'Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi.';
 }

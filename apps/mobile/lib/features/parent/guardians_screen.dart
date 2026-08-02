@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/network/api_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -271,31 +272,71 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
 
   Future<void> _loadAll() async {
     setState(() => _loading = true);
+    // Ensure children list is fresh — skip the short-circuit cache gap.
+    await ref.read(childrenControllerProvider.notifier).refresh(force: true);
+    if (!mounted) return;
     final children = ref.read(childrenControllerProvider).items;
     final api = ref.read(apiClientProvider);
     final next = <String, List<Map<String, dynamic>>>{};
     String? primaryId;
     String? primaryName;
-    for (final c in children) {
-      try {
-        final data = await api.get(
-          '/api/v1/guardians',
-          query: {'childId': c.id},
-        );
-        next[c.id] = (data['guardians'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .toList();
-        final pp = data['primaryParent'];
-        if (primaryId == null && pp is Map<String, dynamic>) {
-          final id = pp['id']?.toString();
-          final name = pp['name']?.toString();
-          if (id != null && id.isNotEmpty) {
-            primaryId = id;
-            primaryName = (name != null && name.isNotEmpty) ? name : null;
-          }
+
+    Future<Map<String, dynamic>?> fetchOne(String childId) async {
+      Object? lastError;
+      for (var attempt = 0; attempt < 3; attempt++) {
+        try {
+          return await api.get(
+            '/api/v1/guardians',
+            query: {'childId': childId},
+          );
+        } catch (e) {
+          lastError = e;
+          final rateLimited =
+              e is ApiException && (e.isRateLimited || e.statusCode >= 500);
+          if (!rateLimited || attempt == 2) break;
+          await Future<void>.delayed(
+            Duration(milliseconds: 400 * (attempt + 1)),
+          );
         }
-      } catch (_) {
-        next[c.id] = [];
+      }
+      if (lastError != null) {
+        // Keep prior data for this child when refresh fails.
+        return null;
+      }
+      return null;
+    }
+
+    List<Map<String, dynamic>> mapGuardians(dynamic raw) {
+      final list = raw is List ? raw : const [];
+      return list
+          .map((e) {
+            if (e is Map<String, dynamic>) return e;
+            if (e is Map) return Map<String, dynamic>.from(e);
+            return null;
+          })
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    }
+
+    final results = await Future.wait(children.map((c) => fetchOne(c.id)));
+    for (var i = 0; i < children.length; i++) {
+      final c = children[i];
+      final data = results[i];
+      if (data == null) {
+        // Preserve previous list on transient failure instead of flashing empty.
+        next[c.id] = _byChild[c.id] ?? const [];
+        continue;
+      }
+      next[c.id] = mapGuardians(data['guardians']);
+      final pp = data['primaryParent'];
+      if (primaryId == null && pp is Map) {
+        final ppMap = Map<String, dynamic>.from(pp);
+        final id = ppMap['id']?.toString();
+        final name = ppMap['name']?.toString();
+        if (id != null && id.isNotEmpty) {
+          primaryId = id;
+          primaryName = (name != null && name.isNotEmpty) ? name : null;
+        }
       }
     }
     if (!mounted) return;
@@ -303,8 +344,10 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       _byChild
         ..clear()
         ..addAll(next);
-      _primaryParentId = primaryId;
-      _primaryParentName = primaryName;
+      if (primaryId != null) {
+        _primaryParentId = primaryId;
+        _primaryParentName = primaryName;
+      }
       _loading = false;
     });
   }
@@ -318,7 +361,9 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       for (final g in entry.value) {
         final status = g['status']?.toString() ?? '';
         if (status == 'revoked') continue;
-        final id = g['guardian_id']?.toString() ?? '';
+        final id = g['guardian_id']?.toString() ??
+            g['guardianId']?.toString() ??
+            '';
         if (id.isEmpty) continue;
         final existing = map[id];
         if (existing == null) {
@@ -374,6 +419,36 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       ),
     );
     await _loadAll();
+  }
+
+  Future<void> _confirmLogout() async {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.logout),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: refresh
+                    ? VisualRefreshColors.danger
+                    : AppColors.coral,
+              ),
+              child: Text(l10n.logout),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true || !mounted) return;
+    await ref.read(authControllerProvider.notifier).logout();
   }
 
   Future<void> _createInviteCode({ChildSummary? fixedChild}) async {
@@ -641,7 +716,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                 Text(l10n.guardianInviteCodeBody),
                 const SizedBox(height: 16),
                 SelectableText(
-                  SignInCodeSheet.formatSpacedCode(code),
+                  SignInCodeSheet.formatDisplayCode(code),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 28,
@@ -1058,6 +1133,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                                         const [])
                                     .where((g) => g['status'] != 'revoked')
                                     .toList(),
+                                loading: _loading,
                                 refresh: refresh,
                                 onTap: () => _openChild(children.items[i]),
                               ),
@@ -1142,6 +1218,48 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                    if (widget.readOnly) ...[
+                      const SizedBox(height: 28),
+                      _SectionLabel(
+                        l10n.sectionAccountLabel,
+                        refresh: refresh,
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: auth.loading ? null : _confirmLogout,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: refresh
+                                ? VisualRefreshColors.danger
+                                : AppColors.danger,
+                            side: BorderSide(
+                              color: refresh
+                                  ? VisualRefreshColors.danger
+                                  : AppColors.danger,
+                              width: 1,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                          icon: Icon(
+                            refresh
+                                ? Icons.logout_rounded
+                                : Icons.logout,
+                            size: 20,
+                          ),
+                          label: Text(
+                            l10n.logout,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15.5,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1234,6 +1352,7 @@ class _ChildAccessRow extends StatelessWidget {
     required this.gender,
     required this.guardians,
     required this.onTap,
+    this.loading = false,
     this.refresh = false,
   });
 
@@ -1241,6 +1360,7 @@ class _ChildAccessRow extends StatelessWidget {
   final ChildGender gender;
   final List<Map<String, dynamic>> guardians;
   final VoidCallback onTap;
+  final bool loading;
   final bool refresh;
 
   @override
@@ -1251,11 +1371,16 @@ class _ChildAccessRow extends StatelessWidget {
         .where((n) => n.isNotEmpty)
         .take(2)
         .join(', ');
-    final subtitle = guardians.isEmpty
-        ? l10n.zeroGuardiansAdd
-        : names.isEmpty
-            ? l10n.guardiansCountOnly(guardians.length)
-            : l10n.guardiansCountNamed(guardians.length, names);
+    final String subtitle;
+    if (loading && guardians.isEmpty) {
+      subtitle = '…';
+    } else if (guardians.isEmpty) {
+      subtitle = l10n.zeroGuardiansAdd;
+    } else if (names.isEmpty) {
+      subtitle = l10n.guardiansCountOnly(guardians.length);
+    } else {
+      subtitle = l10n.guardiansCountNamed(guardians.length, names);
+    }
 
     return Material(
       color: Colors.transparent,
@@ -1356,19 +1481,43 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    try {
-      final api = ref.read(apiClientProvider);
-      final data = await api.get('/api/v1/guardians', query: {
-        'childId': widget.child.id,
-      });
+    final api = ref.read(apiClientProvider);
+    Object? lastError;
+    Map<String, dynamic>? data;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        data = await api.get('/api/v1/guardians', query: {
+          'childId': widget.child.id,
+        });
+        lastError = null;
+        break;
+      } catch (e) {
+        lastError = e;
+        final rateLimited =
+            e is ApiException && (e.isRateLimited || e.statusCode >= 500);
+        if (!rateLimited || attempt == 2) break;
+        await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      }
+    }
+    if (!mounted) return;
+    if (data != null) {
+      final raw = data['guardians'] as List<dynamic>? ?? [];
       setState(() {
-        _guardians = (data['guardians'] as List<dynamic>? ?? [])
+        _guardians = raw
+            .map((e) {
+              if (e is Map<String, dynamic>) return e;
+              if (e is Map) return Map<String, dynamic>.from(e);
+              return null;
+            })
             .whereType<Map<String, dynamic>>()
             .toList();
         _loading = false;
       });
-    } catch (_) {
+    } else {
       setState(() => _loading = false);
+      if (lastError != null) {
+        // Keep prior list; avoid wiping on transient errors.
+      }
     }
   }
 
@@ -1512,7 +1661,7 @@ class _GuardiansScreenState extends ConsumerState<GuardiansScreen> {
           builder: (ctx) => AlertDialog(
             title: Text(l10n.guardianInviteCodeTitle(widget.child.name)),
             content: SelectableText(
-              SignInCodeSheet.formatSpacedCode(code),
+              SignInCodeSheet.formatDisplayCode(code),
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,

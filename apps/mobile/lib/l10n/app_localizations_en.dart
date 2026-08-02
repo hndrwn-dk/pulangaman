@@ -2456,6 +2456,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get guardianInviteInvalidCode => 'Invalid or expired invite code';
 
   @override
+  String get guardianInviteAlreadyLinked =>
+      'This account is already linked. Ask the primary parent to add more children.';
+
+  @override
+  String get guardianInviteRedeemFailed =>
+      'Could not redeem invite. Try again.';
+
+  @override
   String get shareCodeAction => 'Share code';
 
   @override
@@ -2897,4 +2905,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get guardianNoLinkedChildren =>
       'No linked children yet. Enter an invite code to link a child.';
+
+  @override
+  String get guardianToolZonesLabel => 'Zones';
+
+  @override
+  String get guardianToolMeetingLabel => 'Meeting';
+
+  @override
+  String get guardianToolRemindersLabel => 'Reminders';
+
+  @override
+  String get guardianToolHomeTimeLabel => 'Home Time';
+
+  @override
+  String get guardianToolZonesSub => 'Safe Zones';
+
+  @override
+  String get guardianToolMeetingSub => 'EMP';
+
+  @override
+  String get guardianToolRemindersSub => 'Schedule';
+
+  @override
+  String get guardianToolHomeTimeSub => 'Safe home';
+
+  @override
+  String get guardianEmpActiveBannerTitle => 'Meeting point active';
+
+  @override
+  String get guardianEmpActiveBannerBody =>
+      'Emergency meeting point is live — open for location and instructions.';
 }

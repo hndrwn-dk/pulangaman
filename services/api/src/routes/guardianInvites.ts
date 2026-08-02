@@ -11,6 +11,10 @@ import {
   listPrimaryChildren,
   type GuardianAccessLevel,
 } from '../middleware/roles.js';
+import {
+  isValidInviteCodeLength,
+  normalizeInviteCode,
+} from '../utils/inviteCode.js';
 
 export const guardianInvitesRouter = Router();
 
@@ -26,10 +30,6 @@ function generateInviteCode(): string {
     code += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length];
   }
   return code;
-}
-
-function normalizeCode(raw: string): string {
-  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 function toIsoUtc(value: Date | string): string {
@@ -318,13 +318,14 @@ guardianInvitesRouter.post(
 
       const body = z
         .object({
-          code: z.string().min(4).max(16),
+          // Allow spaced / punctuated display forms (e.g. "XE6 RJ7"); normalize next.
+          code: z.string().min(1).max(64),
           name: z.string().min(1).max(120).optional(),
         })
         .parse(req.body);
 
-      const code = normalizeCode(body.code);
-      if (code.length < 4) {
+      const code = normalizeInviteCode(body.code);
+      if (!isValidInviteCodeLength(code)) {
         res.status(400).json({ error: 'invalid_invite_code' });
         return;
       }

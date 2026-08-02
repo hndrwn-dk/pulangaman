@@ -4406,6 +4406,18 @@ abstract class AppLocalizations {
   /// **'Kode undangan tidak valid atau sudah kedaluwarsa'**
   String get guardianInviteInvalidCode;
 
+  /// No description provided for @guardianInviteAlreadyLinked.
+  ///
+  /// In id, this message translates to:
+  /// **'Akun ini sudah terhubung. Minta orang tua utama untuk menambah anak.'**
+  String get guardianInviteAlreadyLinked;
+
+  /// No description provided for @guardianInviteRedeemFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal memakai kode undangan. Coba lagi.'**
+  String get guardianInviteRedeemFailed;
+
   /// No description provided for @shareCodeAction.
   ///
   /// In id, this message translates to:
@@ -5125,6 +5137,66 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Belum ada anak terhubung. Masukkan kode undangan untuk menghubungkan anak.'**
   String get guardianNoLinkedChildren;
+
+  /// No description provided for @guardianToolZonesLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Zona'**
+  String get guardianToolZonesLabel;
+
+  /// No description provided for @guardianToolMeetingLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Kumpul'**
+  String get guardianToolMeetingLabel;
+
+  /// No description provided for @guardianToolRemindersLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengingat'**
+  String get guardianToolRemindersLabel;
+
+  /// No description provided for @guardianToolHomeTimeLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Jam pulang'**
+  String get guardianToolHomeTimeLabel;
+
+  /// No description provided for @guardianToolZonesSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Zona aman'**
+  String get guardianToolZonesSub;
+
+  /// No description provided for @guardianToolMeetingSub.
+  ///
+  /// In id, this message translates to:
+  /// **'EMP'**
+  String get guardianToolMeetingSub;
+
+  /// No description provided for @guardianToolRemindersSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Jadwal'**
+  String get guardianToolRemindersSub;
+
+  /// No description provided for @guardianToolHomeTimeSub.
+  ///
+  /// In id, this message translates to:
+  /// **'Pulang aman'**
+  String get guardianToolHomeTimeSub;
+
+  /// No description provided for @guardianEmpActiveBannerTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik kumpul aktif'**
+  String get guardianEmpActiveBannerTitle;
+
+  /// No description provided for @guardianEmpActiveBannerBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi.'**
+  String get guardianEmpActiveBannerBody;
 }
 
 class _AppLocalizationsDelegate

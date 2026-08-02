@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/network/api_client.dart';
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../parent/vr_sheet_chrome.dart';
+
+/// Normalize invite codes the same way the API does (spaces/punctuation stripped).
+String normalizeGuardianInviteCode(String raw) {
+  return raw.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+}
 
 /// Minimal guardian Account: optional invite redeem (first join only) + sign out.
 class GuardianAccountScreen extends ConsumerStatefulWidget {
@@ -75,8 +81,8 @@ class _GuardianAccountScreenState extends ConsumerState<GuardianAccountScreen> {
           );
 
     if (code == null || !mounted) return;
-    final trimmed = code.trim();
-    if (trimmed.length < 4) {
+    final normalized = normalizeGuardianInviteCode(code);
+    if (normalized.length < 4) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
       );
@@ -86,7 +92,7 @@ class _GuardianAccountScreenState extends ConsumerState<GuardianAccountScreen> {
     try {
       final data = await ref.read(apiClientProvider).post(
         '/api/v1/guardian-invites/redeem',
-        body: {'code': trimmed},
+        body: {'code': normalized},
       );
       await _loadInvites();
       if (!mounted) return;
@@ -100,10 +106,23 @@ class _GuardianAccountScreenState extends ConsumerState<GuardianAccountScreen> {
           ),
         ),
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      final message = switch (e.errorCode) {
+        'already_linked' => l10n.guardianInviteAlreadyLinked,
+        'invalid_invite_code' ||
+        'invite_not_found_or_used' ||
+        'invite_no_children' =>
+          l10n.guardianInviteInvalidCode,
+        _ => l10n.guardianInviteRedeemFailed,
+      };
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.guardianInviteInvalidCode)),
+        SnackBar(content: Text(l10n.guardianInviteRedeemFailed)),
       );
     }
   }

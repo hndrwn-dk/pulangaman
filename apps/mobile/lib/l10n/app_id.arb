@@ -1494,6 +1494,8 @@
     }
   },
   "guardianInviteInvalidCode": "Kode undangan tidak valid atau sudah kedaluwarsa",
+  "guardianInviteAlreadyLinked": "Akun ini sudah terhubung. Minta orang tua utama untuk menambah anak.",
+  "guardianInviteRedeemFailed": "Gagal memakai kode undangan. Coba lagi.",
   "shareCodeAction": "Bagikan kode",
   "guardianInviteSubject": "Undangan Wali Terpercaya PulangAman",
   "activeGuardiansCount": "{count} wali aktif",
@@ -1741,5 +1743,15 @@
   "viewPillLabel": "Lihat",
   "guardianAccountTitle": "Akun",
   "guardianAccountInviteSubtitle": "Masukkan kode undangan dari orang tua utama untuk menghubungkan anak",
-  "guardianNoLinkedChildren": "Belum ada anak terhubung. Masukkan kode undangan untuk menghubungkan anak."
+  "guardianNoLinkedChildren": "Belum ada anak terhubung. Masukkan kode undangan untuk menghubungkan anak.",
+  "guardianToolZonesLabel": "Zona",
+  "guardianToolMeetingLabel": "Kumpul",
+  "guardianToolRemindersLabel": "Pengingat",
+  "guardianToolHomeTimeLabel": "Jam pulang",
+  "guardianToolZonesSub": "Zona aman",
+  "guardianToolMeetingSub": "EMP",
+  "guardianToolRemindersSub": "Jadwal",
+  "guardianToolHomeTimeSub": "Pulang aman",
+  "guardianEmpActiveBannerTitle": "Titik kumpul aktif",
+  "guardianEmpActiveBannerBody": "Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi."
 }

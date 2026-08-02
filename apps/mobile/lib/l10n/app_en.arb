@@ -1058,6 +1058,8 @@
     }
   },
   "guardianInviteInvalidCode": "Invalid or expired invite code",
+  "guardianInviteAlreadyLinked": "This account is already linked. Ask the primary parent to add more children.",
+  "guardianInviteRedeemFailed": "Could not redeem invite. Try again.",
   "shareCodeAction": "Share code",
   "guardianInviteSubject": "PulangAman Trusted Guardian Invite",
   "activeGuardiansCount": "{count, plural, =0{0 active guardians} =1{1 active guardian} other{{count} active guardians}}",
@@ -1305,5 +1307,15 @@
   "viewPillLabel": "View",
   "guardianAccountTitle": "Account",
   "guardianAccountInviteSubtitle": "Enter the invite code from the primary parent to link a child",
-  "guardianNoLinkedChildren": "No linked children yet. Enter an invite code to link a child."
+  "guardianNoLinkedChildren": "No linked children yet. Enter an invite code to link a child.",
+  "guardianToolZonesLabel": "Zones",
+  "guardianToolMeetingLabel": "Meeting",
+  "guardianToolRemindersLabel": "Reminders",
+  "guardianToolHomeTimeLabel": "Home Time",
+  "guardianToolZonesSub": "Safe Zones",
+  "guardianToolMeetingSub": "EMP",
+  "guardianToolRemindersSub": "Schedule",
+  "guardianToolHomeTimeSub": "Safe home",
+  "guardianEmpActiveBannerTitle": "Meeting point active",
+  "guardianEmpActiveBannerBody": "Emergency meeting point is live — open for location and instructions."
 }

@@ -770,7 +770,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
                 ...children.pendingInvites.map((invite) {
                   final refresh = visualRefreshOf(context);
                   final codeLabel = refresh
-                      ? SignInCodeSheet.formatSpacedCode(invite.code)
+                      ? SignInCodeSheet.formatDisplayCode(invite.code)
                       : invite.code;
                   return Container(
                     margin: const EdgeInsets.only(bottom: 8),

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -47,8 +46,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
   final Map<String, DateTime?> _updatedAt = {};
   final Map<String, ChildGender> _genders = {};
   Timer? _locationPoll;
-  String? _alertId;
-  String? _alertChildId;
+  Map<String, dynamic>? _empActivation;
   bool _loadingChildren = true;
 
   ChildSummary? get _selected {
@@ -71,6 +69,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     Future.microtask(_bootstrap);
     _locationPoll = Timer.periodic(const Duration(seconds: 20), (_) {
       unawaited(_loadLocations());
+      unawaited(_loadEmpActivation());
     });
   }
 
@@ -90,7 +89,22 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
       'status': 'ONLINE',
     });
     await _loadLocations();
+    await _loadEmpActivation();
     await _loadMessages();
+  }
+
+  Future<void> _loadEmpActivation() async {
+    try {
+      final data = await ref
+          .read(apiClientProvider)
+          .get('/api/v1/emergency-meeting-points/activation');
+      if (!mounted) return;
+      final activation = data['activation'];
+      setState(() {
+        _empActivation =
+            activation is Map<String, dynamic> ? activation : null;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadMessages() async {
@@ -158,34 +172,8 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     });
   }
 
-  Future<void> _confirmLogout() async {
-    final l10n = AppLocalizations.of(context);
-    final refresh = visualRefreshOf(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(l10n.logout),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.cancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: refresh
-                    ? VisualRefreshColors.danger
-                    : AppColors.coral,
-              ),
-              child: Text(l10n.logout),
-            ),
-          ],
-        );
-      },
-    );
-    if (ok != true || !mounted) return;
-    await ref.read(authControllerProvider.notifier).logout();
+  void _openTrustedGuardians() {
+    _openTool(screen: const GuardiansEntryScreen(readOnly: true));
   }
 
   Future<void> _loadChildren() async {
@@ -259,13 +247,8 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
   }
 
   void _onWs(String event, Map<String, dynamic> payload) {
-    if (event == 'guardian:alert_notify') {
-      setState(() {
-        _alertId = payload['alertId'] as String?;
-        _alertChildId = payload['childId'] as String?;
-      });
-    }
     if (event == 'guardian:emergency_meeting_alert') {
+      unawaited(_loadEmpActivation());
       unawaited(_openEmergencyMeeting(payload));
     }
     if (event == 'child:location_update') {
@@ -334,36 +317,34 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _ack() async {
-    if (_alertId == null) return;
-    final api = ref.read(apiClientProvider);
-    await api.post('/api/v1/panic/$_alertId/guardian-ack');
-  }
-
-  Future<void> _shareLocation() async {
-    if (_alertId == null) return;
-    final pos = await Geolocator.getCurrentPosition();
-    final api = ref.read(apiClientProvider);
-    await api.post('/api/v1/guardians/share-location', body: {
-      'alertId': _alertId,
-      'lat': pos.latitude,
-      'lng': pos.longitude,
-    });
-  }
-
-  Future<void> _needBackup() async {
-    if (_alertId == null) return;
-    final l10n = AppLocalizations.of(context);
-    final api = ref.read(apiClientProvider);
-    await api.post('/api/v1/panic/$_alertId/need-backup', body: {
-      'notes': l10n.needExtraHelpNote,
-    });
+    if (mounted) await _loadEmpActivation();
   }
 
   void _openTool({required Widget screen}) {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
+  Future<void> _openEmpTool() async {
+    final selected = _selected;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EmergencyMeetingScreen(
+          lockedChild: selected,
+          readOnly: !_canManageSelected,
+        ),
+      ),
+    );
+    if (mounted) await _loadEmpActivation();
+  }
+
+  String _initials(String? name) {
+    final parts = (name ?? '').trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return 'WA';
+    if (parts.length == 1) {
+      final s = parts.first;
+      return (s.length >= 2 ? s.substring(0, 2) : s).toUpperCase();
+    }
+    return ('${parts[0][0]}${parts[1][0]}').toUpperCase();
   }
 
   @override
@@ -383,6 +364,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     final canManage = _canManageSelected;
     final period = dayPeriodFor();
     final unreadCount = _kabarRead.unreadOf(_messages).length;
+    final empActive = _empActivation != null;
 
     return Scaffold(
       backgroundColor:
@@ -393,6 +375,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
           onRefresh: () async {
             await _loadChildren();
             await _loadLocations();
+            await _loadEmpActivation();
             await _loadMessages();
           },
           child: ListView(
@@ -402,13 +385,14 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 greeting: period.greeting(l10n),
                 greetingIcon: period.icon,
                 name: auth.name ?? l10n.greetingDefaultName,
+                initials: _initials(auth.name),
                 accessPill: canManage
                     ? l10n.coParentAccessPill
                     : l10n.viewOnlyAccessPill,
                 showAccessPill: selected != null,
                 notificationCount: unreadCount,
                 onNotifications: () => _openInbox(),
-                onLogout: () => unawaited(_confirmLogout()),
+                onAvatar: _openTrustedGuardians,
               ),
               const SizedBox(height: 18),
               if (_loadingChildren)
@@ -443,6 +427,10 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 ),
               ]
               else ...[
+                if (empActive) ...[
+                  _EmpActiveBanner(onOpen: () => unawaited(_openEmpTool())),
+                  const SizedBox(height: 14),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -536,111 +524,31 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                         : l10n.sectionViewLabel,
                   ),
                   const SizedBox(height: 10),
-                  _ToolRow(
-                    icon: Icons.map_outlined,
-                    title: l10n.zonesTitle,
+                  _ToolsGrid(
                     canManage: canManage,
-                    onTap: () => _openTool(
+                    onZones: () => _openTool(
                       screen: PlacesEntryScreen(
                         lockedChild: selected,
                         readOnly: !canManage,
                       ),
                     ),
-                  ),
-                  _ToolRow(
-                    icon: Icons.emergency_share_outlined,
-                    title: l10n.empTitle,
-                    canManage: canManage,
-                    onTap: () => _openTool(
-                      screen: EmergencyMeetingScreen(
-                        lockedChild: selected,
-                        readOnly: !canManage,
-                      ),
-                    ),
-                  ),
-                  _ToolRow(
-                    icon: Icons.alarm_outlined,
-                    title: l10n.remindersTitle,
-                    canManage: canManage,
-                    onTap: () => _openTool(
+                    onMeeting: () => unawaited(_openEmpTool()),
+                    onReminders: () => _openTool(
                       screen: RemindersScreen(
                         initialChildId: selected.id,
                         lockChild: true,
                         readOnly: !canManage,
                       ),
                     ),
-                  ),
-                  _ToolRow(
-                    icon: Icons.home_outlined,
-                    title: l10n.homeByTitle,
-                    canManage: canManage,
-                    onTap: () => _openTool(
+                    onHomeTime: () => _openTool(
                       screen: HomeByScreen(
                         lockedChild: selected,
                         readOnly: !canManage,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  _SectionLabel(l10n.sectionAccountLabel),
-                  const SizedBox(height: 10),
-                  _ToolRow(
-                    icon: Icons.people_outline,
-                    title: l10n.guardiansTitle,
-                    // Roster invite/promote/revoke is primary-only; co-parent is view.
-                    canManage: false,
-                    onTap: () => _openTool(
-                      screen: const GuardiansEntryScreen(readOnly: true),
-                    ),
-                  ),
                 ],
               ],
-              const SizedBox(height: 24),
-              Text(
-                l10n.activeAlerts,
-                style: refresh
-                    ? GoogleFonts.fraunces(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                        color: VisualRefreshColors.textPrimary,
-                      )
-                    : Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 10),
-              if (_alertId == null)
-                _AlertsEmptyState(message: l10n.noActiveAlerts)
-              else
-                Card(
-                  color: refresh
-                      ? VisualRefreshColors.dangerTint
-                      : const Color(0xFFFEE4E2),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(l10n.alertLabelWithId(_alertId!)),
-                        if (_alertChildId != null)
-                          Text(l10n.childIdLabel(_alertChildId!)),
-                        const SizedBox(height: 12),
-                        FilledButton(
-                          onPressed: _ack,
-                          child: Text(l10n.ackAlert),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: _shareLocation,
-                          child: Text(l10n.shareLocation),
-                        ),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: _needBackup,
-                          child: Text(l10n.needBackup),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
@@ -654,21 +562,23 @@ class _GuardianHeader extends StatelessWidget {
     required this.greeting,
     required this.greetingIcon,
     required this.name,
+    required this.initials,
     required this.accessPill,
     required this.showAccessPill,
     required this.notificationCount,
     required this.onNotifications,
-    required this.onLogout,
+    required this.onAvatar,
   });
 
   final String greeting;
   final IconData greetingIcon;
   final String name;
+  final String initials;
   final String accessPill;
   final bool showAccessPill;
   final int notificationCount;
   final VoidCallback onNotifications;
-  final VoidCallback onLogout;
+  final VoidCallback onAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -810,27 +720,26 @@ class _GuardianHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Material(
-              color: refresh ? VisualRefreshColors.surface : Colors.white,
-              shape: CircleBorder(
-                side: BorderSide(
-                  color: refresh
-                      ? VisualRefreshColors.border
-                      : const Color(0xFFE2E6EA),
-                  width: 0.5,
-                ),
-              ),
+              color: refresh ? VisualRefreshColors.anchor : AppColors.tealDeep,
+              shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: onLogout,
+                onTap: onAvatar,
                 child: SizedBox(
                   width: 40,
                   height: 40,
-                  child: Icon(
-                    refresh ? Icons.logout_outlined : Icons.logout,
-                    size: 20,
-                    color: refresh
-                        ? VisualRefreshColors.textPrimary
-                        : null,
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        fontFamily: refresh
+                            ? GoogleFonts.plusJakartaSans().fontFamily
+                            : null,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -838,6 +747,89 @@ class _GuardianHeader extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _EmpActiveBanner extends StatelessWidget {
+  const _EmpActiveBanner({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    final radius = BorderRadius.circular(refresh ? AppRadius.vrCard : 16);
+
+    return Material(
+      color: refresh
+          ? VisualRefreshColors.dangerTint
+          : const Color(0xFFFFE8E6),
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: radius,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(
+              color: refresh
+                  ? VisualRefreshColors.dangerTintBorder
+                  : AppColors.danger.withValues(alpha: 0.25),
+              width: 0.5,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 22,
+                color: refresh
+                    ? VisualRefreshColors.danger
+                    : AppColors.danger,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.guardianEmpActiveBannerTitle,
+                      style: refresh
+                          ? GoogleFonts.fraunces(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: VisualRefreshColors.danger,
+                            )
+                          : const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: AppColors.danger,
+                            ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.guardianEmpActiveBannerBody,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: refresh
+                            ? VisualRefreshColors.textPrimary
+                            : AppColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -909,76 +901,197 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _ToolRow extends StatelessWidget {
-  const _ToolRow({
+class _ToolsGrid extends StatelessWidget {
+  const _ToolsGrid({
+    required this.canManage,
+    required this.onZones,
+    required this.onMeeting,
+    required this.onReminders,
+    required this.onHomeTime,
+  });
+
+  final bool canManage;
+  final VoidCallback onZones;
+  final VoidCallback onMeeting;
+  final VoidCallback onReminders;
+  final VoidCallback onHomeTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final tiles = [
+      (
+        icon: Icons.map_outlined,
+        label: l10n.guardianToolZonesLabel,
+        sub: l10n.guardianToolZonesSub,
+        onTap: onZones,
+      ),
+      (
+        icon: Icons.emergency_share_outlined,
+        label: l10n.guardianToolMeetingLabel,
+        sub: l10n.guardianToolMeetingSub,
+        onTap: onMeeting,
+      ),
+      (
+        icon: Icons.alarm_outlined,
+        label: l10n.guardianToolRemindersLabel,
+        sub: l10n.guardianToolRemindersSub,
+        onTap: onReminders,
+      ),
+      (
+        icon: Icons.home_outlined,
+        label: l10n.guardianToolHomeTimeLabel,
+        sub: l10n.guardianToolHomeTimeSub,
+        onTap: onHomeTime,
+      ),
+    ];
+
+    Widget row(int a, int b) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: _ToolTile(
+              icon: tiles[a].icon,
+              label: tiles[a].label,
+              subtitle: tiles[a].sub,
+              canManage: canManage,
+              onTap: tiles[a].onTap,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _ToolTile(
+              icon: tiles[b].icon,
+              label: tiles[b].label,
+              subtitle: tiles[b].sub,
+              canManage: canManage,
+              onTap: tiles[b].onTap,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        row(0, 1),
+        const SizedBox(height: 12),
+        row(2, 3),
+      ],
+    );
+  }
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({
     required this.icon,
-    required this.title,
+    required this.label,
+    required this.subtitle,
     required this.canManage,
     required this.onTap,
   });
 
   final IconData icon;
-  final String title;
+  final String label;
+  final String subtitle;
   final bool canManage;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final refresh = visualRefreshOf(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: refresh ? VisualRefreshColors.surface : Colors.white,
-        borderRadius: BorderRadius.circular(refresh ? AppRadius.vrCard : 14),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(refresh ? AppRadius.vrCard : 14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              borderRadius:
-                  BorderRadius.circular(refresh ? AppRadius.vrCard : 14),
-              border: refresh
-                  ? Border.all(color: VisualRefreshColors.border, width: 0.5)
-                  : null,
-            ),
-            child: Row(
-              children: [
-                if (canManage)
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: VisualRefreshColors.accentTint,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: VisualRefreshColors.accent),
-                  )
-                else
-                  Icon(icon, color: VisualRefreshColors.textSecondary),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: refresh ? VisualRefreshColors.textPrimary : null,
-                      fontFamily: refresh
-                          ? GoogleFonts.plusJakartaSans().fontFamily
-                          : null,
-                    ),
+    final radius = BorderRadius.circular(14);
+    final tileBg = canManage
+        ? VisualRefreshColors.accentTint
+        : VisualRefreshColors.surface;
+    final iconCircleBg = canManage
+        ? VisualRefreshColors.surface
+        : VisualRefreshColors.tagMuted;
+    final iconColor = canManage
+        ? VisualRefreshColors.accent
+        : VisualRefreshColors.textSecondary;
+
+    return Material(
+      color: tileBg,
+      borderRadius: radius,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: canManage
+                ? null
+                : Border.all(
+                    color: VisualRefreshColors.border,
+                    width: 1,
+                  ),
+          ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: iconCircleBg,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          icon,
+                          size: 20,
+                          color: iconColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          height: 1.15,
+                          color: VisualRefreshColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 10.5,
+                          height: 1.15,
+                          color: VisualRefreshColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (canManage)
-                  Icon(
-                    Icons.chevron_right,
-                    color: VisualRefreshColors.textTertiary,
-                  )
-                else
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              ),
+              if (!canManage)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: VisualRefreshColors.tagMuted,
                       borderRadius: BorderRadius.circular(999),
@@ -986,14 +1099,15 @@ class _ToolRow extends StatelessWidget {
                     child: Text(
                       l10n.viewPillLabel,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
+                        fontSize: 8,
                         fontWeight: FontWeight.w700,
-                        color: VisualRefreshColors.textSecondary,
+                        height: 1.1,
+                        color: VisualRefreshColors.textTertiary,
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -1061,51 +1175,6 @@ class _ChildChip extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _AlertsEmptyState extends StatelessWidget {
-  const _AlertsEmptyState({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: VisualRefreshColors.tagMuted,
-        borderRadius: BorderRadius.circular(AppRadius.vrCard),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              color: VisualRefreshColors.accentTint,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.check_rounded,
-              size: 16,
-              color: VisualRefreshColors.accent,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.plusJakartaSans(
-                fontWeight: FontWeight.w600,
-                color: VisualRefreshColors.textSecondary,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

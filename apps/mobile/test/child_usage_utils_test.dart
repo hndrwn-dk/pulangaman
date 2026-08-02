@@ -1,17 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulangaman/features/child/child_usage_utils.dart';
+import 'package:pulangaman/l10n/app_localizations_id.dart';
 
 void main() {
+  final l10n = AppLocalizationsId();
+
   group('formatDuration', () {
     test('returns minutes for short durations', () {
-      expect(formatDuration(0), '0 mnt');
-      expect(formatDuration(90), '1 mnt');
-      expect(formatDuration(3599), '59 mnt');
+      expect(formatDuration(l10n, 0), '0 mnt');
+      expect(formatDuration(l10n, 90), '1 mnt');
+      expect(formatDuration(l10n, 3599), '59 mnt');
     });
 
     test('returns hours and minutes for long durations', () {
-      expect(formatDuration(3600), '1 jam 0 mnt');
-      expect(formatDuration(3660), '1 jam 1 mnt');
+      expect(formatDuration(l10n, 3600), '1 jam 0 mnt');
+      expect(formatDuration(l10n, 3660), '1 jam 1 mnt');
     });
   });
 

@@ -11,6 +11,19 @@ class ApiException implements Exception {
 
   bool get isUnauthorized => statusCode == 401;
 
+  bool get isRateLimited => statusCode == 429;
+
+  /// Machine error code from JSON body `{ "error": "..." }`, if present.
+  String? get errorCode {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['error'] != null) {
+        return decoded['error'].toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
   @override
   String toString() => 'ApiException($statusCode): $body';
 }

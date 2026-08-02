@@ -65,13 +65,18 @@ class PlacesEntryScreen extends ConsumerWidget {
 
 /// Detail lokasi untuk satu anak (dari child detail).
 class PlacesScreen extends ConsumerWidget {
-  const PlacesScreen({super.key, required this.child});
+  const PlacesScreen({super.key, required this.child, this.readOnly = false});
 
   final ChildSummary child;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return PlacesHubScreen(lockedChild: child, showBack: true);
+    return PlacesHubScreen(
+      lockedChild: child,
+      showBack: true,
+      readOnly: readOnly || child.isViewOnlyAccess,
+    );
   }
 }
 
@@ -113,6 +118,10 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
       orElse: () => items.first,
     );
   }
+
+  /// View-tier guardians never mutate zones, even if [readOnly] was omitted.
+  bool get _effectiveReadOnly =>
+      widget.readOnly || (_selected?.isViewOnlyAccess ?? false);
 
   @override
   void initState() {
@@ -378,6 +387,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
   /// Single add-place entry (replaces the short Home/School/Other list).
   /// Offers missing home/school chips plus custom presets, then address search.
   Future<void> _showAddMenu() async {
+    if (_effectiveReadOnly) return;
     final child = _selected;
     if (child == null) return;
     await _openAddPlaceSheet();
@@ -959,26 +969,28 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       ? GoogleFonts.plusJakartaSans().fontFamily
                       : null,
                 ),
-                trailing: Material(
-                  color: refresh
-                      ? VisualRefreshColors.accentTint
-                      : const Color(0xFFD8F5E8),
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: selected == null ? null : _showAddMenu,
-                    child: SizedBox(
-                      width: 42,
-                      height: 42,
-                      child: Icon(
-                        Icons.add_rounded,
+                trailing: _effectiveReadOnly
+                    ? null
+                    : Material(
                         color: refresh
-                            ? VisualRefreshColors.accent
-                            : AppColors.tealDeep,
+                            ? VisualRefreshColors.accentTint
+                            : const Color(0xFFD8F5E8),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: selected == null ? null : _showAddMenu,
+                          child: SizedBox(
+                            width: 42,
+                            height: 42,
+                            child: Icon(
+                              Icons.add_rounded,
+                              color: refresh
+                                  ? VisualRefreshColors.accent
+                                  : AppColors.tealDeep,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
               ),
               const SizedBox(height: 14),
               TextField(
@@ -1087,7 +1099,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                         style: sectionTitleStyle,
                       ),
                     ),
-                    if (!widget.readOnly)
+                    if (!_effectiveReadOnly)
                       TextButton(
                         onPressed: () =>
                             setState(() => _editMode = !_editMode),
@@ -1147,22 +1159,22 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                           title: _displayTitle(z, l10n),
                           subtitle: _displaySubtitle(z, l10n),
                           type: type,
-                          editMode: !widget.readOnly && _editMode,
+                          editMode: !_effectiveReadOnly && _editMode,
                           onTap: () {
-                            if (widget.readOnly) return;
+                            if (_effectiveReadOnly) return;
                             if (_editMode) {
                               _deleteZone(z);
                             } else if (type == 'home' || type == 'school') {
                               _addBySearch(type);
                             }
                           },
-                          onDelete: (!widget.readOnly && _editMode)
+                          onDelete: (!_effectiveReadOnly && _editMode)
                               ? () => _deleteZone(z)
                               : null,
                         ),
                       );
                     }),
-                    if (!widget.readOnly && !_editMode)
+                    if (!_effectiveReadOnly && !_editMode)
                       ...missingSlots.map((slot) {
                         final isHome = slot == 'home';
                         return Padding(
@@ -1202,15 +1214,15 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                       progress:
                           (_trip!['progress'] as num?)?.toDouble() ?? 0,
                       status: _trip!['status'] as String?,
-                      onStart: (!widget.readOnly &&
+                      onStart: (!_effectiveReadOnly &&
                               _trip!['status'] == 'planned')
                           ? () => unawaited(_startTrip())
                           : null,
-                      onCancel: widget.readOnly
+                      onCancel: _effectiveReadOnly
                           ? null
                           : () => unawaited(_cancelTrip()),
                     )
-                  else if (!widget.readOnly)
+                  else if (!_effectiveReadOnly)
                     Material(
                       color: Colors.transparent,
                       child: InkWell(
@@ -1261,7 +1273,7 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                     ),
                 ],
                 const SizedBox(height: 18),
-                if (!widget.readOnly)
+                if (!_effectiveReadOnly)
                   _DashedAddButton(
                     label: l10n.addNewPlaceLabel,
                     onTap: selected == null ? () {} : _showAddMenu,
