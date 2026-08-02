@@ -61,6 +61,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeBySkipDatesEmpty => 'No holiday dates yet';
 
   @override
+  String get homeByModeLabel => 'Mode';
+
+  @override
+  String homeBySkipDatesCount(int count) {
+    return '$count holiday dates';
+  }
+
+  @override
   String get homeByTodayStatus => 'Today\'s status';
 
   @override

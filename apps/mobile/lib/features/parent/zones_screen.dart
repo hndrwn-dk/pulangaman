@@ -1160,14 +1160,16 @@ class _PlacesHubScreenState extends ConsumerState<PlacesHubScreen> {
                           subtitle: _displaySubtitle(z, l10n),
                           type: type,
                           editMode: !_effectiveReadOnly && _editMode,
-                          onTap: () {
-                            if (_effectiveReadOnly) return;
-                            if (_editMode) {
-                              _deleteZone(z);
-                            } else if (type == 'home' || type == 'school') {
-                              _addBySearch(type);
-                            }
-                          },
+                          onTap: _effectiveReadOnly
+                              ? null
+                              : () {
+                                  if (_editMode) {
+                                    _deleteZone(z);
+                                  } else if (type == 'home' ||
+                                      type == 'school') {
+                                    _addBySearch(type);
+                                  }
+                                },
                           onDelete: (!_effectiveReadOnly && _editMode)
                               ? () => _deleteZone(z)
                               : null,
@@ -1705,7 +1707,7 @@ class _PlaceListCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.type,
-    required this.onTap,
+    this.onTap,
     this.editMode = false,
     this.empty = false,
     this.onDelete,
@@ -1714,7 +1716,7 @@ class _PlaceListCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String type;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool editMode;
   final bool empty;
   final VoidCallback? onDelete;
@@ -1887,13 +1889,15 @@ class _PlaceListCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: refresh
-                        ? VisualRefreshColors.textSecondary
-                        : AppColors.inkSoft,
-                  ),
+                  if (onTap != null) ...[
+                    const SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: refresh
+                          ? VisualRefreshColors.textSecondary
+                          : AppColors.inkSoft,
+                    ),
+                  ],
                 ],
               ],
             ),

@@ -16,6 +16,15 @@
   "homeBySkipDatesTitle": "Holidays",
   "homeBySkipDatesAdd": "Mark a date",
   "homeBySkipDatesEmpty": "No holiday dates yet",
+  "homeByModeLabel": "Mode",
+  "homeBySkipDatesCount": "{count} holiday dates",
+  "@homeBySkipDatesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "homeByTodayStatus": "Today's status",
   "homeByStatusPending": "Waiting for home time",
   "homeByStatusPreNotified": "Home reminder sent to child",

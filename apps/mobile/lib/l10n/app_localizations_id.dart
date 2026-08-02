@@ -61,6 +61,14 @@ class AppLocalizationsId extends AppLocalizations {
   String get homeBySkipDatesEmpty => 'Belum ada tanggal libur';
 
   @override
+  String get homeByModeLabel => 'Mode';
+
+  @override
+  String homeBySkipDatesCount(int count) {
+    return '$count tanggal libur';
+  }
+
+  @override
   String get homeByTodayStatus => 'Status hari ini';
 
   @override

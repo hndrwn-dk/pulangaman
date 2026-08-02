@@ -23,6 +23,15 @@
   "homeBySkipDatesTitle": "Hari libur",
   "homeBySkipDatesAdd": "Tandai tanggal",
   "homeBySkipDatesEmpty": "Belum ada tanggal libur",
+  "homeByModeLabel": "Mode",
+  "homeBySkipDatesCount": "{count} tanggal libur",
+  "@homeBySkipDatesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "homeByTodayStatus": "Status hari ini",
   "homeByStatusPending": "Menunggu jam pulang",
   "homeByStatusPreNotified": "Pengingat pulang dikirim ke anak",

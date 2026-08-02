@@ -194,6 +194,18 @@ abstract class AppLocalizations {
   /// **'Belum ada tanggal libur'**
   String get homeBySkipDatesEmpty;
 
+  /// No description provided for @homeByModeLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Mode'**
+  String get homeByModeLabel;
+
+  /// No description provided for @homeBySkipDatesCount.
+  ///
+  /// In id, this message translates to:
+  /// **'{count} tanggal libur'**
+  String homeBySkipDatesCount(int count);
+
   /// No description provided for @homeByTodayStatus.
   ///
   /// In id, this message translates to:

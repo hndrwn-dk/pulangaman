@@ -68,6 +68,19 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
 
   bool get _childLocked => widget.lockedChild != null;
 
+  /// View-tier guardians never edit home-by, even if [readOnly] was omitted.
+  bool get _effectiveReadOnly {
+    if (widget.readOnly) return true;
+    final locked = widget.lockedChild;
+    if (locked != null) return locked.isViewOnlyAccess;
+    final id = _childId;
+    if (id == null) return false;
+    for (final c in ref.read(childrenControllerProvider).items) {
+      if (c.id == id) return c.isViewOnlyAccess;
+    }
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -347,6 +360,137 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
     return _fmtHm(at.hour, at.minute);
   }
 
+  String _modeSummaryValue(AppLocalizations l10n) {
+    switch (_mode) {
+      case 'maghrib':
+        return l10n.homeByModeMaghrib;
+      case 'custom':
+        return '${l10n.homeByModeCustom} · ${_fmtHm(_customHour, _customMinute)}';
+      case 'off':
+      default:
+        return l10n.homeByModeOff;
+    }
+  }
+
+  String _weekendSummaryValue(AppLocalizations l10n) {
+    switch (_weekendMode) {
+      case 'same':
+        return l10n.homeByWeekendSame;
+      case 'custom':
+        return '${l10n.homeByWeekendCustom} · ${_fmtHm(_weekendHour, _weekendMinute)}';
+      case 'off':
+      default:
+        return l10n.homeByWeekendOff;
+    }
+  }
+
+  String _holidaysSummaryValue(AppLocalizations l10n) {
+    if (_skipDates.isEmpty) return l10n.homeBySkipDatesEmpty;
+    return l10n.homeBySkipDatesCount(_skipDates.length);
+  }
+
+  Widget _todayStatusCard(AppLocalizations l10n, bool refresh) {
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.homeByTodayStatus,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: refresh ? 15.5 : null,
+              color: refresh ? VisualRefreshColors.textPrimary : null,
+              fontFamily: refresh
+                  ? GoogleFonts.plusJakartaSans().fontFamily
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _statusLabel(l10n, _today?['status'] as String?),
+            style: TextStyle(
+              color: refresh ? VisualRefreshColors.textSecondary : null,
+              fontWeight: refresh ? FontWeight.w500 : null,
+              fontFamily: refresh
+                  ? GoogleFonts.plusJakartaSans().fontFamily
+                  : null,
+            ),
+          ),
+          if (_todayTargetLabel() != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              l10n.homeByTargetTime(_todayTargetLabel()!),
+              style: refresh
+                  ? GoogleFonts.fraunces(
+                      color: VisualRefreshColors.accent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 26,
+                      height: 1.2,
+                      letterSpacing: -0.4,
+                    )
+                  : const TextStyle(
+                      color: AppColors.tealDeep,
+                      fontWeight: FontWeight.w700,
+                    ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            l10n.homeByOnceHomeNote,
+            style: TextStyle(
+              color: refresh
+                  ? VisualRefreshColors.textTertiary
+                  : AppColors.inkSoft,
+              fontSize: 13,
+              height: 1.35,
+              fontWeight: refresh ? FontWeight.w500 : null,
+              fontFamily: refresh
+                  ? GoogleFonts.plusJakartaSans().fontFamily
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _viewOnlySummaryChildren(
+    AppLocalizations l10n,
+    bool refresh,
+  ) {
+    return [
+      _SectionCard(
+        child: Column(
+          children: [
+            _SummaryRow(
+              label: l10n.homeByModeLabel,
+              value: _modeSummaryValue(l10n),
+            ),
+            if (_mode != 'off') ...[
+              const SizedBox(height: 14),
+              _SummaryRow(
+                label: l10n.homeByGraceLabel,
+                value: l10n.homeByGraceHint(_graceMinutes),
+              ),
+              const SizedBox(height: 14),
+              _SummaryRow(
+                label: l10n.homeByWeekendTitle,
+                value: _weekendSummaryValue(l10n),
+              ),
+              const SizedBox(height: 14),
+              _SummaryRow(
+                label: l10n.homeBySkipDatesTitle,
+                value: _holidaysSummaryValue(l10n),
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      _todayStatusCard(l10n, refresh),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -463,180 +607,166 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        _SectionCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _ModeTile(
-                                selected: _mode == 'off',
-                                title: l10n.homeByModeOff,
-                                onTap: widget.readOnly
-                                    ? null
-                                    : () => setState(() => _mode = 'off'),
-                              ),
-                              _ModeTile(
-                                selected: _mode == 'maghrib',
-                                title: l10n.homeByModeMaghrib,
-                                subtitle: l10n.homeByModeMaghribHint,
-                                featuredIcon: Icons.nights_stay_rounded,
-                                onTap: widget.readOnly
-                                    ? null
-                                    : () => setState(() => _mode = 'maghrib'),
-                              ),
-                              _ModeTile(
-                                selected: _mode == 'custom',
-                                title: l10n.homeByModeCustom,
-                                onTap: widget.readOnly
-                                    ? null
-                                    : () => setState(() => _mode = 'custom'),
-                              ),
-                              if (_mode == 'custom') ...[
-                                const SizedBox(height: 8),
-                                _TimePickRow(
-                                  label: _fmtHm(_customHour, _customMinute),
-                                  onTap: widget.readOnly
-                                      ? null
-                                      : () => _pickTime(weekend: false),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        if (_mode != 'off') ...[
-                          const SizedBox(height: 12),
+                        if (_effectiveReadOnly)
+                          ..._viewOnlySummaryChildren(l10n, refresh)
+                        else ...[
                           _SectionCard(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  l10n.homeByGraceLabel,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: refresh ? 15.5 : null,
-                                    color: refresh
-                                        ? VisualRefreshColors.textPrimary
-                                        : null,
-                                    fontFamily: refresh
-                                        ? GoogleFonts.plusJakartaSans()
-                                            .fontFamily
-                                        : null,
-                                  ),
-                                ),
-                                Text(
-                                  l10n.homeByGraceHint(_graceMinutes),
-                                  style: TextStyle(
-                                    color: refresh
-                                        ? VisualRefreshColors.textSecondary
-                                        : null,
-                                    fontWeight:
-                                        refresh ? FontWeight.w500 : null,
-                                    fontFamily: refresh
-                                        ? GoogleFonts.plusJakartaSans()
-                                            .fontFamily
-                                        : null,
-                                  ),
-                                ),
-                                Slider(
-                                  value: _graceMinutes.toDouble(),
-                                  min: 5,
-                                  max: 120,
-                                  divisions: 23,
-                                  label: '$_graceMinutes',
-                                  activeColor: refresh
-                                      ? VisualRefreshColors.anchor
-                                      : null,
-                                  inactiveColor: refresh
-                                      ? VisualRefreshColors.tagMuted
-                                      : null,
-                                  onChanged: widget.readOnly
-                                      ? null
-                                      : (v) => setState(
-                                            () => _graceMinutes = v.round(),
-                                          ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _SectionCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (!refresh) ...[
-                                  Text(
-                                    l10n.homeByWeekendTitle,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                ],
                                 _ModeTile(
-                                  selected: _weekendMode == 'off',
-                                  title: l10n.homeByWeekendOff,
+                                  selected: _mode == 'off',
+                                  title: l10n.homeByModeOff,
+                                  onTap: () => setState(() => _mode = 'off'),
+                                ),
+                                _ModeTile(
+                                  selected: _mode == 'maghrib',
+                                  title: l10n.homeByModeMaghrib,
+                                  subtitle: l10n.homeByModeMaghribHint,
                                   featuredIcon: Icons.nights_stay_rounded,
-                                  onTap: widget.readOnly
-                                      ? null
-                                      : () => setState(
-                                            () => _weekendMode = 'off',
-                                          ),
+                                  onTap: () =>
+                                      setState(() => _mode = 'maghrib'),
                                 ),
                                 _ModeTile(
-                                  selected: _weekendMode == 'same',
-                                  title: l10n.homeByWeekendSame,
-                                  onTap: widget.readOnly
-                                      ? null
-                                      : () => setState(
-                                            () => _weekendMode = 'same',
-                                          ),
+                                  selected: _mode == 'custom',
+                                  title: l10n.homeByModeCustom,
+                                  onTap: () =>
+                                      setState(() => _mode = 'custom'),
                                 ),
-                                _ModeTile(
-                                  selected: _weekendMode == 'custom',
-                                  title: l10n.homeByWeekendCustom,
-                                  onTap: widget.readOnly
-                                      ? null
-                                      : () => setState(
-                                            () => _weekendMode = 'custom',
-                                          ),
-                                ),
-                                if (_weekendMode == 'custom')
+                                if (_mode == 'custom') ...[
+                                  const SizedBox(height: 8),
                                   _TimePickRow(
-                                    label: _fmtHm(
-                                      _weekendHour,
-                                      _weekendMinute,
-                                    ),
-                                    onTap: widget.readOnly
-                                        ? null
-                                        : () => _pickTime(weekend: true),
+                                    label: _fmtHm(_customHour, _customMinute),
+                                    onTap: () => _pickTime(weekend: false),
                                   ),
+                                ],
                               ],
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          _SectionCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        l10n.homeBySkipDatesTitle,
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: refresh ? 15.5 : null,
-                                          color: refresh
-                                              ? VisualRefreshColors
-                                                  .textPrimary
-                                              : null,
-                                          fontFamily: refresh
-                                              ? GoogleFonts.plusJakartaSans()
-                                                  .fontFamily
-                                              : null,
-                                        ),
+                          if (_mode != 'off') ...[
+                            const SizedBox(height: 12),
+                            _SectionCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.homeByGraceLabel,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: refresh ? 15.5 : null,
+                                      color: refresh
+                                          ? VisualRefreshColors.textPrimary
+                                          : null,
+                                      fontFamily: refresh
+                                          ? GoogleFonts.plusJakartaSans()
+                                              .fontFamily
+                                          : null,
+                                    ),
+                                  ),
+                                  Text(
+                                    l10n.homeByGraceHint(_graceMinutes),
+                                    style: TextStyle(
+                                      color: refresh
+                                          ? VisualRefreshColors.textSecondary
+                                          : null,
+                                      fontWeight:
+                                          refresh ? FontWeight.w500 : null,
+                                      fontFamily: refresh
+                                          ? GoogleFonts.plusJakartaSans()
+                                              .fontFamily
+                                          : null,
+                                    ),
+                                  ),
+                                  Slider(
+                                    value: _graceMinutes.toDouble(),
+                                    min: 5,
+                                    max: 120,
+                                    divisions: 23,
+                                    label: '$_graceMinutes',
+                                    activeColor: refresh
+                                        ? VisualRefreshColors.anchor
+                                        : null,
+                                    inactiveColor: refresh
+                                        ? VisualRefreshColors.tagMuted
+                                        : null,
+                                    onChanged: (v) => setState(
+                                      () => _graceMinutes = v.round(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _SectionCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (!refresh) ...[
+                                    Text(
+                                      l10n.homeByWeekendTitle,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
                                       ),
                                     ),
-                                    if (!widget.readOnly)
+                                    const SizedBox(height: 8),
+                                  ],
+                                  _ModeTile(
+                                    selected: _weekendMode == 'off',
+                                    title: l10n.homeByWeekendOff,
+                                    featuredIcon: Icons.nights_stay_rounded,
+                                    onTap: () => setState(
+                                      () => _weekendMode = 'off',
+                                    ),
+                                  ),
+                                  _ModeTile(
+                                    selected: _weekendMode == 'same',
+                                    title: l10n.homeByWeekendSame,
+                                    onTap: () => setState(
+                                      () => _weekendMode = 'same',
+                                    ),
+                                  ),
+                                  _ModeTile(
+                                    selected: _weekendMode == 'custom',
+                                    title: l10n.homeByWeekendCustom,
+                                    onTap: () => setState(
+                                      () => _weekendMode = 'custom',
+                                    ),
+                                  ),
+                                  if (_weekendMode == 'custom')
+                                    _TimePickRow(
+                                      label: _fmtHm(
+                                        _weekendHour,
+                                        _weekendMinute,
+                                      ),
+                                      onTap: () => _pickTime(weekend: true),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _SectionCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          l10n.homeBySkipDatesTitle,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: refresh ? 15.5 : null,
+                                            color: refresh
+                                                ? VisualRefreshColors
+                                                    .textPrimary
+                                                : null,
+                                            fontFamily: refresh
+                                                ? GoogleFonts.plusJakartaSans()
+                                                    .fontFamily
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
                                       TextButton(
                                         onPressed: _addSkipDate,
                                         style: TextButton.styleFrom(
@@ -663,181 +793,155 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                           ),
                                         ),
                                       ),
-                                  ],
-                                ),
-                                if (_skipDates.isEmpty)
-                                  Text(
-                                    l10n.homeBySkipDatesEmpty,
-                                    style: TextStyle(
-                                      color: refresh
-                                          ? VisualRefreshColors.textSecondary
-                                          : AppColors.inkSoft,
-                                      fontWeight:
-                                          refresh ? FontWeight.w500 : null,
-                                      fontFamily: refresh
-                                          ? GoogleFonts.plusJakartaSans()
-                                              .fontFamily
-                                          : null,
-                                    ),
-                                  )
-                                else
-                                  ..._skipDates.map((s) {
-                                    final id = s['id'] as String? ?? '';
-                                    final date =
-                                        '${s['skipDate']}'.split('T').first;
-                                    return ListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: Text(
-                                        date,
-                                        style: TextStyle(
-                                          color: refresh
-                                              ? VisualRefreshColors
-                                                  .textPrimary
-                                              : null,
-                                          fontFamily: refresh
-                                              ? GoogleFonts.plusJakartaSans()
-                                                  .fontFamily
-                                              : null,
-                                        ),
+                                    ],
+                                  ),
+                                  if (_skipDates.isEmpty)
+                                    Text(
+                                      l10n.homeBySkipDatesEmpty,
+                                      style: TextStyle(
+                                        color: refresh
+                                            ? VisualRefreshColors
+                                                .textSecondary
+                                            : AppColors.inkSoft,
+                                        fontWeight:
+                                            refresh ? FontWeight.w500 : null,
+                                        fontFamily: refresh
+                                            ? GoogleFonts.plusJakartaSans()
+                                                .fontFamily
+                                            : null,
                                       ),
-                                      trailing: widget.readOnly
-                                          ? null
-                                          : IconButton(
-                                              icon: Icon(
-                                                Icons.close_rounded,
-                                                color: refresh
-                                                    ? VisualRefreshColors
-                                                        .textSecondary
-                                                    : null,
-                                              ),
-                                              onPressed: id.isEmpty
-                                                  ? null
-                                                  : () => unawaited(
-                                                        _removeSkip(id),
-                                                      ),
-                                            ),
-                                    );
-                                  }),
-                              ],
+                                    )
+                                  else
+                                    ..._skipDates.map((s) {
+                                      final id = s['id'] as String? ?? '';
+                                      final date =
+                                          '${s['skipDate']}'.split('T').first;
+                                      return ListTile(
+                                        contentPadding: EdgeInsets.zero,
+                                        title: Text(
+                                          date,
+                                          style: TextStyle(
+                                            color: refresh
+                                                ? VisualRefreshColors
+                                                    .textPrimary
+                                                : null,
+                                            fontFamily: refresh
+                                                ? GoogleFonts.plusJakartaSans()
+                                                    .fontFamily
+                                                : null,
+                                          ),
+                                        ),
+                                        trailing: IconButton(
+                                          icon: Icon(
+                                            Icons.close_rounded,
+                                            color: refresh
+                                                ? VisualRefreshColors
+                                                    .textSecondary
+                                                : null,
+                                          ),
+                                          onPressed: id.isEmpty
+                                              ? null
+                                              : () => unawaited(
+                                                    _removeSkip(id),
+                                                  ),
+                                        ),
+                                      );
+                                    }),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          _todayStatusCard(l10n, refresh),
+                          const SizedBox(height: 20),
+                          SizedBox(
+                            width: double.infinity,
+                            height: refresh ? 56 : null,
+                            child: FilledButton(
+                              onPressed: _saving ? null : _save,
+                              style: refresh
+                                  ? FilledButton.styleFrom(
+                                      backgroundColor:
+                                          VisualRefreshColors.anchor,
+                                      foregroundColor:
+                                          VisualRefreshColors.background,
+                                      disabledBackgroundColor:
+                                          VisualRefreshColors.anchor
+                                              .withValues(alpha: 0.45),
+                                      elevation: 0,
+                                      shape: const StadiumBorder(),
+                                    )
+                                  : null,
+                              child: Text(
+                                _saving ? '...' : l10n.homeBySave,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: refresh ? 16 : null,
+                                  fontFamily: refresh
+                                      ? GoogleFonts.plusJakartaSans()
+                                          .fontFamily
+                                      : null,
+                                ),
+                              ),
                             ),
                           ),
                         ],
-                        const SizedBox(height: 12),
-                        _SectionCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.homeByTodayStatus,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: refresh ? 15.5 : null,
-                                  color: refresh
-                                      ? VisualRefreshColors.textPrimary
-                                      : null,
-                                  fontFamily: refresh
-                                      ? GoogleFonts.plusJakartaSans()
-                                          .fontFamily
-                                      : null,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _statusLabel(
-                                  l10n,
-                                  _today?['status'] as String?,
-                                ),
-                                style: TextStyle(
-                                  color: refresh
-                                      ? VisualRefreshColors.textSecondary
-                                      : null,
-                                  fontWeight:
-                                      refresh ? FontWeight.w500 : null,
-                                  fontFamily: refresh
-                                      ? GoogleFonts.plusJakartaSans()
-                                          .fontFamily
-                                      : null,
-                                ),
-                              ),
-                              if (_todayTargetLabel() != null) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  l10n.homeByTargetTime(
-                                    _todayTargetLabel()!,
-                                  ),
-                                  style: refresh
-                                      ? GoogleFonts.fraunces(
-                                          color: VisualRefreshColors.accent,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 26,
-                                          height: 1.2,
-                                          letterSpacing: -0.4,
-                                        )
-                                      : const TextStyle(
-                                          color: AppColors.tealDeep,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                ),
-                              ],
-                              const SizedBox(height: 10),
-                              Text(
-                                l10n.homeByOnceHomeNote,
-                                style: TextStyle(
-                                  color: refresh
-                                      ? VisualRefreshColors.textTertiary
-                                      : AppColors.inkSoft,
-                                  fontSize: 13,
-                                  height: 1.35,
-                                  fontWeight:
-                                      refresh ? FontWeight.w500 : null,
-                                  fontFamily: refresh
-                                      ? GoogleFonts.plusJakartaSans()
-                                          .fontFamily
-                                      : null,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        if (!widget.readOnly)
-                        SizedBox(
-                          width: double.infinity,
-                          height: refresh ? 56 : null,
-                          child: FilledButton(
-                            onPressed: _saving ? null : _save,
-                            style: refresh
-                                ? FilledButton.styleFrom(
-                                    backgroundColor:
-                                        VisualRefreshColors.anchor,
-                                    foregroundColor:
-                                        VisualRefreshColors.background,
-                                    disabledBackgroundColor:
-                                        VisualRefreshColors.anchor
-                                            .withValues(alpha: 0.45),
-                                    elevation: 0,
-                                    shape: const StadiumBorder(),
-                                  )
-                                : null,
-                            child: Text(
-                              _saving ? '...' : l10n.homeBySave,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: refresh ? 16 : null,
-                                fontFamily: refresh
-                                    ? GoogleFonts.plusJakartaSans()
-                                        .fontFamily
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final refresh = visualRefreshOf(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 118,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: refresh ? 13.5 : 13,
+              color: refresh
+                  ? VisualRefreshColors.textSecondary
+                  : AppColors.inkSoft,
+              fontFamily: refresh
+                  ? GoogleFonts.plusJakartaSans().fontFamily
+                  : null,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: refresh ? 15 : 14.5,
+              height: 1.35,
+              color: refresh
+                  ? VisualRefreshColors.textPrimary
+                  : AppColors.ink,
+              fontFamily: refresh
+                  ? GoogleFonts.plusJakartaSans().fontFamily
+                  : null,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
