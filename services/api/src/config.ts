@@ -13,6 +13,9 @@ const envSchema = z.object({
   LOCATION_TTL_SECONDS: z.coerce.number().default(900),
   STALE_LOCATION_SECONDS: z.coerce.number().default(120),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(100),
+  INVITE_ATTEMPT_MAX: z.coerce.number().int().min(1).default(5),
+  INVITE_ATTEMPT_WINDOW_MS: z.coerce.number().default(900_000), // 15 min
+  INVITE_ATTEMPT_LOCKOUT_MS: z.coerce.number().default(1_800_000), // 30 min
   ZONE_DEBOUNCE_SECONDS: z.coerce.number().default(45),
   ZONE_HYSTERESIS_M: z.coerce.number().default(15),
   LOCATION_RETENTION_DAYS: z.coerce.number().default(7),

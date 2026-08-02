@@ -4,6 +4,11 @@ import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import {
+  clearInviteAttempts,
+  isInviteLocked,
+  recordInviteFailure,
+} from '../middleware/inviteAttemptLimit.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
   hasActiveGuardianLinks,
@@ -316,6 +321,12 @@ guardianInvitesRouter.post(
         return;
       }
 
+      const attemptKey = `redeem:${guardianId}`;
+      if (isInviteLocked(attemptKey)) {
+        res.status(429).json({ error: 'invite_attempts_locked' });
+        return;
+      }
+
       const body = z
         .object({
           // Allow spaced / punctuated display forms (e.g. "XE6 RJ7"); normalize next.
@@ -362,6 +373,7 @@ guardianInvitesRouter.post(
         );
         if (invite.rowCount === 0) {
           await client.query('ROLLBACK');
+          recordInviteFailure(attemptKey);
           res.status(404).json({ error: 'invite_not_found_or_used' });
           return;
         }
@@ -468,6 +480,7 @@ guardianInvitesRouter.post(
         );
 
         await client.query('COMMIT');
+        clearInviteAttempts(attemptKey);
 
         const names = await pool.query<{ id: string; name: string }>(
           `SELECT id, name FROM users WHERE id = ANY($1::uuid[])`,

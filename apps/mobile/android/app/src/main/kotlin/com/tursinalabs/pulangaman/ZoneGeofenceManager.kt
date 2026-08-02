@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.Geofence
@@ -70,6 +71,10 @@ object ZoneGeofenceManager {
         }
         if (!hasFineLocation(context)) {
             Log.w(TAG, "skip register: fine location missing")
+            return
+        }
+        if (!hasBackgroundLocation(context)) {
+            Log.w(TAG, "skip register: background location missing, geofence transitions may not fire while backgrounded")
             return
         }
         addGeofences(context, zones)
@@ -150,6 +155,16 @@ object ZoneGeofenceManager {
         return ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasBackgroundLocation(context: Context): Boolean {
+        // Pre-Q: fine/coarse location already implies background access,
+        // there's no separate permission to check.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
         ) == PackageManager.PERMISSION_GRANTED
     }
 

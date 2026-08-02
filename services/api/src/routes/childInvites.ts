@@ -4,6 +4,11 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { createChildCustomToken } from '../firebase/admin.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import {
+  clearInviteAttempts,
+  isInviteLocked,
+  recordInviteFailure,
+} from '../middleware/inviteAttemptLimit.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 export const childInvitesRouter = Router();
@@ -249,6 +254,12 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
       })
       .parse(req.body);
 
+    const attemptKey = `join:${req.ip ?? 'anon'}`;
+    if (isInviteLocked(attemptKey)) {
+      res.status(429).json({ error: 'invite_attempts_locked' });
+      return;
+    }
+
     const code = normalizeCode(body.code);
     if (code.length < 4) {
       res.status(400).json({ error: 'invalid_invite_code' });
@@ -280,6 +291,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
       );
       if (invite.rowCount === 0) {
         await client.query('ROLLBACK');
+        recordInviteFailure(attemptKey);
         res.status(404).json({ error: 'invite_not_found_or_used' });
         return;
       }
@@ -301,6 +313,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
         );
         if (existing.rowCount === 0) {
           await client.query('ROLLBACK');
+          recordInviteFailure(attemptKey);
           res.status(404).json({ error: 'relink_child_not_found' });
           return;
         }
@@ -381,6 +394,7 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
       }
 
       await client.query('COMMIT');
+      clearInviteAttempts(attemptKey);
 
       res.status(201).json({
         userId: childId,
