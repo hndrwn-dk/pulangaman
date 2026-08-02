@@ -1740,6 +1740,6 @@
   "sectionAccountLabel": "AKUN",
   "viewPillLabel": "Lihat",
   "guardianAccountTitle": "Akun",
-  "guardianAccountInviteSubtitle": "Tukarkan kode undangan untuk anak lain",
-  "guardianNoLinkedChildren": "Belum ada anak terhubung. Tukarkan kode undangan dari Akun."
+  "guardianAccountInviteSubtitle": "Masukkan kode undangan dari orang tua utama untuk menghubungkan anak",
+  "guardianNoLinkedChildren": "Belum ada anak terhubung. Buka Akun untuk memasukkan kode undangan."
 }

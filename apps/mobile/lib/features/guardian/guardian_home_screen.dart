@@ -287,7 +287,10 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 showAccessPill: selected != null,
                 onAccount: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const GuardianAccountScreen(),
+                    builder: (_) => GuardianAccountScreen(
+                      // Only first-time (no children) may redeem an invite.
+                      allowRedeemInvite: _children.isEmpty,
+                    ),
                   ),
                 ),
                 onLogout: () =>
@@ -453,9 +456,10 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                   _ToolRow(
                     icon: Icons.people_outline,
                     title: l10n.guardiansTitle,
-                    canManage: canManage,
+                    // Roster invite/promote/revoke is primary-only; co-parent is view.
+                    canManage: false,
                     onTap: () => _openTool(
-                      screen: GuardiansEntryScreen(readOnly: !canManage),
+                      screen: const GuardiansEntryScreen(readOnly: true),
                     ),
                   ),
                 ],

@@ -6,8 +6,9 @@ import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import {
-  canManageChildFeatures,
-  listFeatureManagedChildren,
+  hasActiveGuardianLinks,
+  isParentOfChild,
+  listPrimaryChildren,
   type GuardianAccessLevel,
 } from '../middleware/roles.js';
 
@@ -77,7 +78,7 @@ async function insertInviteRow(
   return result.rows[0];
 }
 
-/** Parent / co-parent creates a short invite code for a guardian. */
+/** Primary parent creates a short invite code for a guardian. */
 guardianInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;
@@ -111,14 +112,15 @@ guardianInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedReques
     let childName: string | null = null;
 
     if (allChildren) {
-      const managed = await listFeatureManagedChildren(parentId);
-      if (managed.length === 0) {
+      const primary = await listPrimaryChildren(parentId);
+      if (primary.length === 0) {
         res.status(404).json({ error: 'child_not_found' });
         return;
       }
     } else {
       childId = body.childId!;
-      if (!(await canManageChildFeatures(parentId, childId))) {
+      // Invite create is primary-parent only (not co_parent manage).
+      if (!(await isParentOfChild(parentId, childId))) {
         res.status(404).json({ error: 'child_not_found' });
         return;
       }
@@ -327,6 +329,12 @@ guardianInvitesRouter.post(
         return;
       }
 
+      // After first link, redeem is closed — only primary admin adds more children.
+      if (await hasActiveGuardianLinks(guardianId)) {
+        res.status(403).json({ error: 'already_linked' });
+        return;
+      }
+
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -384,8 +392,8 @@ guardianInvitesRouter.post(
         if (inviteRow.child_id) {
           targetChildIds = [inviteRow.child_id];
         } else {
-          const managed = await listFeatureManagedChildren(inviteRow.parent_id);
-          targetChildIds = managed.map((c) => c.id);
+          const primary = await listPrimaryChildren(inviteRow.parent_id);
+          targetChildIds = primary.map((c) => c.id);
         }
 
         if (targetChildIds.length === 0) {
@@ -491,7 +499,7 @@ guardianInvitesRouter.post(
   },
 );
 
-/** Parent revokes a pending guardian invite code. */
+/** Primary parent revokes a pending guardian invite code. */
 guardianInvitesRouter.post(
   '/:id/revoke',
   requireAuth,
@@ -505,36 +513,15 @@ guardianInvitesRouter.post(
         return;
       }
 
+      // Only the invite creator (primary) may revoke — co-parents cannot create.
       const owned = await pool.query<{ child_id: string | null }>(
         `SELECT child_id FROM guardian_invites
          WHERE id = $1 AND parent_id = $2 AND status = 'pending'`,
         [inviteId, parentId],
       );
       if (owned.rowCount === 0) {
-        // Co-parent may have created via canManage — also allow revoke if they manage the child.
-        const any = await pool.query<{
-          id: string;
-          child_id: string | null;
-          parent_id: string;
-        }>(
-          `SELECT id, child_id, parent_id FROM guardian_invites
-           WHERE id = $1 AND status = 'pending'`,
-          [inviteId],
-        );
-        if (any.rowCount === 0) {
-          res.status(404).json({ error: 'invite_not_found' });
-          return;
-        }
-        const targetChildId = any.rows[0].child_id;
-        if (targetChildId == null) {
-          // Family-wide invites are only revocable by the creator.
-          res.status(404).json({ error: 'invite_not_found' });
-          return;
-        }
-        if (!(await canManageChildFeatures(parentId, targetChildId))) {
-          res.status(404).json({ error: 'invite_not_found' });
-          return;
-        }
+        res.status(404).json({ error: 'invite_not_found' });
+        return;
       }
 
       const result = await pool.query(

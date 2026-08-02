@@ -1060,7 +1060,7 @@
   "guardianInviteInvalidCode": "Invalid or expired invite code",
   "shareCodeAction": "Share code",
   "guardianInviteSubject": "PulangAman Trusted Guardian Invite",
-  "activeGuardiansCount": "{count} active guardians",
+  "activeGuardiansCount": "{count, plural, =0{0 active guardians} =1{1 active guardian} other{{count} active guardians}}",
   "@activeGuardiansCount": {
     "placeholders": {
       "count": { "type": "int" }
@@ -1304,6 +1304,6 @@
   "sectionAccountLabel": "ACCOUNT",
   "viewPillLabel": "View",
   "guardianAccountTitle": "Account",
-  "guardianAccountInviteSubtitle": "Redeem an invite code for another child",
-  "guardianNoLinkedChildren": "No linked children yet. Redeem an invite code from Account."
+  "guardianAccountInviteSubtitle": "Enter the invite code from the primary parent to link a child",
+  "guardianNoLinkedChildren": "No linked children yet. Open Account to enter an invite code."
 }

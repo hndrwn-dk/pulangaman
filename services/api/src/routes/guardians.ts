@@ -6,8 +6,8 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { config } from '../config.js';
 import { guardianPresenceKey, getRedis } from '../redis/client.js';
 import {
-  canManageChildFeatures,
   canViewChild,
+  isParentOfChild,
   listViewableChildren,
   type GuardianAccessLevel,
 } from '../middleware/roles.js';
@@ -46,7 +46,8 @@ guardiansRouter.post('/invite', async (req: AuthedRequest, res, next) => {
     }
 
     const body = inviteSchema.parse(req.body);
-    if (!(await canManageChildFeatures(parentId, body.childId))) {
+    // Guardian invite is primary-parent only (not co_parent manage).
+    if (!(await isParentOfChild(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -240,12 +241,12 @@ guardiansRouter.post('/revoke', async (req: AuthedRequest, res, next) => {
       return;
     }
 
-    if (!(await canManageChildFeatures(parentId, body.childId))) {
+    // Revoke is primary-parent only (not co_parent manage).
+    if (!(await isParentOfChild(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
 
-    // Co-parents may not revoke themselves via this endpoint (primary can).
     if (body.guardianId === parentId) {
       res.status(400).json({ error: 'cannot_revoke_self' });
       return;
@@ -291,7 +292,8 @@ guardiansRouter.patch('/access-level', async (req: AuthedRequest, res, next) => 
       return;
     }
 
-    if (!(await canManageChildFeatures(parentId, body.childId))) {
+    // Promote / demote is primary-parent only (not co_parent manage).
+    if (!(await isParentOfChild(parentId, body.childId))) {
       res.status(404).json({ error: 'child_not_found' });
       return;
     }
@@ -367,11 +369,24 @@ guardiansRouter.get('/', async (req: AuthedRequest, res, next) => {
       [childId],
     );
 
+    const primary = await pool.query<{ id: string; name: string }>(
+      `SELECT u.id, u.name
+       FROM parent_children pc
+       JOIN users u ON u.id = pc.parent_id
+       WHERE pc.child_id = $1
+       LIMIT 1`,
+      [childId],
+    );
+    const primaryRow = primary.rows[0];
+
     res.json({
       guardians: result.rows.map((row) => ({
         ...row,
         accessLevel: row.access_level as GuardianAccessLevel,
       })),
+      primaryParent: primaryRow
+        ? { id: primaryRow.id, name: primaryRow.name }
+        : null,
     });
   } catch (error) {
     next(error);

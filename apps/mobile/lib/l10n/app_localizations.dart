@@ -5117,13 +5117,13 @@ abstract class AppLocalizations {
   /// No description provided for @guardianAccountInviteSubtitle.
   ///
   /// In id, this message translates to:
-  /// **'Tukarkan kode undangan untuk anak lain'**
+  /// **'Masukkan kode undangan dari orang tua utama untuk menghubungkan anak'**
   String get guardianAccountInviteSubtitle;
 
   /// No description provided for @guardianNoLinkedChildren.
   ///
   /// In id, this message translates to:
-  /// **'Belum ada anak terhubung. Tukarkan kode undangan dari Akun.'**
+  /// **'Belum ada anak terhubung. Buka Akun untuk memasukkan kode undangan.'**
   String get guardianNoLinkedChildren;
 }
 

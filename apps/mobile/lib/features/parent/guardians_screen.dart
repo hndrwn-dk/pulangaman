@@ -236,6 +236,9 @@ class GuardiansEntryScreen extends ConsumerStatefulWidget {
 class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
   final Map<String, List<Map<String, dynamic>>> _byChild = {};
   final Map<String, ChildGender> _genders = {};
+  /// Primary parent for the household (from guardians list API).
+  String? _primaryParentId;
+  String? _primaryParentName;
   bool _loading = true;
 
   @override
@@ -271,6 +274,8 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
     final children = ref.read(childrenControllerProvider).items;
     final api = ref.read(apiClientProvider);
     final next = <String, List<Map<String, dynamic>>>{};
+    String? primaryId;
+    String? primaryName;
     for (final c in children) {
       try {
         final data = await api.get(
@@ -280,6 +285,15 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
         next[c.id] = (data['guardians'] as List<dynamic>? ?? [])
             .whereType<Map<String, dynamic>>()
             .toList();
+        final pp = data['primaryParent'];
+        if (primaryId == null && pp is Map<String, dynamic>) {
+          final id = pp['id']?.toString();
+          final name = pp['name']?.toString();
+          if (id != null && id.isNotEmpty) {
+            primaryId = id;
+            primaryName = (name != null && name.isNotEmpty) ? name : null;
+          }
+        }
       } catch (_) {
         next[c.id] = [];
       }
@@ -289,6 +303,8 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
       _byChild
         ..clear()
         ..addAll(next);
+      _primaryParentId = primaryId;
+      _primaryParentName = primaryName;
       _loading = false;
     });
   }
@@ -335,12 +351,25 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
     return ('${parts[0][0]}${parts[1][0]}').toUpperCase();
   }
 
+  /// Primary admin only may create invites / promote / revoke. Co-parents
+  /// keep feature manage elsewhere but not guardian roster control.
+  bool get _isPrimaryAdmin {
+    final children = ref.read(childrenControllerProvider).items;
+    final auth = ref.read(authControllerProvider);
+    return children.any((c) => c.access == 'primary') ||
+        (_primaryParentId != null &&
+            auth.userId != null &&
+            _primaryParentId == auth.userId);
+  }
+
+  bool get _canManageGuardians => !widget.readOnly && _isPrimaryAdmin;
+
   Future<void> _openChild(ChildSummary child) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => GuardiansScreen(
           child: child,
-          readOnly: widget.readOnly,
+          readOnly: !_canManageGuardians,
         ),
       ),
     );
@@ -348,6 +377,7 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
   }
 
   Future<void> _createInviteCode({ChildSummary? fixedChild}) async {
+    if (!_canManageGuardians) return;
     final l10n = AppLocalizations.of(context);
     final children = ref.read(childrenControllerProvider).items;
     if (children.isEmpty) {
@@ -648,6 +678,20 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
     final refresh = visualRefreshOf(context);
     final cardDecoration = _hubCardDecoration(refresh);
 
+    final isPrimary = _isPrimaryAdmin;
+    final canManageGuardians = _canManageGuardians;
+    // Prefer named primary parent for co-parent/view viewers; fall back to self
+    // only when the current user is the primary.
+    final String? adminName;
+    if (isPrimary) {
+      adminName = auth.name ?? l10n.parentRoleFallback;
+    } else if (_primaryParentName != null && _primaryParentName!.isNotEmpty) {
+      adminName = _primaryParentName;
+    } else {
+      adminName = null;
+    }
+    final showAdminYou = isPrimary;
+
     return Scaffold(
       backgroundColor:
           refresh ? VisualRefreshColors.background : const Color(0xFFF0F2F5),
@@ -727,110 +771,130 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                       decoration: cardDecoration,
                       child: Column(
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 22,
-                                  backgroundColor: refresh
-                                      ? VisualRefreshColors.anchor
-                                      : AppColors.tealDeep,
-                                  child: Text(
-                                    _initials(auth.name),
-                                    style: TextStyle(
-                                      color: refresh
-                                          ? VisualRefreshColors.background
-                                          : Colors.white,
-                                      fontWeight: FontWeight.w900,
+                          if (adminName != null)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 22,
+                                    backgroundColor: refresh
+                                        ? VisualRefreshColors.anchor
+                                        : AppColors.tealDeep,
+                                    child: Text(
+                                      _initials(adminName),
+                                      style: TextStyle(
+                                        color: refresh
+                                            ? VisualRefreshColors.background
+                                            : Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        auth.name ?? l10n.parentRoleFallback,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          adminName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 15.5,
+                                            color: refresh
+                                                ? VisualRefreshColors.textPrimary
+                                                : null,
+                                            fontFamily: refresh
+                                                ? GoogleFonts.plusJakartaSans()
+                                                    .fontFamily
+                                                : null,
+                                          ),
+                                        ),
+                                        Text(
+                                          l10n.adminAllChildren,
+                                          style: TextStyle(
+                                            color: refresh
+                                                ? VisualRefreshColors
+                                                    .textSecondary
+                                                : AppColors.inkSoft,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12.5,
+                                            fontFamily: refresh
+                                                ? GoogleFonts.plusJakartaSans()
+                                                    .fontFamily
+                                                : null,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (showAdminYou)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: refresh
+                                            ? VisualRefreshColors.accentTint
+                                            : const Color(0xFFD8F5E8),
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Text(
+                                        l10n.youBadge,
                                         style: TextStyle(
+                                          fontSize: 11,
                                           fontWeight: FontWeight.w900,
-                                          fontSize: 15.5,
                                           color: refresh
-                                              ? VisualRefreshColors.textPrimary
-                                              : null,
+                                              ? VisualRefreshColors.accent
+                                              : AppColors.tealDeep,
                                           fontFamily: refresh
                                               ? GoogleFonts.plusJakartaSans()
                                                   .fontFamily
                                               : null,
                                         ),
                                       ),
-                                      Text(
-                                        l10n.adminAllChildren,
-                                        style: TextStyle(
-                                          color: refresh
-                                              ? VisualRefreshColors
-                                                  .textSecondary
-                                              : AppColors.inkSoft,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12.5,
-                                          fontFamily: refresh
-                                              ? GoogleFonts.plusJakartaSans()
-                                                  .fontFamily
-                                              : null,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: refresh
-                                        ? VisualRefreshColors.accentTint
-                                        : const Color(0xFFD8F5E8),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    l10n.youBadge,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900,
-                                      color: refresh
-                                          ? VisualRefreshColors.accent
-                                          : AppColors.tealDeep,
-                                      fontFamily: refresh
-                                          ? GoogleFonts.plusJakartaSans()
-                                              .fontFamily
-                                          : null,
                                     ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
                           if (_loading)
                             const Padding(
                               padding: EdgeInsets.all(20),
                               child: Center(child: CircularProgressIndicator()),
                             )
+                          else if (guardians.isEmpty && adminName == null)
+                            Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Text(
+                                l10n.noGuardiansForChild,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: refresh
+                                      ? VisualRefreshColors.textSecondary
+                                      : AppColors.inkSoft,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
                           else
                             ...guardians.map((g) {
+                              final isSelf = auth.userId != null &&
+                                  g.id == auth.userId;
                               return Column(
                                 children: [
-                                  Divider(
-                                    height: 1,
-                                    thickness: refresh ? 0.5 : 1,
-                                    indent: 14,
-                                    endIndent: 14,
-                                    color: refresh
-                                        ? VisualRefreshColors.border
-                                        : null,
-                                  ),
+                                  if (adminName != null ||
+                                      guardians.first.id != g.id)
+                                    Divider(
+                                      height: 1,
+                                      thickness: refresh ? 0.5 : 1,
+                                      indent: 14,
+                                      endIndent: 14,
+                                      color: refresh
+                                          ? VisualRefreshColors.border
+                                          : null,
+                                    ),
                                   Padding(
                                     padding: const EdgeInsets.fromLTRB(
                                       14,
@@ -911,6 +975,36 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                                             ],
                                           ),
                                         ),
+                                        if (isSelf)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 5,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: refresh
+                                                  ? VisualRefreshColors
+                                                      .accentTint
+                                                  : const Color(0xFFD8F5E8),
+                                              borderRadius:
+                                                  BorderRadius.circular(999),
+                                            ),
+                                            child: Text(
+                                              l10n.youBadge,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w900,
+                                                color: refresh
+                                                    ? VisualRefreshColors.accent
+                                                    : AppColors.tealDeep,
+                                                fontFamily: refresh
+                                                    ? GoogleFonts
+                                                            .plusJakartaSans()
+                                                        .fontFamily
+                                                    : null,
+                                              ),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -971,63 +1065,63 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                           ],
                         ),
                       ),
-                    const SizedBox(height: 20),
-                    _SectionLabel(l10n.inviteNewSection, refresh: refresh),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-                      decoration: cardDecoration,
-                      child: Column(
-                        children: [
-                          Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: refresh
-                                  ? VisualRefreshColors.accentTint
-                                  : const Color(0xFFF3E8FF),
-                              borderRadius: BorderRadius.circular(18),
+                    if (canManageGuardians) ...[
+                      const SizedBox(height: 20),
+                      _SectionLabel(l10n.inviteNewSection, refresh: refresh),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                        decoration: cardDecoration,
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: refresh
+                                    ? VisualRefreshColors.accentTint
+                                    : const Color(0xFFF3E8FF),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Icon(
+                                Icons.person_add_alt_1_rounded,
+                                color: refresh
+                                    ? VisualRefreshColors.accent
+                                    : const Color(0xFF7C3AED),
+                                size: 28,
+                              ),
                             ),
-                            child: Icon(
-                              Icons.person_add_alt_1_rounded,
-                              color: refresh
-                                  ? VisualRefreshColors.accent
-                                  : const Color(0xFF7C3AED),
-                              size: 28,
+                            const SizedBox(height: 12),
+                            Text(
+                              l10n.addTrustedGuardian,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: refresh
+                                    ? VisualRefreshColors.textPrimary
+                                    : null,
+                                fontFamily: refresh
+                                    ? GoogleFonts.plusJakartaSans().fontFamily
+                                    : null,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            l10n.addTrustedGuardian,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                              color: refresh
-                                  ? VisualRefreshColors.textPrimary
-                                  : null,
-                              fontFamily: refresh
-                                  ? GoogleFonts.plusJakartaSans().fontFamily
-                                  : null,
+                            const SizedBox(height: 4),
+                            Text(
+                              l10n.guardianInviteChannelHint,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: refresh
+                                    ? VisualRefreshColors.textSecondary
+                                    : AppColors.inkSoft,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                fontFamily: refresh
+                                    ? GoogleFonts.plusJakartaSans().fontFamily
+                                    : null,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.guardianInviteChannelHint,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: refresh
-                                  ? VisualRefreshColors.textSecondary
-                                  : AppColors.inkSoft,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              fontFamily: refresh
-                                  ? GoogleFonts.plusJakartaSans().fontFamily
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          if (!widget.readOnly)
+                            const SizedBox(height: 16),
                             SizedBox(
                               width: double.infinity,
                               height: 52,
@@ -1047,9 +1141,10 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                                 ),
                               ),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

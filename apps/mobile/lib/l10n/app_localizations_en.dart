@@ -2463,7 +2463,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String activeGuardiansCount(int count) {
-    return '$count active guardians';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count active guardians',
+      one: '1 active guardian',
+      zero: '0 active guardians',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -2885,9 +2892,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get guardianAccountInviteSubtitle =>
-      'Redeem an invite code for another child';
+      'Enter the invite code from the primary parent to link a child';
 
   @override
   String get guardianNoLinkedChildren =>
-      'No linked children yet. Redeem an invite code from Account.';
+      'No linked children yet. Open Account to enter an invite code.';
 }

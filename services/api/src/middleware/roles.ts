@@ -57,8 +57,10 @@ export async function getActiveGuardianAccess(
 }
 
 /**
- * Shared write/manage check for Safe Zones, EMP, Reminders, Safe Home Time,
- * and guardian invite/manage. Primary parent OR active co_parent guardian.
+ * Shared write/manage check for Safe Zones, EMP, Reminders, Safe Home Time.
+ * Primary parent OR active co_parent guardian.
+ * Not used for guardian invite / promote / revoke — those are primary-only
+ * via isParentOfChild / isPrimaryParentExclusive.
  */
 export async function canManageChildFeatures(
   userId: string,
@@ -71,6 +73,32 @@ export async function canManageChildFeatures(
     isPrimaryParent: false,
     activeGuardianAccess: access,
   });
+}
+
+/** True when the user already has at least one active guardian link. */
+export async function hasActiveGuardianLinks(userId: string): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT 1 FROM child_approved_guardians
+     WHERE guardian_id = $1 AND status = 'active'
+     LIMIT 1`,
+    [userId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** Children where the user is the exclusive primary parent (parent_children). */
+export async function listPrimaryChildren(userId: string): Promise<
+  Array<{ id: string; name: string }>
+> {
+  const result = await pool.query<{ id: string; name: string }>(
+    `SELECT u.id, u.name
+     FROM parent_children pc
+     JOIN users u ON u.id = pc.child_id
+     WHERE pc.parent_id = $1
+     ORDER BY u.name`,
+    [userId],
+  );
+  return result.rows;
 }
 
 /**

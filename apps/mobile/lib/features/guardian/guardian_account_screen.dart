@@ -7,9 +7,16 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
 import '../parent/vr_sheet_chrome.dart';
 
-/// Minimal guardian Account: redeem invite codes + sign out.
+/// Minimal guardian Account: optional invite redeem (first join only) + sign out.
 class GuardianAccountScreen extends ConsumerStatefulWidget {
-  const GuardianAccountScreen({super.key});
+  const GuardianAccountScreen({
+    super.key,
+    this.allowRedeemInvite = true,
+  });
+
+  /// When false (already linked to children), hide invite redeem UI so
+  /// co-parents / wali cannot pile on more children via codes.
+  final bool allowRedeemInvite;
 
   @override
   ConsumerState<GuardianAccountScreen> createState() =>
@@ -23,10 +30,15 @@ class _GuardianAccountScreenState extends ConsumerState<GuardianAccountScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(_loadInvites);
+    if (widget.allowRedeemInvite) {
+      Future.microtask(_loadInvites);
+    } else {
+      _loadingInvites = false;
+    }
   }
 
   Future<void> _loadInvites() async {
+    if (!widget.allowRedeemInvite) return;
     try {
       final api = ref.read(apiClientProvider);
       final data = await api.get('/api/v1/guardians/invites');
@@ -112,83 +124,85 @@ class _GuardianAccountScreenState extends ConsumerState<GuardianAccountScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
-          Text(
-            l10n.invitesSectionTitle,
-            style: refresh
-                ? GoogleFonts.fraunces(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: VisualRefreshColors.textPrimary,
-                  )
-                : Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            l10n.guardianAccountInviteSubtitle,
-            style: TextStyle(
-              color: refresh
-                  ? VisualRefreshColors.textSecondary
-                  : AppColors.inkSoft,
-              fontFamily:
-                  refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
-            ),
-          ),
-          const SizedBox(height: 14),
-          if (_loadingInvites)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_invites.isEmpty)
+          if (widget.allowRedeemInvite) ...[
             Text(
-              l10n.noInvites,
-              style: TextStyle(
-                color: refresh ? VisualRefreshColors.textSecondary : null,
-              ),
-            )
-          else
-            ..._invites.map((invite) {
-              final access = invite['accessLevel']?.toString() ??
-                  invite['access_level']?.toString() ??
-                  'view';
-              final accessLabel = access == 'co_parent'
-                  ? l10n.guardianAccessCoParent
-                  : l10n.guardianAccessView;
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('${invite['child_name']}'),
-                subtitle: Text(
-                  l10n.fromParentWithAccess(
-                    '${invite['parent_name']}',
-                    accessLabel,
-                  ),
-                ),
-                trailing: FilledButton(
-                  onPressed: () => _accept(invite['child_id'] as String),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: refresh
-                        ? VisualRefreshColors.anchor
-                        : AppColors.teal,
-                  ),
-                  child: Text(l10n.acceptInvite),
-                ),
-              );
-            }),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _redeemInviteCode,
-            icon: const Icon(Icons.vpn_key_outlined),
-            label: Text(l10n.enterGuardianInviteCode),
-            style: OutlinedButton.styleFrom(
-              foregroundColor:
-                  refresh ? VisualRefreshColors.anchor : AppColors.teal,
-              side: BorderSide(
-                color: refresh ? VisualRefreshColors.border : AppColors.teal,
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              l10n.invitesSectionTitle,
+              style: refresh
+                  ? GoogleFonts.fraunces(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: VisualRefreshColors.textPrimary,
+                    )
+                  : Theme.of(context).textTheme.titleLarge,
             ),
-          ),
-          const SizedBox(height: 28),
+            const SizedBox(height: 4),
+            Text(
+              l10n.guardianAccountInviteSubtitle,
+              style: TextStyle(
+                color: refresh
+                    ? VisualRefreshColors.textSecondary
+                    : AppColors.inkSoft,
+                fontFamily:
+                    refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (_loadingInvites)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_invites.isEmpty)
+              Text(
+                l10n.noInvites,
+                style: TextStyle(
+                  color: refresh ? VisualRefreshColors.textSecondary : null,
+                ),
+              )
+            else
+              ..._invites.map((invite) {
+                final access = invite['accessLevel']?.toString() ??
+                    invite['access_level']?.toString() ??
+                    'view';
+                final accessLabel = access == 'co_parent'
+                    ? l10n.guardianAccessCoParent
+                    : l10n.guardianAccessView;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('${invite['child_name']}'),
+                  subtitle: Text(
+                    l10n.fromParentWithAccess(
+                      '${invite['parent_name']}',
+                      accessLabel,
+                    ),
+                  ),
+                  trailing: FilledButton(
+                    onPressed: () => _accept(invite['child_id'] as String),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: refresh
+                          ? VisualRefreshColors.anchor
+                          : AppColors.teal,
+                    ),
+                    child: Text(l10n.acceptInvite),
+                  ),
+                );
+              }),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: _redeemInviteCode,
+              icon: const Icon(Icons.vpn_key_outlined),
+              label: Text(l10n.enterGuardianInviteCode),
+              style: OutlinedButton.styleFrom(
+                foregroundColor:
+                    refresh ? VisualRefreshColors.anchor : AppColors.teal,
+                side: BorderSide(
+                  color: refresh ? VisualRefreshColors.border : AppColors.teal,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 28),
+          ],
           TextButton.icon(
             onPressed: () =>
                 ref.read(authControllerProvider.notifier).logout(),

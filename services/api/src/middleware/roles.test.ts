@@ -152,4 +152,19 @@ describe('isPrimaryParentExclusive', () => {
     assert.equal(isPrimaryParentExclusive({ isPrimaryParent: true }), true);
     assert.equal(isPrimaryParentExclusive({ isPrimaryParent: false }), false);
   });
+
+  it('guardian invite / promote / revoke follow the same primary-only rule', () => {
+    // Co-parents keep canManage for zones/EMP/reminders/home-by, but must not
+    // create invites, change access levels, or revoke guardians.
+    assert.equal(isPrimaryParentExclusive({ isPrimaryParent: true }), true);
+    assert.equal(isPrimaryParentExclusive({ isPrimaryParent: false }), false);
+    assert.equal(
+      canManageChildFeaturesFromLinks({
+        isPrimaryParent: false,
+        activeGuardianAccess: 'co_parent',
+      }),
+      true,
+      'co_parent still manages features',
+    );
+  });
 });
