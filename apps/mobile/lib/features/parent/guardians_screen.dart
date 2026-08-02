@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_controller.dart';
+import 'account_settings_screen.dart';
 import 'child_avatar.dart';
 import 'children_controller.dart';
 import 'sign_in_code_sheet.dart';
@@ -1223,11 +1224,8 @@ class _GuardiansEntryScreenState extends ConsumerState<GuardiansEntryScreen> {
                     ],
                     if (widget.readOnly) ...[
                       const SizedBox(height: 28),
-                      _SectionLabel(
-                        l10n.sectionAccountLabel,
-                        refresh: refresh,
-                      ),
-                      const SizedBox(height: 8),
+                      const AccountPrefsSections(),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         height: 52,

@@ -29,39 +29,90 @@ class AccountSettingsScreen extends ConsumerStatefulWidget {
   @override
   ConsumerState<AccountSettingsScreen> createState() =>
       _AccountSettingsScreenState();
+
+  static Future<void> openNotificationSettings(BuildContext context) async {
+    final opened = await openAppSettings();
+    if (opened || !context.mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final refresh = visualRefreshOf(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: refresh ? VisualRefreshColors.surface : null,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.notificationsSheetTitle,
+                style: refresh
+                    ? GoogleFonts.fraunces(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        color: VisualRefreshColors.textPrimary,
+                      )
+                    : const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 17,
+                      ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.notificationsSheetBody,
+                style: TextStyle(
+                  color: refresh
+                      ? VisualRefreshColors.textSecondary
+                      : AppColors.inkSoft,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                  fontFamily: refresh
+                      ? GoogleFonts.plusJakartaSans().fontFamily
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: refresh
+                      ? FilledButton.styleFrom(
+                          backgroundColor: VisualRefreshColors.anchor,
+                          foregroundColor: VisualRefreshColors.background,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        )
+                      : null,
+                  child: Text(
+                    l10n.understood,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
-  bool _languageOpen = false;
-
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
-    final locale = ref.watch(localeControllerProvider);
     final l10n = AppLocalizations.of(context);
-    final currentLabel = locale.languageCode == 'en'
-        ? l10n.settingsLanguageEn
-        : l10n.settingsLanguageId;
     final displayName = auth.name ?? l10n.parentFallbackName;
 
-    return _buildVisualRefresh(
-      context,
-      auth: auth,
-      locale: locale,
-      l10n: l10n,
-      currentLabel: currentLabel,
-      displayName: displayName,
-    );
-  }
-
-  Widget _buildVisualRefresh(
-    BuildContext context, {
-    required AuthState auth,
-    required Locale locale,
-    required AppLocalizations l10n,
-    required String currentLabel,
-    required String displayName,
-  }) {
     return Scaffold(
       backgroundColor: VisualRefreshColors.background,
       body: SafeArea(
@@ -128,142 +179,7 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  _VrSectionLabel(l10n.settingsLanguage),
-                  const SizedBox(height: 8),
-                  _VrCard(
-                    child: Column(
-                      children: [
-                        InkWell(
-                          onTap: () => setState(() {
-                            _languageOpen = !_languageOpen;
-                          }),
-                          borderRadius: BorderRadius.circular(AppRadius.vrCard),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.language_rounded,
-                                  color: VisualRefreshColors.textSecondary,
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        l10n.settingsLanguage,
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 15.5,
-                                          color: VisualRefreshColors.textPrimary,
-                                        ),
-                                      ),
-                                      if (!_languageOpen) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          currentLabel,
-                                          style: GoogleFonts.plusJakartaSans(
-                                            color: VisualRefreshColors
-                                                .textSecondary,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  _languageOpen
-                                      ? Icons.expand_less_rounded
-                                      : Icons.expand_more_rounded,
-                                  color: VisualRefreshColors.textTertiary,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (_languageOpen) ...[
-                          const Divider(
-                            height: 1,
-                            indent: 14,
-                            endIndent: 14,
-                            color: VisualRefreshColors.border,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                            child: Column(
-                              children: [
-                                _VrLanguageOption(
-                                  label: l10n.settingsLanguageId,
-                                  selected: locale.languageCode == 'id',
-                                  onTap: () {
-                                    unawaited(
-                                      ref
-                                          .read(
-                                            localeControllerProvider.notifier,
-                                          )
-                                          .setLocale(const Locale('id')),
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 4),
-                                _VrLanguageOption(
-                                  label: l10n.settingsLanguageEn,
-                                  selected: locale.languageCode == 'en',
-                                  onTap: () {
-                                    unawaited(
-                                      ref
-                                          .read(
-                                            localeControllerProvider.notifier,
-                                          )
-                                          .setLocale(const Locale('en')),
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _VrSectionLabel(l10n.settingsSectionApp),
-                  const SizedBox(height: 8),
-                  _VrCard(
-                    child: Column(
-                      children: [
-                        _VrNavRow(
-                          icon: Icons.info_outline_rounded,
-                          title: l10n.settingsAbout,
-                          subtitle: l10n.settingsAboutHint,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const _AboutScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                        const Divider(
-                          height: 1,
-                          indent: 48,
-                          endIndent: 14,
-                          color: VisualRefreshColors.border,
-                        ),
-                        _VrNavRow(
-                          icon: Icons.notifications_outlined,
-                          title: l10n.settingsNotifications,
-                          subtitle: l10n.settingsNotificationsHint,
-                          onTap: () => _openNotificationSettings(context),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const AccountPrefsSections(),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -305,82 +221,6 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     );
   }
 
-  static Future<void> _openNotificationSettings(BuildContext context) async {
-    final opened = await openAppSettings();
-    if (opened || !context.mounted) return;
-    final l10n = AppLocalizations.of(context);
-    final refresh = visualRefreshOf(context);
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor:
-          refresh ? VisualRefreshColors.surface : null,
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.notificationsSheetTitle,
-                style: refresh
-                    ? GoogleFonts.fraunces(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 18,
-                        color: VisualRefreshColors.textPrimary,
-                      )
-                    : const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 17,
-                      ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.notificationsSheetBody,
-                style: TextStyle(
-                  color: refresh
-                      ? VisualRefreshColors.textSecondary
-                      : AppColors.inkSoft,
-                  fontWeight: FontWeight.w600,
-                  height: 1.35,
-                  fontFamily: refresh
-                      ? GoogleFonts.plusJakartaSans().fontFamily
-                      : null,
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: refresh
-                      ? FilledButton.styleFrom(
-                          backgroundColor: VisualRefreshColors.anchor,
-                          foregroundColor: VisualRefreshColors.background,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        )
-                      : null,
-                  child: Text(
-                    l10n.understood,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontFamily: refresh
-                          ? GoogleFonts.plusJakartaSans().fontFamily
-                          : null,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   static String _initials(String? name) {
     final parts = (name ?? '').trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts.first.isEmpty) return 'PA';
@@ -389,6 +229,165 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       return (s.length >= 2 ? s.substring(0, 2) : s).toUpperCase();
     }
     return ('${parts[0][0]}${parts[1][0]}').toUpperCase();
+  }
+}
+
+/// Language + App preference rows shared by Account Settings and wali Guardians.
+class AccountPrefsSections extends ConsumerStatefulWidget {
+  const AccountPrefsSections({super.key});
+
+  @override
+  ConsumerState<AccountPrefsSections> createState() =>
+      _AccountPrefsSectionsState();
+}
+
+class _AccountPrefsSectionsState extends ConsumerState<AccountPrefsSections> {
+  bool _languageOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = ref.watch(localeControllerProvider);
+    final l10n = AppLocalizations.of(context);
+    final currentLabel = locale.languageCode == 'en'
+        ? l10n.settingsLanguageEn
+        : l10n.settingsLanguageId;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _VrSectionLabel(l10n.settingsLanguage),
+        const SizedBox(height: 8),
+        _VrCard(
+          child: Column(
+            children: [
+              InkWell(
+                onTap: () => setState(() {
+                  _languageOpen = !_languageOpen;
+                }),
+                borderRadius: BorderRadius.circular(AppRadius.vrCard),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.language_rounded,
+                        color: VisualRefreshColors.textSecondary,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.settingsLanguage,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15.5,
+                                color: VisualRefreshColors.textPrimary,
+                              ),
+                            ),
+                            if (!_languageOpen) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                currentLabel,
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: VisualRefreshColors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        _languageOpen
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: VisualRefreshColors.textTertiary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_languageOpen) ...[
+                const Divider(
+                  height: 1,
+                  indent: 14,
+                  endIndent: 14,
+                  color: VisualRefreshColors.border,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+                  child: Column(
+                    children: [
+                      _VrLanguageOption(
+                        label: l10n.settingsLanguageId,
+                        selected: locale.languageCode == 'id',
+                        onTap: () {
+                          unawaited(
+                            ref
+                                .read(localeControllerProvider.notifier)
+                                .setLocale(const Locale('id')),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      _VrLanguageOption(
+                        label: l10n.settingsLanguageEn,
+                        selected: locale.languageCode == 'en',
+                        onTap: () {
+                          unawaited(
+                            ref
+                                .read(localeControllerProvider.notifier)
+                                .setLocale(const Locale('en')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _VrSectionLabel(l10n.settingsSectionApp),
+        const SizedBox(height: 8),
+        _VrCard(
+          child: Column(
+            children: [
+              _VrNavRow(
+                icon: Icons.info_outline_rounded,
+                title: l10n.settingsAbout,
+                subtitle: l10n.settingsAboutHint,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const _AboutScreen(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(
+                height: 1,
+                indent: 48,
+                endIndent: 14,
+                color: VisualRefreshColors.border,
+              ),
+              _VrNavRow(
+                icon: Icons.notifications_outlined,
+                title: l10n.settingsNotifications,
+                subtitle: l10n.settingsNotificationsHint,
+                onTap: () =>
+                    AccountSettingsScreen.openNotificationSettings(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
