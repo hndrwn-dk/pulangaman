@@ -315,7 +315,10 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
   Future<void> _openHomeBy() async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => HomeByScreen(lockedChild: widget.child),
+        builder: (_) => HomeByScreen(
+          lockedChild: widget.child,
+          readOnly: widget.child.isViewOnlyAccess,
+        ),
       ),
     );
     await _loadHomeBySummary();
