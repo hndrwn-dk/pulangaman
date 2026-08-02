@@ -1000,7 +1000,6 @@ class _ToolTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final radius = BorderRadius.circular(14);
     final tileBg = canManage
         ? VisualRefreshColors.accentTint
@@ -1029,85 +1028,57 @@ class _ToolTile extends StatelessWidget {
                     width: 1,
                   ),
           ),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: iconCircleBg,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          icon,
-                          size: 20,
-                          color: iconColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          height: 1.15,
-                          color: VisualRefreshColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 10.5,
-                          height: 1.15,
-                          color: VisualRefreshColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (!canManage)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: VisualRefreshColors.tagMuted,
-                      borderRadius: BorderRadius.circular(999),
+                      color: iconCircleBg,
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(
-                      l10n.viewPillLabel,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700,
-                        height: 1.1,
-                        color: VisualRefreshColors.textTertiary,
-                      ),
+                    child: Icon(
+                      icon,
+                      size: 20,
+                      color: iconColor,
                     ),
                   ),
-                ),
-            ],
+                  const SizedBox(height: 8),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      height: 1.15,
+                      color: VisualRefreshColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 10.5,
+                      height: 1.15,
+                      color: VisualRefreshColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
