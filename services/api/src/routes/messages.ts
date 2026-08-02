@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { hasRole, listViewableChildren } from '../middleware/roles.js';
 import { sendFcmToUser } from '../services/fcm.js';
 import { broadcastToRoom, childRoom } from '../ws/server.js';
 
@@ -17,20 +18,25 @@ const sendSchema = z.object({
 
 messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
   try {
-    const parentId = req.auth?.userId;
-    if (!parentId) {
+    const userId = req.auth?.userId;
+    if (!userId) {
       res.status(403).json({ error: 'user_profile_required' });
       return;
     }
 
-    const role = await pool.query(
-      `SELECT 1 FROM user_roles WHERE user_id = $1 AND role = 'parent'`,
-      [parentId],
-    );
-    if (role.rowCount === 0) {
-      res.status(403).json({ error: 'parent_role_required' });
+    // Primary parents and active guardians (view / co_parent) may read kabar.
+    const allowed = await hasRole(userId, ['parent', 'guardian']);
+    if (!allowed) {
+      res.status(403).json({ error: 'parent_or_guardian_role_required' });
       return;
     }
+
+    const children = await listViewableChildren(userId);
+    if (children.length === 0) {
+      res.json({ messages: [] });
+      return;
+    }
+    const childIds = children.map((c) => c.id);
 
     const result = await pool.query<{
       id: string;
@@ -66,9 +72,8 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
          END AS preset,
          ae.created_at AS sent_at
        FROM audit_events ae
-       JOIN parent_children pc ON pc.child_id = ae.subject_child_id
        JOIN users u ON u.id = ae.subject_child_id
-       WHERE pc.parent_id = $1
+       WHERE ae.subject_child_id = ANY($1::uuid[])
          AND ae.action IN (
            'child.message',
            'panic.triggered',
@@ -80,7 +85,7 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
          AND ae.created_at > now() - interval '24 hours'
        ORDER BY ae.created_at DESC
        LIMIT 50`,
-      [parentId],
+      [childIds],
     );
 
     res.json({

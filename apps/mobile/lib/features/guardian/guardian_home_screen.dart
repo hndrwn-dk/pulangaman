@@ -19,6 +19,9 @@ import '../parent/emergency_meeting_alert_screen.dart';
 import '../parent/emergency_meeting_screen.dart';
 import '../parent/guardians_screen.dart';
 import '../parent/home_by_screen.dart';
+import '../parent/kabar_inbox_screen.dart';
+import '../parent/kabar_models.dart';
+import '../parent/kabar_read_store.dart';
 import '../parent/live_map_screen.dart';
 import '../parent/reminders_screen.dart';
 import '../parent/zones_screen.dart';
@@ -33,6 +36,8 @@ class GuardianHomeScreen extends ConsumerStatefulWidget {
 
 class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
   final _ws = WsClient();
+  final _kabarRead = KabarReadStore();
+  final List<ChildKabarMessage> _messages = [];
   List<ChildSummary> _children = [];
   String? _selectedChildId;
   final Map<String, LatLng> _positions = {};
@@ -70,6 +75,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
   }
 
   Future<void> _bootstrap() async {
+    await _kabarRead.load();
     await _loadChildren();
     final auth = ref.read(authControllerProvider);
     final token = auth.token;
@@ -84,6 +90,71 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
       'status': 'ONLINE',
     });
     await _loadLocations();
+    await _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/messages');
+      final list = (data['messages'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(ChildKabarMessage.fromJson)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(list);
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _markAllKabarRead() async {
+    DateTime? newest;
+    for (final m in _messages) {
+      if (newest == null || m.sentAt.isAfter(newest)) {
+        newest = m.sentAt;
+      }
+    }
+    await _kabarRead.markAllRead(newest ?? DateTime.now());
+    if (mounted) setState(() {});
+  }
+
+  void _openInbox({String? childId}) {
+    unawaited(_loadMessages().then((_) {
+      if (!mounted) return;
+      final names = {for (final c in _children) c.id: c.name};
+      final unreadIds = {
+        for (final m in _messages)
+          if (_kabarRead.isUnread(m)) m.id,
+      };
+      Navigator.of(context)
+          .push(
+        MaterialPageRoute(
+          builder: (_) => KabarInboxScreen(
+            messages: List<ChildKabarMessage>.from(_messages),
+            initialChildId: childId ?? _selectedChildId,
+            childNames: names,
+            unreadIds: unreadIds,
+            onMarkAllRead: _markAllKabarRead,
+          ),
+        ),
+      )
+          .then((_) {
+        if (mounted) setState(() {});
+      });
+    }));
+  }
+
+  void _openAccount() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GuardianAccountScreen(
+          // Only first-time (no children) may redeem an invite.
+          allowRedeemInvite: _children.isEmpty,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadChildren() async {
@@ -182,7 +253,32 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
           _batteryCharging[childId] = payload['batteryCharging'] == true;
         }
       });
+      return;
     }
+    if (event == 'child:panic_triggered' ||
+        event == 'child:panic_acked' ||
+        event == 'child:panic_resolved') {
+      unawaited(_loadMessages());
+      return;
+    }
+    if (event != 'child:message') return;
+    final msg = ChildKabarMessage.fromJson({
+      'id': payload['id'] ??
+          '${payload['childId']}-${payload['sentAt']}-${payload['text']}',
+      'childId': payload['childId'],
+      'childName': payload['childName'],
+      'text': payload['text'],
+      'preset': payload['preset'],
+      'sentAt': payload['sentAt'] ?? DateTime.now().toIso8601String(),
+    });
+    if (!mounted) return;
+    setState(() {
+      _messages.removeWhere((m) => m.id == msg.id);
+      _messages.insert(0, msg);
+      if (_messages.length > 50) {
+        _messages.removeRange(50, _messages.length);
+      }
+    });
   }
 
   Future<void> _openEmergencyMeeting(Map<String, dynamic> payload) async {
@@ -262,6 +358,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     final selected = _selected;
     final canManage = _canManageSelected;
     final period = dayPeriodFor();
+    final unreadCount = _kabarRead.unreadOf(_messages).length;
 
     return Scaffold(
       backgroundColor:
@@ -272,6 +369,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
           onRefresh: () async {
             await _loadChildren();
             await _loadLocations();
+            await _loadMessages();
           },
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -285,16 +383,9 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                     ? l10n.coParentAccessPill
                     : l10n.viewOnlyAccessPill,
                 showAccessPill: selected != null,
-                onAccount: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => GuardianAccountScreen(
-                      // Only first-time (no children) may redeem an invite.
-                      allowRedeemInvite: _children.isEmpty,
-                    ),
-                  ),
-                ),
-                onLogout: () =>
-                    ref.read(authControllerProvider.notifier).logout(),
+                notificationCount: unreadCount,
+                onNotifications: () => _openInbox(),
+                onAccount: _openAccount,
               ),
               const SizedBox(height: 18),
               if (_loadingChildren)
@@ -462,6 +553,12 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                       screen: const GuardiansEntryScreen(readOnly: true),
                     ),
                   ),
+                  _ToolRow(
+                    icon: Icons.manage_accounts_outlined,
+                    title: l10n.guardianAccountTitle,
+                    canManage: true,
+                    onTap: _openAccount,
+                  ),
                 ],
               ],
               const SizedBox(height: 24),
@@ -526,8 +623,9 @@ class _GuardianHeader extends StatelessWidget {
     required this.initials,
     required this.accessPill,
     required this.showAccessPill,
+    required this.notificationCount,
+    required this.onNotifications,
     required this.onAccount,
-    required this.onLogout,
   });
 
   final String greeting;
@@ -536,8 +634,9 @@ class _GuardianHeader extends StatelessWidget {
   final String initials;
   final String accessPill;
   final bool showAccessPill;
+  final int notificationCount;
+  final VoidCallback onNotifications;
   final VoidCallback onAccount;
-  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -619,9 +718,10 @@ class _GuardianHeader extends StatelessWidget {
             ],
           ),
         ),
-        Column(
+        Row(
           children: [
-            Row(
+            Stack(
+              clipBehavior: Clip.none,
               children: [
                 Material(
                   color: refresh ? VisualRefreshColors.surface : Colors.white,
@@ -635,47 +735,69 @@ class _GuardianHeader extends StatelessWidget {
                   ),
                   child: InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: onAccount,
-                    child: const SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Icon(Icons.notifications_none_rounded, size: 22),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Material(
-                  color: VisualRefreshColors.anchor,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: onAccount,
+                    onTap: onNotifications,
                     child: SizedBox(
                       width: 40,
                       height: 40,
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: GoogleFonts.plusJakartaSans(
-                            color: VisualRefreshColors.background,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
+                      child: Icon(
+                        Icons.notifications_none_rounded,
+                        size: 22,
+                        color: refresh
+                            ? VisualRefreshColors.textPrimary
+                            : null,
                       ),
                     ),
                   ),
                 ),
+                if (notificationCount > 0)
+                  Positioned(
+                    right: -2,
+                    top: -2,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: refresh
+                            ? VisualRefreshColors.danger
+                            : AppColors.coral,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        notificationCount > 9 ? '9+' : '$notificationCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
-            IconButton(
-              onPressed: onLogout,
-              icon: Icon(
-                Icons.logout,
-                size: 20,
-                color: VisualRefreshColors.textTertiary,
+            const SizedBox(width: 8),
+            Material(
+              color: VisualRefreshColors.anchor,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onAccount,
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: VisualRefreshColors.background,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              visualDensity: VisualDensity.compact,
             ),
           ],
         ),
