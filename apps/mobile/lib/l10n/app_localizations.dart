@@ -5281,6 +5281,96 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Tutup tanpa melanjutkan'**
   String get closeLocationDisclosureTooltip;
+
+  /// No description provided for @deleteAccountButton.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus akun'**
+  String get deleteAccountButton;
+
+  /// No description provided for @deleteAccountConfirmTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus akun Anda?'**
+  String get deleteAccountConfirmTitle;
+
+  /// No description provided for @deleteAccountConfirmBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Ini menghapus permanen akun PulangAman Anda dan semua anak yang hanya Anda miliki, termasuk riwayat lokasi dan data terkait. Tidak bisa dibatalkan.'**
+  String get deleteAccountConfirmBody;
+
+  /// No description provided for @deleteAccountConfirmBodyGuardian.
+  ///
+  /// In id, this message translates to:
+  /// **'Ini menghapus permanen akun wali Anda. Anak yang Anda lihat tetap milik orang tua — tidak ada data anak yang ikut terhapus. Tidak bisa dibatalkan.'**
+  String get deleteAccountConfirmBodyGuardian;
+
+  /// No description provided for @deleteAccountConfirmAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus akun'**
+  String get deleteAccountConfirmAction;
+
+  /// No description provided for @deleteAccountFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Gagal menghapus akun. Coba lagi.'**
+  String get deleteAccountFailed;
+
+  /// No description provided for @unlinkChildTemporary.
+  ///
+  /// In id, this message translates to:
+  /// **'Putuskan sementara'**
+  String get unlinkChildTemporary;
+
+  /// No description provided for @deleteChildDataPermanently.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus data permanen'**
+  String get deleteChildDataPermanently;
+
+  /// No description provided for @deleteChildDataConfirmTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus permanen {name}?'**
+  String deleteChildDataConfirmTitle(String name);
+
+  /// No description provided for @deleteChildDataConfirmBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Ini menghapus permanen akun {name} dan semua data terkait (riwayat lokasi, zona, perangkat). Akses wali ikut hilang. Tidak bisa dibatalkan.'**
+  String deleteChildDataConfirmBody(String name);
+
+  /// No description provided for @guardianLeaveNowLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Berhenti jadi wali sekarang'**
+  String get guardianLeaveNowLabel;
+
+  /// No description provided for @guardianLeaveNowSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Akses langsung berhenti. Parent akan diberi tahu.'**
+  String get guardianLeaveNowSubtitle;
+
+  /// No description provided for @guardianRequestParentLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Minta parent yang hapus akses saya'**
+  String get guardianRequestParentLabel;
+
+  /// No description provided for @guardianRequestParentSubtitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Akses tetap aktif sampai parent menyetujui.'**
+  String get guardianRequestParentSubtitle;
+
+  /// No description provided for @leaveRequestSent.
+  ///
+  /// In id, this message translates to:
+  /// **'Permintaan terkirim. Akses tetap aktif sampai parent mencabutnya.'**
+  String get leaveRequestSent;
 }
 
 class _AppLocalizationsDelegate

@@ -492,6 +492,42 @@ childrenRouter.get('/:id/location', async (req: AuthedRequest, res, next) => {
   }
 });
 
+childrenRouter.delete('/:id/data', async (req: AuthedRequest, res, next) => {
+  try {
+    const parentId = req.auth?.userId;
+    const childId = String(req.params.id);
+    if (!parentId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+    if (!(await isParentOfChild(parentId, childId))) {
+      res.status(404).json({ error: 'child_not_found' });
+      return;
+    }
+
+    const uidRow = await pool.query<{ firebase_uid: string }>(
+      `SELECT firebase_uid FROM users WHERE id = $1`,
+      [childId],
+    );
+
+    await pool.query(
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, 'child.data_deleted', '{}'::jsonb)`,
+      [parentId, childId],
+    );
+    await pool.query('DELETE FROM users WHERE id = $1', [childId]);
+
+    if (uidRow.rows[0]) {
+      const { deleteFirebaseUser } = await import('../firebase/admin.js');
+      await deleteFirebaseUser(uidRow.rows[0].firebase_uid);
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 childrenRouter.delete('/:id', async (req: AuthedRequest, res, next) => {
   try {
     const parentId = req.auth?.userId;

@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme.dart';
 import '../../l10n/app_localizations.dart';
-import 'vr_sheet_chrome.dart';
+import '../parent/vr_sheet_chrome.dart';
+
+enum RemoveChildChoice { cancel, unlinkTemporary, deletePermanently }
 
 /// Visual-refresh confirmation sheet for removing a child from the parent list.
-Future<bool> showRemoveChildSheet({
+Future<RemoveChildChoice> showRemoveChildSheet({
   required BuildContext context,
   required String childName,
 }) async {
-  final result = await showVrModalBottomSheet<bool>(
+  final result = await showVrModalBottomSheet<RemoveChildChoice>(
     context: context,
     builder: (ctx) => RemoveChildSheet(childName: childName),
   );
-  return result == true;
+  return result ?? RemoveChildChoice.cancel;
 }
 
 class RemoveChildSheet extends StatelessWidget {
@@ -40,12 +43,60 @@ class RemoveChildSheet extends StatelessWidget {
           const SizedBox(height: 10),
           VrSheetBody(l10n.removeChildConfirmBody(childName)),
           const SizedBox(height: 24),
-          VrSheetDualActions(
-            secondaryLabel: l10n.cancel,
-            primaryLabel: l10n.delete,
-            primaryDestructive: true,
-            onSecondary: () => Navigator.pop(context, false),
-            onPrimary: () => Navigator.pop(context, true),
+          SizedBox(
+            height: 52,
+            child: OutlinedButton(
+              onPressed: () =>
+                  Navigator.pop(context, RemoveChildChoice.unlinkTemporary),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: VisualRefreshColors.textPrimary,
+                side: const BorderSide(
+                  color: VisualRefreshColors.border,
+                  width: 1,
+                ),
+                shape: const StadiumBorder(),
+              ),
+              child: Text(
+                l10n.unlinkChildTemporary,
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 52,
+            child: FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, RemoveChildChoice.deletePermanently),
+              style: FilledButton.styleFrom(
+                backgroundColor: VisualRefreshColors.danger,
+                foregroundColor: VisualRefreshColors.background,
+                elevation: 0,
+                shape: const StadiumBorder(),
+              ),
+              child: Text(
+                l10n.deleteChildDataPermanently,
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: () => Navigator.pop(context, RemoveChildChoice.cancel),
+            child: Text(
+              l10n.cancel,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                color: VisualRefreshColors.textSecondary,
+              ),
+            ),
           ),
         ],
       ),

@@ -16,7 +16,6 @@ import '../parent/child_home_map_card.dart';
 import '../parent/children_controller.dart';
 import '../parent/emergency_meeting_alert_screen.dart';
 import '../parent/emergency_meeting_screen.dart';
-import '../parent/guardians_screen.dart';
 import '../parent/home_by_screen.dart';
 import '../parent/kabar_inbox_screen.dart';
 import '../parent/kabar_models.dart';
@@ -160,20 +159,16 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
     }));
   }
 
-  void _openInviteRedeem() {
+  void _openAccount() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const GuardianAccountScreen(
-          allowRedeemInvite: true,
+        builder: (_) => GuardianAccountScreen(
+          allowRedeemInvite: _children.isEmpty,
         ),
       ),
     ).then((_) {
       if (mounted) unawaited(_loadChildren());
     });
-  }
-
-  void _openTrustedGuardians() {
-    _openTool(screen: const GuardiansEntryScreen(readOnly: true));
   }
 
   Future<void> _loadChildren() async {
@@ -392,7 +387,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 showAccessPill: selected != null,
                 notificationCount: unreadCount,
                 onNotifications: () => _openInbox(),
-                onAvatar: _openTrustedGuardians,
+                onAvatar: _openAccount,
               ),
               const SizedBox(height: 18),
               if (_loadingChildren)
@@ -411,7 +406,7 @@ class _GuardianHomeScreenState extends ConsumerState<GuardianHomeScreen> {
                 ),
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
-                  onPressed: _openInviteRedeem,
+                  onPressed: _openAccount,
                   icon: const Icon(Icons.vpn_key_outlined),
                   label: Text(l10n.enterGuardianInviteCode),
                   style: OutlinedButton.styleFrom(

@@ -1779,5 +1779,34 @@
   "openLiveMapTooltip": "Buka peta langsung",
   "cancelTripTooltip": "Batalkan perjalanan",
   "screenTimeSettingsTooltip": "Pengaturan waktu layar",
-  "closeLocationDisclosureTooltip": "Tutup tanpa melanjutkan"
+  "closeLocationDisclosureTooltip": "Tutup tanpa melanjutkan",
+  "deleteAccountButton": "Hapus akun",
+  "deleteAccountConfirmTitle": "Hapus akun Anda?",
+  "deleteAccountConfirmBody": "Ini menghapus permanen akun PulangAman Anda dan semua anak yang hanya Anda miliki, termasuk riwayat lokasi dan data terkait. Tidak bisa dibatalkan.",
+  "deleteAccountConfirmBodyGuardian": "Ini menghapus permanen akun wali Anda. Anak yang Anda lihat tetap milik orang tua — tidak ada data anak yang ikut terhapus. Tidak bisa dibatalkan.",
+  "deleteAccountConfirmAction": "Hapus akun",
+  "deleteAccountFailed": "Gagal menghapus akun. Coba lagi.",
+  "unlinkChildTemporary": "Putuskan sementara",
+  "deleteChildDataPermanently": "Hapus data permanen",
+  "deleteChildDataConfirmTitle": "Hapus permanen {name}?",
+  "@deleteChildDataConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteChildDataConfirmBody": "Ini menghapus permanen akun {name} dan semua data terkait (riwayat lokasi, zona, perangkat). Akses wali ikut hilang. Tidak bisa dibatalkan.",
+  "@deleteChildDataConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "guardianLeaveNowLabel": "Berhenti jadi wali sekarang",
+  "guardianLeaveNowSubtitle": "Akses langsung berhenti. Parent akan diberi tahu.",
+  "guardianRequestParentLabel": "Minta parent yang hapus akses saya",
+  "guardianRequestParentSubtitle": "Akses tetap aktif sampai parent menyetujui.",
+  "leaveRequestSent": "Permintaan terkirim. Akses tetap aktif sampai parent mencabutnya."
 }

@@ -7,10 +7,12 @@ import { config } from '../config.js';
 import { guardianPresenceKey, getRedis } from '../redis/client.js';
 import {
   canViewChild,
+  getActiveGuardianAccess,
   isParentOfChild,
   listViewableChildren,
   type GuardianAccessLevel,
 } from '../middleware/roles.js';
+import { guardianLeaveAuditAction } from './guardianLeaveLogic.js';
 
 export const guardiansRouter = Router();
 
@@ -485,6 +487,105 @@ guardiansRouter.post('/presence', async (req: AuthedRequest, res, next) => {
     }
 
     res.json({ ok: true, status: body.status });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Jalur 1 — immediate, self-service.
+guardiansRouter.post('/leave', async (req: AuthedRequest, res, next) => {
+  try {
+    const guardianId = req.auth?.userId;
+    const body = z.object({ childId: z.string().uuid() }).parse(req.body);
+    if (!guardianId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+    const result = await pool.query(
+      `UPDATE child_approved_guardians
+       SET status = 'revoked', updated_at = now()
+       WHERE child_id = $1 AND guardian_id = $2 AND status IN ('invited', 'active')
+       RETURNING child_id, guardian_id, status`,
+      [body.childId, guardianId],
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: 'guardian_link_not_found' });
+      return;
+    }
+    await pool.query(
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, $3, '{}'::jsonb)`,
+      [guardianId, body.childId, guardianLeaveAuditAction('leave')],
+    );
+
+    const parent = await pool.query<{ parent_id: string }>(
+      `SELECT parent_id FROM parent_children WHERE child_id = $1 LIMIT 1`,
+      [body.childId],
+    );
+    if (parent.rowCount) {
+      const { sendFcmToUser } = await import('../services/fcm.js');
+      await sendFcmToUser(
+        parent.rows[0].parent_id,
+        { title: 'PulangAman', body: 'Seorang wali baru saja berhenti mengakses akun anak Anda.' },
+        { type: 'guardian_left', childId: body.childId, route: 'child_detail' },
+      ).catch((err) => console.error('guardian_left_notify_failed', { err }));
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Jalur 2 — request only, does NOT change status. Access stays active
+// until the parent acts via the EXISTING /guardians/revoke. Don't add a
+// new child_approved_guardians status for this — it would ripple into
+// getActiveGuardianAccess/canViewChild and everywhere else checking
+// status = 'active'.
+guardiansRouter.post('/leave-request', async (req: AuthedRequest, res, next) => {
+  try {
+    const guardianId = req.auth?.userId;
+    const body = z.object({ childId: z.string().uuid() }).parse(req.body);
+    if (!guardianId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+    const access = await getActiveGuardianAccess(guardianId, body.childId);
+    if (!access) {
+      res.status(404).json({ error: 'guardian_link_not_found' });
+      return;
+    }
+
+    const [guardian, parent] = await Promise.all([
+      pool.query<{ name: string }>(`SELECT name FROM users WHERE id = $1`, [guardianId]),
+      pool.query<{ parent_id: string }>(
+        `SELECT parent_id FROM parent_children WHERE child_id = $1 LIMIT 1`,
+        [body.childId],
+      ),
+    ]);
+    if (parent.rowCount === 0) {
+      res.status(400).json({ error: 'parent_link_missing' });
+      return;
+    }
+
+    await pool.query(
+      `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+       VALUES ($1, $2, $3, '{}'::jsonb)`,
+      [guardianId, body.childId, guardianLeaveAuditAction('leave-request')],
+    );
+
+    const guardianName = guardian.rows[0]?.name ?? 'Seorang wali';
+    const { sendFcmToUser } = await import('../services/fcm.js');
+    await sendFcmToUser(
+      parent.rows[0].parent_id,
+      {
+        title: 'PulangAman — Permintaan dari wali',
+        body: `${guardianName} minta akses ke akun anak Anda dicabut. Ketuk untuk tinjau.`,
+      },
+      { type: 'guardian_leave_requested', childId: body.childId, route: 'child_detail' },
+    ).catch((err) => console.error('guardian_leave_request_notify_failed', { err }));
+
+    res.status(202).json({ requested: true });
   } catch (error) {
     next(error);
   }

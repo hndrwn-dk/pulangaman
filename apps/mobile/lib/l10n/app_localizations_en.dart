@@ -2983,4 +2983,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get closeLocationDisclosureTooltip => 'Close without continuing';
+
+  @override
+  String get deleteAccountButton => 'Delete account';
+
+  @override
+  String get deleteAccountConfirmTitle => 'Delete your account?';
+
+  @override
+  String get deleteAccountConfirmBody =>
+      'This permanently deletes your PulangAman account and all children you exclusively own, including their location history and related data. This cannot be undone.';
+
+  @override
+  String get deleteAccountConfirmBodyGuardian =>
+      'This permanently deletes your guardian account. Children you can view stay with their parent — nothing cascades. This cannot be undone.';
+
+  @override
+  String get deleteAccountConfirmAction => 'Delete account';
+
+  @override
+  String get deleteAccountFailed => 'Could not delete account. Try again.';
+
+  @override
+  String get unlinkChildTemporary => 'Unlink temporarily';
+
+  @override
+  String get deleteChildDataPermanently => 'Delete data permanently';
+
+  @override
+  String deleteChildDataConfirmTitle(String name) {
+    return 'Permanently delete $name?';
+  }
+
+  @override
+  String deleteChildDataConfirmBody(String name) {
+    return 'This permanently deletes $name\'s account and all related data (location history, zones, devices). Guardians lose access. This cannot be undone.';
+  }
+
+  @override
+  String get guardianLeaveNowLabel => 'Stop being a guardian now';
+
+  @override
+  String get guardianLeaveNowSubtitle =>
+      'Access ends immediately. The parent will be notified.';
+
+  @override
+  String get guardianRequestParentLabel => 'Ask parent to remove my access';
+
+  @override
+  String get guardianRequestParentSubtitle =>
+      'Access stays active until the parent approves.';
+
+  @override
+  String get leaveRequestSent =>
+      'Request sent. Access stays active until the parent removes it.';
 }

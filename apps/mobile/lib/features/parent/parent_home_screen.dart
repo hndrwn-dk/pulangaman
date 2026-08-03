@@ -1104,45 +1104,99 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
     ChildSummary child,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final bool ok;
+    final RemoveChildChoice choice;
     if (visualRefreshOf(context)) {
-      ok = await showRemoveChildSheet(
+      choice = await showRemoveChildSheet(
         context: context,
         childName: child.name,
       );
     } else {
-      ok = await showDialog<bool>(
+      choice = await showDialog<RemoveChildChoice>(
             context: context,
             builder: (ctx) => AlertDialog(
               title: Text(l10n.removeChildConfirmTitle(child.name)),
+              content: Text(l10n.removeChildConfirmBody(child.name)),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
+                  onPressed: () =>
+                      Navigator.pop(ctx, RemoveChildChoice.cancel),
                   child: Text(l10n.cancel),
                 ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.pop(ctx, RemoveChildChoice.unlinkTemporary),
+                  child: Text(l10n.unlinkChildTemporary),
+                ),
                 FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style:
-                      FilledButton.styleFrom(backgroundColor: AppColors.coral),
-                  child: Text(l10n.delete),
+                  onPressed: () =>
+                      Navigator.pop(ctx, RemoveChildChoice.deletePermanently),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.coral,
+                  ),
+                  child: Text(l10n.deleteChildDataPermanently),
                 ),
               ],
             ),
-          ) ==
-          true;
+          ) ??
+          RemoveChildChoice.cancel;
     }
-    if (!ok || !context.mounted) return;
-    try {
-      await ref.read(childrenControllerProvider.notifier).unlinkChild(child.id);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.childRemoved(child.name))),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.deleteFailedWithDetail('$e'))),
-      );
+    if (!context.mounted) return;
+
+    switch (choice) {
+      case RemoveChildChoice.cancel:
+        return;
+      case RemoveChildChoice.unlinkTemporary:
+        try {
+          await ref
+              .read(childrenControllerProvider.notifier)
+              .unlinkChild(child.id);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.childRemoved(child.name))),
+          );
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.deleteFailedWithDetail('$e'))),
+          );
+        }
+        return;
+      case RemoveChildChoice.deletePermanently:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.deleteChildDataConfirmTitle(child.name)),
+            content: Text(l10n.deleteChildDataConfirmBody(child.name)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.cancel),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: VisualRefreshColors.danger,
+                ),
+                child: Text(l10n.deleteChildDataPermanently),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !context.mounted) return;
+        try {
+          await ref
+              .read(childrenControllerProvider.notifier)
+              .deleteChildData(child.id);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.childRemoved(child.name))),
+          );
+        } catch (e) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.deleteFailedWithDetail('$e'))),
+          );
+        }
     }
   }
 

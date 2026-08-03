@@ -15,6 +15,7 @@ import { locationRouter } from './routes/location.js';
 import { panicRouter } from './routes/panic.js';
 import { guardiansRouter } from './routes/guardians.js';
 import { guardianInvitesRouter } from './routes/guardianInvites.js';
+import { accountRouter } from './routes/account.js';
 import { schoolsRouter } from './routes/schools.js';
 import { reportsRouter } from './routes/reports.js';
 import { routesRouter } from './routes/routes.js';
@@ -60,6 +61,7 @@ export function createApp() {
   app.use('/api/v1/panic', panicRouter);
   app.use('/api/v1/guardians', guardiansRouter);
   app.use('/api/v1/guardian-invites', guardianInvitesRouter);
+  app.use('/api/v1/account', accountRouter);
   app.use('/api/v1/schools', schoolsRouter);
   app.use('/api/v1/reports', reportsRouter);
   app.use('/api/v1/routes', routesRouter);

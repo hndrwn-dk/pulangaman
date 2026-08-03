@@ -2980,4 +2980,58 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get closeLocationDisclosureTooltip => 'Tutup tanpa melanjutkan';
+
+  @override
+  String get deleteAccountButton => 'Hapus akun';
+
+  @override
+  String get deleteAccountConfirmTitle => 'Hapus akun Anda?';
+
+  @override
+  String get deleteAccountConfirmBody =>
+      'Ini menghapus permanen akun PulangAman Anda dan semua anak yang hanya Anda miliki, termasuk riwayat lokasi dan data terkait. Tidak bisa dibatalkan.';
+
+  @override
+  String get deleteAccountConfirmBodyGuardian =>
+      'Ini menghapus permanen akun wali Anda. Anak yang Anda lihat tetap milik orang tua — tidak ada data anak yang ikut terhapus. Tidak bisa dibatalkan.';
+
+  @override
+  String get deleteAccountConfirmAction => 'Hapus akun';
+
+  @override
+  String get deleteAccountFailed => 'Gagal menghapus akun. Coba lagi.';
+
+  @override
+  String get unlinkChildTemporary => 'Putuskan sementara';
+
+  @override
+  String get deleteChildDataPermanently => 'Hapus data permanen';
+
+  @override
+  String deleteChildDataConfirmTitle(String name) {
+    return 'Hapus permanen $name?';
+  }
+
+  @override
+  String deleteChildDataConfirmBody(String name) {
+    return 'Ini menghapus permanen akun $name dan semua data terkait (riwayat lokasi, zona, perangkat). Akses wali ikut hilang. Tidak bisa dibatalkan.';
+  }
+
+  @override
+  String get guardianLeaveNowLabel => 'Berhenti jadi wali sekarang';
+
+  @override
+  String get guardianLeaveNowSubtitle =>
+      'Akses langsung berhenti. Parent akan diberi tahu.';
+
+  @override
+  String get guardianRequestParentLabel => 'Minta parent yang hapus akses saya';
+
+  @override
+  String get guardianRequestParentSubtitle =>
+      'Akses tetap aktif sampai parent menyetujui.';
+
+  @override
+  String get leaveRequestSent =>
+      'Permintaan terkirim. Akses tetap aktif sampai parent mencabutnya.';
 }

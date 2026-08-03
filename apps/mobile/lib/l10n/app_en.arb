@@ -1343,5 +1343,34 @@
   "openLiveMapTooltip": "Open live map",
   "cancelTripTooltip": "Cancel trip",
   "screenTimeSettingsTooltip": "Screen time settings",
-  "closeLocationDisclosureTooltip": "Close without continuing"
+  "closeLocationDisclosureTooltip": "Close without continuing",
+  "deleteAccountButton": "Delete account",
+  "deleteAccountConfirmTitle": "Delete your account?",
+  "deleteAccountConfirmBody": "This permanently deletes your PulangAman account and all children you exclusively own, including their location history and related data. This cannot be undone.",
+  "deleteAccountConfirmBodyGuardian": "This permanently deletes your guardian account. Children you can view stay with their parent — nothing cascades. This cannot be undone.",
+  "deleteAccountConfirmAction": "Delete account",
+  "deleteAccountFailed": "Could not delete account. Try again.",
+  "unlinkChildTemporary": "Unlink temporarily",
+  "deleteChildDataPermanently": "Delete data permanently",
+  "deleteChildDataConfirmTitle": "Permanently delete {name}?",
+  "@deleteChildDataConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteChildDataConfirmBody": "This permanently deletes {name}'s account and all related data (location history, zones, devices). Guardians lose access. This cannot be undone.",
+  "@deleteChildDataConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "guardianLeaveNowLabel": "Stop being a guardian now",
+  "guardianLeaveNowSubtitle": "Access ends immediately. The parent will be notified.",
+  "guardianRequestParentLabel": "Ask parent to remove my access",
+  "guardianRequestParentSubtitle": "Access stays active until the parent approves.",
+  "leaveRequestSent": "Request sent. Access stays active until the parent removes it."
 }

@@ -128,3 +128,15 @@ export async function ensureFirebaseUser(params: {
     return created.uid;
   }
 }
+
+export async function deleteFirebaseUser(uid: string): Promise<void> {
+  const auth = getFirebaseAuth();
+  if (!auth) return; // dev stub — nothing to delete
+  try {
+    await auth.deleteUser(uid);
+  } catch (error) {
+    console.error('delete_firebase_user_failed', { uid, error });
+    // Don't rethrow — Postgres data is already gone by the time this is
+    // called, which is what matters most for the deletion request.
+  }
+}

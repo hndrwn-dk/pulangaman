@@ -379,6 +379,17 @@ class ChildrenController extends StateNotifier<ChildrenState> {
     unawaited(refresh(force: true));
   }
 
+  Future<void> deleteChildData(String childId) async {
+    final api = _ref.read(apiClientProvider);
+    await api.delete('/api/v1/children/$childId/data');
+    state = ChildrenState(
+      items: state.items.where((c) => c.id != childId).toList(),
+      invites: state.invites,
+      fromCache: false,
+    );
+    unawaited(refresh(force: true));
+  }
+
   /// Revoke a pending invite so it disappears from PENDING CODES immediately.
   Future<void> revokeInvite(String inviteId) async {
     final api = _ref.read(apiClientProvider);
