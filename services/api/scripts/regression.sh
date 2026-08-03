@@ -15,7 +15,7 @@ C_PHONE="+62812${STAMP: -7}2"
 G_PHONE="+62812${STAMP: -7}3"
 S_PHONE="+62812${STAMP: -7}4"
 P_TOK="dev:parent_${P_PHONE//[^0-9]/}"
-C_TOK="dev:child_${C_PHONE//[^0-9]/}"
+C_TOK=""  # set after create from server-minted firebaseUid
 G_TOK="dev:guardian_${G_PHONE//[^0-9]/}"
 S_TOK="dev:parent_${S_PHONE//[^0-9]/}"  # school admin logs in as generic user
 
@@ -57,9 +57,12 @@ SADMIN_ID=$(echo "$S" | jq "['userId']")
 echo "----- Children -----"
 CR=$(curl -sS -X POST "$BASE/api/v1/children" -H "Authorization: Bearer $P_TOK" -H "Content-Type: application/json" -d "{\"name\":\"Andi\",\"phone\":\"$C_PHONE\",\"grade\":5}")
 CHILD_ID=$(echo "$CR" | jq "['id']"); echo "child=$CHILD_ID"
-[ -n "$CHILD_ID" ] && PASS=$((PASS+1)) && echo "PASS | create child" || { FAIL=$((FAIL+1)); echo "FAIL | create child | $CR"; }
+CHILD_UID=$(echo "$CR" | jq "['firebaseUid']"); echo "childUid=$CHILD_UID"
+# Child auth must use the server-minted UID (not a guessable child_{phone}).
+C_TOK="dev:$CHILD_UID"
+[ -n "$CHILD_ID" ] && [ -n "$CHILD_UID" ] && PASS=$((PASS+1)) && echo "PASS | create child" || { FAIL=$((FAIL+1)); echo "FAIL | create child | $CR"; }
 run "list children"          200 GET  /api/v1/children  "$P_TOK"
-# child logs in (binds to created child via phone)
+# child logs in via server-minted firebase_uid (byUid), not phone rebind
 CS=$(curl -sS -X POST "$BASE/api/v1/auth/session" -H "Authorization: Bearer $C_TOK" -H "Content-Type: application/json" -d "{\"name\":\"Andi\",\"phone\":\"$C_PHONE\",\"role\":\"child\"}")
 CHILD_LOGIN_ID=$(echo "$CS" | jq "['userId']")
 [ "$CHILD_LOGIN_ID" = "$CHILD_ID" ] && PASS=$((PASS+1)) && echo "PASS | child login binds to created id" || { FAIL=$((FAIL+1)); echo "FAIL | child login binds ($CHILD_LOGIN_ID vs $CHILD_ID)"; }

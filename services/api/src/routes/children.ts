@@ -18,6 +18,7 @@ import {
   type ActivityPoint,
   type ActivityZone,
 } from '../services/activityTimeline.js';
+import { mintChildFirebaseUid } from './childIdentity.js';
 
 export const childrenRouter = Router();
 
@@ -27,8 +28,7 @@ const createChildSchema = z.object({
   name: z.string().min(1).max(120),
   phone: z.string().min(8).max(20),
   grade: z.number().int().min(1).max(12).optional(),
-  /** Optional override for tests/dev; otherwise server mints a Firebase uid. */
-  firebaseUid: z.string().min(1).optional(),
+  // Client-supplied firebaseUid is intentionally ignored (identity hijack vector).
 });
 
 const emergencyContactSchema = z.object({
@@ -65,83 +65,103 @@ childrenRouter.post('/', async (req: AuthedRequest, res, next) => {
     }
 
     const body = createChildSchema.parse(req.body);
-    const normalizedPhone = body.phone.replace(/\D/g, '');
-    const firebaseUid = body.firebaseUid ?? `child_${normalizedPhone}`;
-    await ensureFirebaseUser({
-      uid: firebaseUid,
-      phone: body.phone.startsWith('+') ? body.phone : undefined,
-      displayName: body.name,
-    });
-    const tokenResult = await createChildCustomToken(firebaseUid);
+
+    let childId: string;
+    let firebaseUid: string;
+    let responseName = body.name;
+    let httpStatus: 200 | 201 = 201;
 
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // If parent already created this phone, return existing link + fresh custom token.
-      const existing = await client.query<{ id: string }>(
-        `SELECT u.id
+      // If parent already created this phone, return existing link + fresh custom token
+      // for the child's real server-minted UID (never a client-supplied one).
+      const existing = await client.query<{ id: string; firebase_uid: string; name: string }>(
+        `SELECT u.id, u.firebase_uid, u.name
          FROM users u
          JOIN parent_children pc ON pc.child_id = u.id
          WHERE pc.parent_id = $1 AND u.phone = $2
-         LIMIT 1`,
+         LIMIT 1
+         FOR UPDATE`,
         [parentId, body.phone],
       );
       if (existing.rowCount && existing.rows[0]) {
+        childId = existing.rows[0].id;
+        firebaseUid = existing.rows[0].firebase_uid;
+        responseName = body.name;
+        httpStatus = 200;
         await client.query('COMMIT');
-        res.status(200).json({
-          id: existing.rows[0].id,
-          name: body.name,
-          firebaseUid,
-          customToken: tokenResult.customToken,
-        });
-        return;
+      } else {
+        // Always mint an unguessable server UID. Never upsert on firebase_uid —
+        // ON CONFLICT DO UPDATE previously let clients overwrite foreign users.
+        firebaseUid = mintChildFirebaseUid();
+        let child;
+        try {
+          child = await client.query<{ id: string }>(
+            `INSERT INTO users (firebase_uid, phone, name)
+             VALUES ($1, $2, $3)
+             RETURNING id`,
+            [firebaseUid, body.phone, body.name],
+          );
+        } catch (insertError) {
+          await client.query('ROLLBACK');
+          // Unique firebase_uid collision — refuse rather than claim a foreign row.
+          const code =
+            insertError && typeof insertError === 'object' && 'code' in insertError
+              ? String((insertError as { code?: string }).code)
+              : '';
+          if (code === '23505') {
+            res.status(409).json({ error: 'child_uid_collision' });
+            return;
+          }
+          throw insertError;
+        }
+        childId = child.rows[0].id;
+
+        await client.query(
+          `INSERT INTO user_roles (user_id, role) VALUES ($1, 'child')
+           ON CONFLICT DO NOTHING`,
+          [childId],
+        );
+        await client.query(
+          `INSERT INTO child_profiles (user_id, grade) VALUES ($1, $2)
+           ON CONFLICT (user_id) DO UPDATE SET grade = COALESCE(EXCLUDED.grade, child_profiles.grade)`,
+          [childId, body.grade ?? null],
+        );
+        await client.query(
+          `INSERT INTO parent_children (parent_id, child_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [parentId, childId],
+        );
+        await client.query(
+          `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
+           VALUES ($1, $2, 'child.created', '{}'::jsonb)`,
+          [parentId, childId],
+        );
+
+        await client.query('COMMIT');
       }
-
-      const child = await client.query<{ id: string }>(
-        `INSERT INTO users (firebase_uid, phone, name)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (firebase_uid) DO UPDATE
-           SET name = EXCLUDED.name, phone = EXCLUDED.phone, updated_at = now()
-         RETURNING id`,
-        [firebaseUid, body.phone, body.name],
-      );
-      const childId = child.rows[0].id;
-
-      await client.query(
-        `INSERT INTO user_roles (user_id, role) VALUES ($1, 'child')
-         ON CONFLICT DO NOTHING`,
-        [childId],
-      );
-      await client.query(
-        `INSERT INTO child_profiles (user_id, grade) VALUES ($1, $2)
-         ON CONFLICT (user_id) DO UPDATE SET grade = COALESCE(EXCLUDED.grade, child_profiles.grade)`,
-        [childId, body.grade ?? null],
-      );
-      await client.query(
-        `INSERT INTO parent_children (parent_id, child_id) VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
-        [parentId, childId],
-      );
-      await client.query(
-        `INSERT INTO audit_events (actor_id, subject_child_id, action, payload)
-         VALUES ($1, $2, 'child.created', '{}'::jsonb)`,
-        [parentId, childId],
-      );
-
-      await client.query('COMMIT');
-      res.status(201).json({
-        id: childId,
-        name: body.name,
-        firebaseUid,
-        customToken: tokenResult.customToken,
-      });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       client.release();
     }
+
+    await ensureFirebaseUser({
+      uid: firebaseUid,
+      phone: body.phone.startsWith('+') ? body.phone : undefined,
+      displayName: responseName,
+    });
+    const tokenResult = await createChildCustomToken(firebaseUid);
+
+    res.status(httpStatus).json({
+      id: childId,
+      name: responseName,
+      firebaseUid,
+      customToken: tokenResult.customToken,
+    });
   } catch (error) {
     next(error);
   }

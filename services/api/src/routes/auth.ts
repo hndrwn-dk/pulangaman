@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
+import { mayClaimFirebaseUid, resolveSessionPhone } from './authIdentity.js';
 
 export const authRouter = Router();
 
@@ -36,7 +37,12 @@ authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) =
   try {
     const body = sessionBodySchema.parse(req.body);
     const firebaseUid = req.auth!.firebaseUid;
-    const phone = body.phone ?? req.auth?.phone;
+    // Identity phone comes from the verified token. Body phone is only a
+    // fallback for dev-auth tokens that carry no phone_number claim.
+    const phone = resolveSessionPhone({
+      tokenPhone: req.auth?.phone,
+      bodyPhone: body.phone,
+    });
     if (!phone) {
       res.status(400).json({ error: 'phone_required' });
       return;
@@ -47,27 +53,35 @@ authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) =
     try {
       await client.query('BEGIN');
 
-      // Claim pending invite placeholder (pending:{phone}) onto this Firebase identity.
-      const pending = await client.query<{ id: string }>(
-        `SELECT id FROM users
-         WHERE phone = $1 AND firebase_uid = $2
-         LIMIT 1`,
-        [phone, `pending:${phone}`],
+      // Claim pending invite placeholder (pending:{…}) onto this Firebase identity.
+      // Match by digit-normalized phone; never claim rows with a real Firebase UID.
+      const pending = await client.query<{ id: string; firebase_uid: string }>(
+        `SELECT id, firebase_uid FROM users
+         WHERE regexp_replace(phone, '\\D', '', 'g') = $1
+           AND firebase_uid LIKE 'pending:%'
+         LIMIT 1
+         FOR UPDATE`,
+        [digits],
       );
 
       let userId: string;
       let claimedExisting = false;
 
-      if (pending.rowCount && pending.rows[0]) {
+      if (
+        pending.rowCount &&
+        pending.rows[0] &&
+        mayClaimFirebaseUid(pending.rows[0].firebase_uid)
+      ) {
         userId = pending.rows[0].id;
         await client.query(
           `UPDATE users
            SET firebase_uid = $2,
-               email = COALESCE($3, email),
-               name = $4,
+               phone = $3,
+               email = COALESCE($4, email),
+               name = $5,
                updated_at = now()
            WHERE id = $1`,
-          [userId, firebaseUid, body.email ?? null, body.name],
+          [userId, firebaseUid, phone, body.email ?? null, body.name],
         );
         claimedExisting = true;
       } else {
@@ -89,45 +103,20 @@ authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) =
             [userId, phone, body.email ?? null, body.name],
           );
         } else {
-          // Claim existing account with same verified phone (OTP / legacy digits).
-          const byPhone = await client.query<{ id: string; firebase_uid: string }>(
-            `SELECT id, firebase_uid FROM users
-             WHERE regexp_replace(phone, '\\D', '', 'g') = $1
-             ORDER BY updated_at DESC
-             LIMIT 1`,
-            [digits],
+          // Do NOT rebind another account by phone digits — that enables
+          // takeover when a client posts a victim phone with their own token.
+          const upsert = await client.query<{ id: string }>(
+            `INSERT INTO users (firebase_uid, phone, email, name)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (firebase_uid) DO UPDATE
+               SET phone = EXCLUDED.phone,
+                   email = COALESCE(EXCLUDED.email, users.email),
+                   name = EXCLUDED.name,
+                   updated_at = now()
+             RETURNING id`,
+            [firebaseUid, phone, body.email ?? null, body.name],
           );
-
-          if (byPhone.rowCount && byPhone.rows[0]) {
-            userId = byPhone.rows[0].id;
-            const previousUid = byPhone.rows[0].firebase_uid;
-            if (previousUid !== firebaseUid) {
-              await client.query(
-                `UPDATE users
-                 SET firebase_uid = $2,
-                     phone = $3,
-                     email = COALESCE($4, email),
-                     name = $5,
-                     updated_at = now()
-                 WHERE id = $1`,
-                [userId, firebaseUid, phone, body.email ?? null, body.name],
-              );
-              claimedExisting = true;
-            }
-          } else {
-            const upsert = await client.query<{ id: string }>(
-              `INSERT INTO users (firebase_uid, phone, email, name)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (firebase_uid) DO UPDATE
-                 SET phone = EXCLUDED.phone,
-                     email = COALESCE(EXCLUDED.email, users.email),
-                     name = EXCLUDED.name,
-                     updated_at = now()
-               RETURNING id`,
-              [firebaseUid, phone, body.email ?? null, body.name],
-            );
-            userId = upsert.rows[0].id;
-          }
+          userId = upsert.rows[0].id;
         }
       }
 
