@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { mayClaimFirebaseUid, resolveSessionPhone } from './authIdentity.js';
+import {
+  allowLegacyChildRecovery,
+  isLegacyFirebaseUid,
+} from './authRecovery.js';
 
 export const authRouter = Router();
 
@@ -21,16 +25,6 @@ const sessionBodySchema = z.object({
 /** Digits only, strip leading 0 after country assumption handled by caller. */
 export function phoneDigits(raw: string): string {
   return raw.replace(/\D/g, '');
-}
-
-function isLegacyFirebaseUid(uid: string): boolean {
-  return (
-    uid.startsWith('parent_') ||
-    uid.startsWith('guardian_') ||
-    uid.startsWith('child_') ||
-    uid.startsWith('dev:') ||
-    uid.startsWith('pending:')
-  );
 }
 
 authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) => {
@@ -169,7 +163,12 @@ authRouter.post('/session', requireAuth, async (req: AuthedRequest, res, next) =
         if (
           legacyParent.rowCount &&
           legacyParent.rows[0] &&
-          isLegacyFirebaseUid(legacyParent.rows[0].firebase_uid)
+          isLegacyFirebaseUid(legacyParent.rows[0].firebase_uid) &&
+          allowLegacyChildRecovery({
+            actorPhoneDigits: digits,
+            recoverFromPhoneDigits: legacyDigits,
+            legacyFirebaseUid: legacyParent.rows[0].firebase_uid,
+          })
         ) {
           const moved = await client.query(
             `UPDATE parent_children
