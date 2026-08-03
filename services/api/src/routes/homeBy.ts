@@ -6,6 +6,7 @@ import { rateLimit } from '../middleware/rateLimit.js';
 import { canManageChildFeatures, canViewChild } from '../middleware/roles.js';
 import { applyAckForChild } from '../services/homeByService.js';
 import { jakartaDateString } from '../services/homeByLogic.js';
+import { resolveHomeByAlertParentId } from './homeByAlertParent.js';
 
 export const homeByRouter = Router();
 homeByRouter.use(requireAuth, rateLimit);
@@ -154,6 +155,17 @@ homeByRouter.put('/:childId', async (req: AuthedRequest, res, next) => {
       }
     }
 
+    // Alerts must stay with the exclusive primary parent. Co-parent saves used
+    // to overwrite parent_id with the actor and silently steal FCM/WS delivery.
+    const primary = await pool.query<{ parent_id: string }>(
+      `SELECT parent_id FROM parent_children WHERE child_id = $1 LIMIT 1`,
+      [childId],
+    );
+    const alertParentId = resolveHomeByAlertParentId({
+      primaryParentId: primary.rows[0]?.parent_id,
+      actorId: parentId,
+    });
+
     const result = await pool.query(
       `INSERT INTO home_by_settings (
          child_id, parent_id, mode, custom_hour, custom_minute,
@@ -177,7 +189,7 @@ homeByRouter.put('/:childId', async (req: AuthedRequest, res, next) => {
        RETURNING *`,
       [
         childId,
-        parentId,
+        alertParentId,
         body.mode,
         body.mode === 'custom' ? body.customHour ?? null : null,
         body.mode === 'custom' ? body.customMinute ?? null : null,
