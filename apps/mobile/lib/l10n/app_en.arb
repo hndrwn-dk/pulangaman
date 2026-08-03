@@ -1291,6 +1291,13 @@
       "hours": { "type": "int" }
     }
   },
+  "codeValidForMinutes": "Valid for {minutes} min",
+  "@codeValidForMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "codeExpired": "Code expired",
   "empQuickAccessSubtitle": "Quick access in an emergency",
   "reminderCoachmarkTitle": "Try Schedule Reminders",
   "reminderCoachmarkBody": "Set routine reminders for your child — study, bedtime, or other schedules — from the More menu.",

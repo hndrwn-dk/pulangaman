@@ -2857,6 +2857,14 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String codeValidForMinutes(int minutes) {
+    return 'Berlaku $minutes menit';
+  }
+
+  @override
+  String get codeExpired => 'Kode kedaluwarsa';
+
+  @override
   String get empQuickAccessSubtitle => 'Akses cepat saat kondisi darurat';
 
   @override

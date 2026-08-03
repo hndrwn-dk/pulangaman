@@ -38,6 +38,7 @@ class ApiClient {
   final http.Client _client;
   final String baseUrl;
   String? _token;
+  String? _appCheckToken;
 
   /// Called once after a 401 to obtain a fresh bearer token and retry.
   TokenRefresher? refreshToken;
@@ -46,12 +47,15 @@ class ApiClient {
     _token = token;
   }
 
+  void setAppCheckToken(String? token) => _appCheckToken = token;
+
   String? get token => _token;
 
   Map<String, String> get _headers => {
         'content-type': 'application/json',
         if (_token != null && _token!.isNotEmpty)
           'authorization': 'Bearer $_token',
+        if (_appCheckToken != null) 'X-Firebase-AppCheck': _appCheckToken!,
       };
 
   Future<Map<String, dynamic>> post(

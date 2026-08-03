@@ -55,10 +55,13 @@ class SignInCodeSheet extends StatelessWidget {
 
   static String expiryLabel(AppLocalizations l10n, DateTime? expiresAt) {
     if (expiresAt == null) return l10n.codeValid24Hours;
-    final hours = expiresAt.difference(DateTime.now()).inHours;
-    if (hours <= 0 || (hours >= 20 && hours <= 24)) {
-      return l10n.codeValid24Hours;
+    final remaining = expiresAt.difference(DateTime.now());
+    if (remaining.inMinutes <= 0) return l10n.codeExpired;
+    if (remaining.inMinutes < 60) {
+      return l10n.codeValidForMinutes(remaining.inMinutes.clamp(1, 59));
     }
+    final hours = remaining.inHours;
+    if (hours >= 20 && hours <= 24) return l10n.codeValid24Hours;
     return l10n.codeValidForHours(hours.clamp(1, 168));
   }
 

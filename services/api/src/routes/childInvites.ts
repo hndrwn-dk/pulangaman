@@ -1,8 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
+import { config } from '../config.js';
 import { pool } from '../db/pool.js';
 import { createChildCustomToken } from '../firebase/admin.js';
+import { requireAppCheck } from '../middleware/appCheck.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import {
   clearInviteAttempts,
@@ -10,11 +12,11 @@ import {
   recordInviteFailure,
 } from '../middleware/inviteAttemptLimit.js';
 import { rateLimit } from '../middleware/rateLimit.js';
+import { notifyParentChildJoined } from './childJoinNotify.js';
 
 export const childInvitesRouter = Router();
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const INVITE_TTL_HOURS = 24;
 
 function generateInviteCode(): string {
   const bytes = randomBytes(6);
@@ -88,9 +90,9 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
            AND status = 'pending'
            AND (
              expires_at <= now()
-             OR created_at <= now() - ($2::int * interval '1 hour')
+             OR created_at <= now() - ($2::int * interval '1 minute')
            )`,
-        [parentId, INVITE_TTL_HOURS],
+        [parentId, config.CHILD_INVITE_TTL_MINUTES],
       );
 
       // At most one pending code per child (relink) or per new-child display name.
@@ -117,7 +119,7 @@ childInvitesRouter.post('/', requireAuth, rateLimit, async (req: AuthedRequest, 
 
       let code = generateInviteCode();
       for (let attempt = 0; attempt < 5; attempt += 1) {
-        const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 3_600_000);
+        const expiresAt = new Date(Date.now() + config.CHILD_INVITE_TTL_MINUTES * 60_000);
         try {
           const result = await client.query<{
             id: string;
@@ -198,9 +200,9 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
          AND status = 'pending'
          AND (
            expires_at <= now()
-           OR created_at <= now() - ($2::int * interval '1 hour')
+           OR created_at <= now() - ($2::int * interval '1 minute')
          )`,
-      [parentId, INVITE_TTL_HOURS],
+      [parentId, config.CHILD_INVITE_TTL_MINUTES],
     );
 
     const result = await pool.query<{
@@ -219,10 +221,10 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
        WHERE parent_id = $1
          AND status = 'pending'
          AND expires_at > now()
-         AND created_at > now() - ($2::int * interval '1 hour')
+         AND created_at > now() - ($2::int * interval '1 minute')
        ORDER BY created_at DESC
        LIMIT 20`,
-      [parentId, INVITE_TTL_HOURS],
+      [parentId, config.CHILD_INVITE_TTL_MINUTES],
     );
     res.json({
       invites: result.rows.map((row) => ({
@@ -245,7 +247,7 @@ childInvitesRouter.get('/', requireAuth, rateLimit, async (req: AuthedRequest, r
  * Child joins via invite code (no prior auth).
  * Creates child user + parent_children link, OR reuses existing child when invite has relink_child_id.
  */
-childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
+childInvitesRouter.post('/join', requireAppCheck, rateLimit, async (req, res, next) => {
   try {
     const body = z
       .object({
@@ -395,6 +397,8 @@ childInvitesRouter.post('/join', rateLimit, async (req, res, next) => {
 
       await client.query('COMMIT');
       clearInviteAttempts(attemptKey);
+
+      await notifyParentChildJoined(inviteRow.parent_id, childId, displayName);
 
       res.status(201).json({
         userId: childId,

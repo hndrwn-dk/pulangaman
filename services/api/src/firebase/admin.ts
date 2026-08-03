@@ -77,6 +77,12 @@ export async function verifyIdToken(idToken: string): Promise<{ uid: string; pho
   }
 }
 
+export async function verifyAppCheckToken(token: string): Promise<void> {
+  if (!isFirebaseConfigured) return; // local dev without a project — skip
+  initFirebase();
+  await admin.appCheck().verifyToken(token);
+}
+
 export async function createChildCustomToken(
   firebaseUid: string,
 ): Promise<{ customToken: string | null; firebaseUid: string }> {

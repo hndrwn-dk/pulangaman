@@ -13,6 +13,7 @@ const envSchema = z.object({
   LOCATION_TTL_SECONDS: z.coerce.number().default(900),
   STALE_LOCATION_SECONDS: z.coerce.number().default(120),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().default(100),
+  CHILD_INVITE_TTL_MINUTES: z.coerce.number().int().min(5).default(30),
   INVITE_ATTEMPT_MAX: z.coerce.number().int().min(1).default(5),
   INVITE_ATTEMPT_WINDOW_MS: z.coerce.number().default(900_000), // 15 min
   INVITE_ATTEMPT_LOCKOUT_MS: z.coerce.number().default(1_800_000), // 30 min
@@ -39,6 +40,12 @@ const envSchema = z.object({
   // Month heatmap + weekday insights need ~28–35 days of history.
   USAGE_RETENTION_DAYS: z.coerce.number().int().min(1).max(90).default(42),
   KILL_SWITCH_POLICY_ENFORCE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  // Start false (monitor via Firebase Console App Check metrics); flip true
+  // only after confirming real Play Store traffic passes.
+  APP_CHECK_ENFORCE: z
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),

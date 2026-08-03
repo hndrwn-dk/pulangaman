@@ -5054,6 +5054,18 @@ abstract class AppLocalizations {
   /// **'Berlaku {hours} jam'**
   String codeValidForHours(int hours);
 
+  /// No description provided for @codeValidForMinutes.
+  ///
+  /// In id, this message translates to:
+  /// **'Berlaku {minutes} menit'**
+  String codeValidForMinutes(int minutes);
+
+  /// No description provided for @codeExpired.
+  ///
+  /// In id, this message translates to:
+  /// **'Kode kedaluwarsa'**
+  String get codeExpired;
+
   /// No description provided for @empQuickAccessSubtitle.
   ///
   /// In id, this message translates to:

@@ -2860,6 +2860,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String codeValidForMinutes(int minutes) {
+    return 'Valid for $minutes min';
+  }
+
+  @override
+  String get codeExpired => 'Code expired';
+
+  @override
   String get empQuickAccessSubtitle => 'Quick access in an emergency';
 
   @override

@@ -1727,6 +1727,13 @@
       "hours": { "type": "int" }
     }
   },
+  "codeValidForMinutes": "Berlaku {minutes} menit",
+  "@codeValidForMinutes": {
+    "placeholders": {
+      "minutes": { "type": "int" }
+    }
+  },
+  "codeExpired": "Kode kedaluwarsa",
   "empQuickAccessSubtitle": "Akses cepat saat kondisi darurat",
   "reminderCoachmarkTitle": "Coba Pengingat Jadwal",
   "reminderCoachmarkBody": "Atur pengingat rutin buat anak — belajar, tidur, atau jadwal lainnya — dari menu Lainnya.",

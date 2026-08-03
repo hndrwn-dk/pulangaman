@@ -34,6 +34,9 @@ dependencies:
   # 6.2.0-beta line required: stable 6.1.5 ships an Android Gradle config
   # (getDefaultProguardFile 'proguard-android.txt') rejected by newer AGP.
   flutter_inappwebview: 6.2.0-beta.3
+  firebase_messaging: ^16.4.3
+  flutter_local_notifications: ^20.1.0
+  firebase_app_check: ^0.4.5+2
 
 dev_dependencies:
   flutter_test:
