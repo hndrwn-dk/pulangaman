@@ -82,7 +82,7 @@ messagesRouter.get('/', async (req: AuthedRequest, res, next) => {
            'trip.started',
            'trip.arrived'
          )
-         AND ae.created_at > now() - interval '24 hours'
+         AND ae.created_at > now() - interval '7 days'
        ORDER BY ae.created_at DESC
        LIMIT 50`,
       [childIds],

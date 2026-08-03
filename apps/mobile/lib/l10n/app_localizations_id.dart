@@ -1390,12 +1390,12 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String kabarSummaryUnread(int unread, int total) {
-    return '$unread belum dibaca · $total kabar · 24 jam terakhir';
+    return '$unread belum dibaca · $total kabar · 7 hari terakhir';
   }
 
   @override
   String kabarSummaryAll(int total) {
-    return '$total kabar · 24 jam terakhir';
+    return '$total kabar · 7 hari terakhir';
   }
 
   @override

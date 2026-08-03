@@ -1390,12 +1390,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String kabarSummaryUnread(int unread, int total) {
-    return '$unread unread · $total updates · last 24h';
+    return '$unread unread · $total updates · last 7d';
   }
 
   @override
   String kabarSummaryAll(int total) {
-    return '$total updates · last 24h';
+    return '$total updates · last 7d';
   }
 
   @override

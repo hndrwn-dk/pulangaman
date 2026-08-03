@@ -2573,13 +2573,13 @@ abstract class AppLocalizations {
   /// No description provided for @kabarSummaryUnread.
   ///
   /// In id, this message translates to:
-  /// **'{unread} belum dibaca · {total} kabar · 24 jam terakhir'**
+  /// **'{unread} belum dibaca · {total} kabar · 7 hari terakhir'**
   String kabarSummaryUnread(int unread, int total);
 
   /// No description provided for @kabarSummaryAll.
   ///
   /// In id, this message translates to:
-  /// **'{total} kabar · 24 jam terakhir'**
+  /// **'{total} kabar · 7 hari terakhir'**
   String kabarSummaryAll(int total);
 
   /// No description provided for @noKabarForFilter.

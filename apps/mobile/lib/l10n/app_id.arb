@@ -799,7 +799,7 @@
   "allKabarMarkedRead": "Semua kabar ditandai sudah dibaca",
   "kabarHistoryTitle": "Riwayat Kabar",
   "noKabarYet": "Belum ada kabar",
-  "kabarSummaryUnread": "{unread} belum dibaca · {total} kabar · 24 jam terakhir",
+  "kabarSummaryUnread": "{unread} belum dibaca · {total} kabar · 7 hari terakhir",
   "@kabarSummaryUnread": {
     "placeholders": {
       "unread": {
@@ -810,7 +810,7 @@
       }
     }
   },
-  "kabarSummaryAll": "{total} kabar · 24 jam terakhir",
+  "kabarSummaryAll": "{total} kabar · 7 hari terakhir",
   "@kabarSummaryAll": {
     "placeholders": {
       "total": {
