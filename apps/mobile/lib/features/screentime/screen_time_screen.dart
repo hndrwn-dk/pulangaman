@@ -1109,26 +1109,33 @@ class _SettingsCircleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final refresh = visualRefreshOf(context);
+    final l10n = AppLocalizations.of(context);
     if (refresh) {
       return Opacity(
         opacity: enabled ? 1 : 0.45,
         child: PaRoundIconButton(
           icon: Icons.settings_rounded,
+          semanticLabel: l10n.screenTimeSettingsTooltip,
           onTap: onTap ?? () {},
           elevation: 0,
         ),
       );
     }
-    return Material(
-      color: const Color(0xFFE8ECF0),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: const SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(Icons.settings_rounded, size: 20),
+    return Semantics(
+      button: true,
+      label: l10n.screenTimeSettingsTooltip,
+      enabled: enabled && onTap != null,
+      child: Material(
+        color: const Color(0xFFE8ECF0),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: const SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(Icons.settings_rounded, size: 20),
+          ),
         ),
       ),
     );
@@ -2774,6 +2781,7 @@ class _ScreenTimeRulesScreenState extends ConsumerState<ScreenTimeRulesScreen> {
             child: refresh
                 ? PaRoundIconButton(
                     icon: Icons.refresh_rounded,
+                    semanticLabel: l10n.reloadTooltip,
                     onTap: () => _load(widget.child.id),
                     size: 40,
                     iconSize: 20,

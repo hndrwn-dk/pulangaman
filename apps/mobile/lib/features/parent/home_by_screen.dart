@@ -832,6 +832,7 @@ class _HomeByScreenState extends ConsumerState<HomeByScreen> {
                                           ),
                                         ),
                                         trailing: IconButton(
+                                          tooltip: l10n.homeBySkipDateRemoveTooltip,
                                           icon: Icon(
                                             Icons.close_rounded,
                                             color: refresh

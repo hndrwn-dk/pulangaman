@@ -788,46 +788,53 @@ class _VrPanicHoldButtonState extends State<_VrPanicHoldButton>
   Widget build(BuildContext context) {
     const size = 168.0;
     const ringWidth = 6.0;
+    final l10n = AppLocalizations.of(context);
 
-    return Listener(
-      onPointerDown: (_) => _startHold(),
-      onPointerUp: (_) => _cancelHold(),
-      onPointerCancel: (_) => _cancelHold(),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            return CustomPaint(
-              painter: _PanicRingPainter(
-                progress: _controller.value,
-                trackColor: VisualRefreshColors.danger.withValues(alpha: 0.22),
-                progressColor: VisualRefreshColors.danger,
-                strokeWidth: ringWidth,
-              ),
-              child: child,
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Material(
-              color: widget.enabled
-                  ? VisualRefreshColors.danger
-                  : VisualRefreshColors.danger.withValues(alpha: 0.45),
-              shape: const CircleBorder(),
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    widget.label,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
-                      height: 1.2,
-                      letterSpacing: 0.2,
+    return Semantics(
+      button: true,
+      label: widget.label,
+      hint: l10n.panicHoldSemanticsHint,
+      onLongPress: widget.enabled ? widget.onHoldComplete : null,
+      child: Listener(
+        onPointerDown: (_) => _startHold(),
+        onPointerUp: (_) => _cancelHold(),
+        onPointerCancel: (_) => _cancelHold(),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: _PanicRingPainter(
+                  progress: _controller.value,
+                  trackColor: VisualRefreshColors.danger.withValues(alpha: 0.22),
+                  progressColor: VisualRefreshColors.danger,
+                  strokeWidth: ringWidth,
+                ),
+                child: child,
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Material(
+                color: widget.enabled
+                    ? VisualRefreshColors.danger
+                    : VisualRefreshColors.danger.withValues(alpha: 0.45),
+                shape: const CircleBorder(),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      widget.label,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        height: 1.2,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
                 ),

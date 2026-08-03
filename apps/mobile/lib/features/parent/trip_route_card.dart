@@ -120,6 +120,7 @@ class TripRouteCard extends StatelessWidget {
                     ),
                     if (onCancel != null)
                       IconButton(
+                        tooltip: l10n.cancelTripTooltip,
                         onPressed: onCancel,
                         icon: const Icon(Icons.close_rounded),
                         color: refresh

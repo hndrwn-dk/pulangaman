@@ -2949,4 +2949,35 @@ class AppLocalizationsId extends AppLocalizations {
   @override
   String get guardianEmpActiveBannerBody =>
       'Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi.';
+
+  @override
+  String get panicHoldSemanticsHint =>
+      'Aktivasi darurat — tahan 3 detik, atau gunakan aksi tap-and-hold pembaca layar';
+
+  @override
+  String get backButtonLabel => 'Kembali';
+
+  @override
+  String get homeBySkipDateRemoveTooltip => 'Hapus tanggal libur';
+
+  @override
+  String get dismissZoneAlertTooltip => 'Tutup peringatan zona';
+
+  @override
+  String get deletePlaceTooltip => 'Hapus tempat';
+
+  @override
+  String get centerOnChildTooltip => 'Pusatkan peta ke anak';
+
+  @override
+  String get openLiveMapTooltip => 'Buka peta langsung';
+
+  @override
+  String get cancelTripTooltip => 'Batalkan perjalanan';
+
+  @override
+  String get screenTimeSettingsTooltip => 'Pengaturan waktu layar';
+
+  @override
+  String get closeLocationDisclosureTooltip => 'Tutup tanpa melanjutkan';
 }

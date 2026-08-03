@@ -1333,5 +1333,15 @@
   "guardianToolRemindersSub": "Schedule",
   "guardianToolHomeTimeSub": "Safe home",
   "guardianEmpActiveBannerTitle": "Meeting point active",
-  "guardianEmpActiveBannerBody": "Emergency meeting point is live — open for location and instructions."
+  "guardianEmpActiveBannerBody": "Emergency meeting point is live — open for location and instructions.",
+  "panicHoldSemanticsHint": "Emergency activation — hold for 3 seconds, or use the screen reader tap-and-hold action",
+  "backButtonLabel": "Back",
+  "homeBySkipDateRemoveTooltip": "Remove holiday date",
+  "dismissZoneAlertTooltip": "Dismiss zone alert",
+  "deletePlaceTooltip": "Delete place",
+  "centerOnChildTooltip": "Center map on child",
+  "openLiveMapTooltip": "Open live map",
+  "cancelTripTooltip": "Cancel trip",
+  "screenTimeSettingsTooltip": "Screen time settings",
+  "closeLocationDisclosureTooltip": "Close without continuing"
 }

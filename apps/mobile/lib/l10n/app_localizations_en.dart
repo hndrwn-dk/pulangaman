@@ -2952,4 +2952,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get guardianEmpActiveBannerBody =>
       'Emergency meeting point is live — open for location and instructions.';
+
+  @override
+  String get panicHoldSemanticsHint =>
+      'Emergency activation — hold for 3 seconds, or use the screen reader tap-and-hold action';
+
+  @override
+  String get backButtonLabel => 'Back';
+
+  @override
+  String get homeBySkipDateRemoveTooltip => 'Remove holiday date';
+
+  @override
+  String get dismissZoneAlertTooltip => 'Dismiss zone alert';
+
+  @override
+  String get deletePlaceTooltip => 'Delete place';
+
+  @override
+  String get centerOnChildTooltip => 'Center map on child';
+
+  @override
+  String get openLiveMapTooltip => 'Open live map';
+
+  @override
+  String get cancelTripTooltip => 'Cancel trip';
+
+  @override
+  String get screenTimeSettingsTooltip => 'Screen time settings';
+
+  @override
+  String get closeLocationDisclosureTooltip => 'Close without continuing';
 }

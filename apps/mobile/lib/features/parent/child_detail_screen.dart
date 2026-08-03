@@ -871,6 +871,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                       children: [
                         PaRoundIconButton(
                           icon: Icons.arrow_back_rounded,
+                          semanticLabel: l10n.backButtonLabel,
                           onTap: () => Navigator.of(context).pop(),
                         ),
                         const Spacer(),
@@ -878,6 +879,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                           children: [
                             PaRoundIconButton(
                               icon: Icons.gps_fixed_rounded,
+                              semanticLabel: l10n.centerOnChildTooltip,
                               iconColor: refresh
                                   ? VisualRefreshColors.accent
                                   : const Color(0xFFE85A7A),
@@ -894,6 +896,7 @@ class _ChildDetailScreenState extends ConsumerState<ChildDetailScreen> {
                             const SizedBox(height: 8),
                             PaRoundIconButton(
                               icon: Icons.open_in_full_rounded,
+                              semanticLabel: l10n.openLiveMapTooltip,
                               onTap: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(

@@ -49,6 +49,7 @@ class BackgroundLocationDisclosureScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
+          tooltip: l10n.closeLocationDisclosureTooltip,
           icon: const Icon(Icons.close_rounded),
           onPressed: () => Navigator.of(context).pop(false),
         ),

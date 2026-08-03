@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Circular white icon chip used on map overlays and screen headers.
 class PaRoundIconButton extends StatelessWidget {
@@ -12,6 +13,7 @@ class PaRoundIconButton extends StatelessWidget {
     this.size = 42,
     this.iconSize = 20,
     this.elevation = 3,
+    this.semanticLabel,
   });
 
   final IconData icon;
@@ -21,6 +23,7 @@ class PaRoundIconButton extends StatelessWidget {
   final double size;
   final double iconSize;
   final double elevation;
+  final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -30,25 +33,29 @@ class PaRoundIconButton extends StatelessWidget {
         : backgroundColor;
     final resolvedIcon =
         iconColor ?? (refresh ? VisualRefreshColors.textPrimary : AppColors.ink);
-    return Material(
-      color: resolvedBg,
-      shape: CircleBorder(
-        side: refresh
-            ? const BorderSide(
-                color: VisualRefreshColors.border,
-                width: 0.5,
-              )
-            : BorderSide.none,
-      ),
-      elevation: refresh ? 0 : elevation,
-      shadowColor: Colors.black26,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Icon(icon, size: iconSize, color: resolvedIcon),
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Material(
+        color: resolvedBg,
+        shape: CircleBorder(
+          side: refresh
+              ? const BorderSide(
+                  color: VisualRefreshColors.border,
+                  width: 0.5,
+                )
+              : BorderSide.none,
+        ),
+        elevation: refresh ? 0 : elevation,
+        shadowColor: Colors.black26,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(icon, size: iconSize, color: resolvedIcon),
+          ),
         ),
       ),
     );
@@ -63,8 +70,10 @@ class PaBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return PaRoundIconButton(
       icon: Icons.arrow_back_rounded,
+      semanticLabel: l10n.backButtonLabel,
       onTap: onPressed ?? () => Navigator.of(context).maybePop(),
     );
   }

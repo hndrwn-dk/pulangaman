@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
@@ -345,6 +346,12 @@ class ChildrenController extends StateNotifier<ChildrenState> {
       items: state.items,
       invites: [invite, ...remaining],
     );
+    final role = _ref.read(authControllerProvider).role;
+    if (role != null && role != AppRole.child) {
+      unawaited(
+        FirebaseAnalytics.instance.logEvent(name: 'child_invite_created'),
+      );
+    }
     unawaited(refresh(force: true));
     return invite;
   }

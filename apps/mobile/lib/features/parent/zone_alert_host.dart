@@ -578,6 +578,7 @@ class _ParentZoneAlertHostState extends ConsumerState<ParentZoneAlertHost>
                     ),
                     subtitle: Text(_banner!.localizedMessage(l10n)),
                     trailing: IconButton(
+                      tooltip: l10n.dismissZoneAlertTooltip,
                       icon: const Icon(Icons.close),
                       onPressed: () => setState(() => _banner = null),
                     ),

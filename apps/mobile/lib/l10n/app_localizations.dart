@@ -5221,6 +5221,66 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi.'**
   String get guardianEmpActiveBannerBody;
+
+  /// No description provided for @panicHoldSemanticsHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Aktivasi darurat — tahan 3 detik, atau gunakan aksi tap-and-hold pembaca layar'**
+  String get panicHoldSemanticsHint;
+
+  /// No description provided for @backButtonLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Kembali'**
+  String get backButtonLabel;
+
+  /// No description provided for @homeBySkipDateRemoveTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus tanggal libur'**
+  String get homeBySkipDateRemoveTooltip;
+
+  /// No description provided for @dismissZoneAlertTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup peringatan zona'**
+  String get dismissZoneAlertTooltip;
+
+  /// No description provided for @deletePlaceTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus tempat'**
+  String get deletePlaceTooltip;
+
+  /// No description provided for @centerOnChildTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Pusatkan peta ke anak'**
+  String get centerOnChildTooltip;
+
+  /// No description provided for @openLiveMapTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Buka peta langsung'**
+  String get openLiveMapTooltip;
+
+  /// No description provided for @cancelTripTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Batalkan perjalanan'**
+  String get cancelTripTooltip;
+
+  /// No description provided for @screenTimeSettingsTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Pengaturan waktu layar'**
+  String get screenTimeSettingsTooltip;
+
+  /// No description provided for @closeLocationDisclosureTooltip.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup tanpa melanjutkan'**
+  String get closeLocationDisclosureTooltip;
 }
 
 class _AppLocalizationsDelegate

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -365,6 +366,7 @@ class AuthController extends StateNotifier<AuthState> {
       role: role,
       name: name.trim(),
     );
+    _logLoginCompletedIfAllowed(role);
   }
 
   Future<void> _startPhoneOtp({
@@ -491,6 +493,17 @@ class AuthController extends StateNotifier<AuthState> {
       role: role,
       name: name.trim(),
     );
+    _logLoginCompletedIfAllowed(role);
+  }
+
+  /// Parent/guardian funnel only — never for child (Designed for Families).
+  void _logLoginCompletedIfAllowed(AppRole role) {
+    if (role == AppRole.child) return;
+    unawaited(() async {
+      // Ensure collection is on before the event (logout may have disabled it).
+      await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+      await FirebaseAnalytics.instance.logEvent(name: 'login_completed');
+    }());
   }
 
   /// Move children from a legacy parent phone onto the current parent account.

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'l10n/app_localizations.dart';
@@ -41,6 +43,8 @@ class PulangAmanApp extends ConsumerWidget {
           pushService.init(onTapPayload: (data) => _handlePushTap(ref, data)),
         );
       }
+      // Crashlytics: all roles. Analytics: parent/guardian only (Designed for Families).
+      unawaited(_syncFirebaseTelemetry(next));
     });
     // Visual Refresh is always on for all roles.
     // Key forces a fresh navigator when auth flips, so logout leaves
@@ -91,6 +95,19 @@ Future<void> _syncNativeAppLocale(String languageCode) async {
     await ReminderChannel().setAppLocale(languageCode);
   } catch (_) {
     // Native channel unavailable (tests / non-Android) — ignore.
+  }
+}
+
+Future<void> _syncFirebaseTelemetry(AuthState auth) async {
+  try {
+    await FirebaseCrashlytics.instance.setUserIdentifier(
+      auth.isAuthenticated ? (auth.userId ?? '') : '',
+    );
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
+      auth.isAuthenticated && auth.role != AppRole.child,
+    );
+  } catch (_) {
+    // Telemetry must never block navigation / logout.
   }
 }
 

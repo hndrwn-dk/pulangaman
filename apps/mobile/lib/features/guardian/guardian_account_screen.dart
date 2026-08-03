@@ -1,3 +1,4 @@
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -95,6 +96,11 @@ class _GuardianAccountScreenState extends ConsumerState<GuardianAccountScreen> {
         body: {'code': normalized},
       );
       await _loadInvites();
+      final role = ref.read(authControllerProvider).role;
+      if (role != null && role != AppRole.child) {
+        await FirebaseAnalytics.instance
+            .logEvent(name: 'guardian_invite_redeemed');
+      }
       if (!mounted) return;
       final childName = data['childName']?.toString() ?? '';
       ScaffoldMessenger.of(context).showSnackBar(

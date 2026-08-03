@@ -1844,6 +1844,7 @@ class _PlaceListCard extends StatelessWidget {
                 ),
                 if (editMode && onDelete != null)
                   IconButton(
+                    tooltip: l10n.deletePlaceTooltip,
                     onPressed: onDelete,
                     icon: Icon(
                       Icons.delete_outline_rounded,

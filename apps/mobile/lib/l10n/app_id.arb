@@ -1769,5 +1769,15 @@
   "guardianToolRemindersSub": "Jadwal",
   "guardianToolHomeTimeSub": "Pulang aman",
   "guardianEmpActiveBannerTitle": "Titik kumpul aktif",
-  "guardianEmpActiveBannerBody": "Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi."
+  "guardianEmpActiveBannerBody": "Titik kumpul darurat sedang aktif — buka untuk lokasi dan instruksi.",
+  "panicHoldSemanticsHint": "Aktivasi darurat — tahan 3 detik, atau gunakan aksi tap-and-hold pembaca layar",
+  "backButtonLabel": "Kembali",
+  "homeBySkipDateRemoveTooltip": "Hapus tanggal libur",
+  "dismissZoneAlertTooltip": "Tutup peringatan zona",
+  "deletePlaceTooltip": "Hapus tempat",
+  "centerOnChildTooltip": "Pusatkan peta ke anak",
+  "openLiveMapTooltip": "Buka peta langsung",
+  "cancelTripTooltip": "Batalkan perjalanan",
+  "screenTimeSettingsTooltip": "Pengaturan waktu layar",
+  "closeLocationDisclosureTooltip": "Tutup tanpa melanjutkan"
 }

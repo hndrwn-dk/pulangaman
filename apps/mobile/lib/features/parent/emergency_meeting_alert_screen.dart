@@ -116,6 +116,7 @@ class _EmergencyMeetingAlertScreenState
                     ),
                     const Spacer(),
                     IconButton(
+                      tooltip: l10n.closeAction,
                       onPressed: () => Navigator.of(context).maybePop(),
                       icon: const Icon(Icons.close_rounded),
                       color: ReminderMomentColors.closeIcon,
@@ -272,6 +273,7 @@ class _EmergencyMeetingAlertScreenState
                 Align(
                   alignment: Alignment.centerLeft,
                   child: IconButton(
+                    tooltip: l10n.backButtonLabel,
                     onPressed: () => Navigator.of(context).maybePop(),
                     icon: const Icon(Icons.arrow_back_rounded),
                     color: Colors.white.withValues(alpha: 0.9),
