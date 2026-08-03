@@ -38,3 +38,20 @@ export function shouldEmitZoneEvent(params: {
   }
   return params.sinceLastEventMs >= params.debounceMs;
 }
+
+/**
+ * Presence must be written whenever nextPresence differs from the stored
+ * value — including when shouldEmitZoneEvent is false. Debounce only
+ * suppresses FCM/WS notifications; it must not freeze zone_states.presence
+ * (safe-trip arrival and Home By read that column as truth).
+ */
+export function shouldPersistZonePresence(params: {
+  previous: Presence;
+  next: Presence;
+  hasExistingState: boolean;
+}): boolean {
+  if (params.next === params.previous && params.hasExistingState) {
+    return false;
+  }
+  return true;
+}

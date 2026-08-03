@@ -2,7 +2,12 @@ import { pool } from '../db/pool.js';
 import { config } from '../config.js';
 import { sendFcmToUser } from './fcm.js';
 import { broadcastToRoom, childRoom } from '../ws/server.js';
-import { nextPresence, shouldEmitZoneEvent, type Presence } from './geofenceLogic.js';
+import {
+  nextPresence,
+  shouldEmitZoneEvent,
+  shouldPersistZonePresence,
+  type Presence,
+} from './geofenceLogic.js';
 import { recordSchoolAttendance } from './attendance.js';
 
 type ZoneRow = {
@@ -84,7 +89,13 @@ export async function evaluateGeofences(params: {
       hysteresisM: config.ZONE_HYSTERESIS_M,
     });
 
-    if (next === previous && state.rowCount) {
+    if (
+      !shouldPersistZonePresence({
+        previous,
+        next,
+        hasExistingState: (state.rowCount ?? 0) > 0,
+      })
+    ) {
       continue;
     }
 
@@ -92,8 +103,6 @@ export async function evaluateGeofences(params: {
       ? new Date(state.rows[0].last_event_at).getTime()
       : 0;
     const sinceLast = Date.now() - lastEventAt;
-    const isTransition = previous !== 'unknown' && next !== previous;
-    const firstInside = previous === 'unknown' && next === 'inside';
     const emit = shouldEmitZoneEvent({
       previous,
       next,
@@ -101,10 +110,8 @@ export async function evaluateGeofences(params: {
       debounceMs: config.ZONE_DEBOUNCE_SECONDS * 1000,
     });
 
-    if ((isTransition || firstInside) && !emit) {
-      continue;
-    }
-
+    // Persist presence even when debounce suppresses notifications so
+    // trip arrival / Home By never read a stale "inside" flag.
     await pool.query(
       `INSERT INTO zone_states (child_id, zone_id, presence, last_event_at, updated_at)
        VALUES ($1, $2, $3, now(), now())

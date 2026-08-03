@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { nextPresence, shouldEmitZoneEvent } from './geofenceLogic.js';
+import {
+  nextPresence,
+  shouldEmitZoneEvent,
+  shouldPersistZonePresence,
+} from './geofenceLogic.js';
 
 describe('nextPresence', () => {
   it('enters when inside radius from unknown', () => {
@@ -69,6 +73,47 @@ describe('shouldEmitZoneEvent', () => {
         next: 'outside',
         sinceLastEventMs: 0,
         debounceMs: 45_000,
+      }),
+      false,
+    );
+  });
+});
+
+describe('shouldPersistZonePresence', () => {
+  it('still persists exit while debounce suppresses the notification', () => {
+    const previous = 'inside' as const;
+    const next = nextPresence({
+      previous,
+      distanceM: 200,
+      radiusM: 50,
+      hysteresisM: 15,
+    });
+    assert.equal(next, 'outside');
+    assert.equal(
+      shouldEmitZoneEvent({
+        previous,
+        next,
+        sinceLastEventMs: 5_000,
+        debounceMs: 45_000,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldPersistZonePresence({
+        previous,
+        next,
+        hasExistingState: true,
+      }),
+      true,
+    );
+  });
+
+  it('skips write only when presence is unchanged', () => {
+    assert.equal(
+      shouldPersistZonePresence({
+        previous: 'inside',
+        next: 'inside',
+        hasExistingState: true,
       }),
       false,
     );
