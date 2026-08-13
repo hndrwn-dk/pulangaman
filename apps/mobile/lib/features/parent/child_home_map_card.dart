@@ -598,10 +598,15 @@ class _VisualRefreshOverflowMenuState extends State<_VisualRefreshOverflowMenu> 
         return Stack(
           children: [
             Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _dismiss,
-                child: const ColoredBox(color: Color(0x00000000)),
+              child: Semantics(
+                label: AppLocalizations.of(ctx).closeMenuLabel,
+                button: true,
+                onDismiss: _dismiss,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _dismiss,
+                  child: const ColoredBox(color: Color(0x00000000)),
+                ),
               ),
             ),
             Positioned(

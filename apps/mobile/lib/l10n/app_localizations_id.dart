@@ -829,6 +829,12 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get screenTimeRingLoading => 'Memuat data screen time';
+
+  @override
+  String get closeMenuLabel => 'Tutup menu';
+
+  @override
   String get noRemindersYet => 'Belum ada pengingat';
 
   @override
@@ -3030,6 +3036,9 @@ class AppLocalizationsId extends AppLocalizations {
   String deleteChildDataConfirmBody(String name) {
     return 'Ini menghapus permanen akun $name dan semua data terkait (riwayat lokasi, zona, perangkat). Akses wali ikut hilang. Tidak bisa dibatalkan.';
   }
+
+  @override
+  String get guardianLeaveSheetTitle => 'Kelola akses wali';
 
   @override
   String get guardianLeaveNowLabel => 'Berhenti jadi wali sekarang';

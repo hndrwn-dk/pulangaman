@@ -452,6 +452,8 @@
       }
     }
   },
+  "screenTimeRingLoading": "Memuat data screen time",
+  "closeMenuLabel": "Tutup menu",
   "@reminderActiveCount": {
     "placeholders": {
       "count": {
@@ -1818,6 +1820,7 @@
       }
     }
   },
+  "guardianLeaveSheetTitle": "Kelola akses wali",
   "guardianLeaveNowLabel": "Berhenti jadi wali sekarang",
   "guardianLeaveNowSubtitle": "Akses langsung berhenti. Parent akan diberi tahu.",
   "guardianRequestParentLabel": "Minta parent yang hapus akses saya",

@@ -1592,6 +1592,18 @@ abstract class AppLocalizations {
   /// **'{duration}, {status}'**
   String screenTimeRingSummary(String duration, String status);
 
+  /// No description provided for @screenTimeRingLoading.
+  ///
+  /// In id, this message translates to:
+  /// **'Memuat data screen time'**
+  String get screenTimeRingLoading;
+
+  /// No description provided for @closeMenuLabel.
+  ///
+  /// In id, this message translates to:
+  /// **'Tutup menu'**
+  String get closeMenuLabel;
+
   /// No description provided for @noRemindersYet.
   ///
   /// In id, this message translates to:
@@ -5365,6 +5377,12 @@ abstract class AppLocalizations {
   /// In id, this message translates to:
   /// **'Ini menghapus permanen akun {name} dan semua data terkait (riwayat lokasi, zona, perangkat). Akses wali ikut hilang. Tidak bisa dibatalkan.'**
   String deleteChildDataConfirmBody(String name);
+
+  /// No description provided for @guardianLeaveSheetTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Kelola akses wali'**
+  String get guardianLeaveSheetTitle;
 
   /// No description provided for @guardianLeaveNowLabel.
   ///

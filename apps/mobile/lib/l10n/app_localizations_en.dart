@@ -830,6 +830,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get screenTimeRingLoading => 'Loading screen time data';
+
+  @override
+  String get closeMenuLabel => 'Close menu';
+
+  @override
   String get noRemindersYet => 'No reminders yet';
 
   @override
@@ -3034,6 +3040,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String deleteChildDataConfirmBody(String name) {
     return 'This permanently deletes $name\'s account and all related data (location history, zones, devices). Guardians lose access. This cannot be undone.';
   }
+
+  @override
+  String get guardianLeaveSheetTitle => 'Manage guardian access';
 
   @override
   String get guardianLeaveNowLabel => 'Stop being a guardian now';

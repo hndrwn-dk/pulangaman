@@ -38,7 +38,7 @@ class GuardianLeaveSheet extends StatelessWidget {
             iconColor: VisualRefreshColors.danger,
           ),
           const SizedBox(height: 18),
-          VrSheetTitle(l10n.guardianLeaveNowLabel),
+          VrSheetTitle(l10n.guardianLeaveSheetTitle),
           const SizedBox(height: 10),
           VrSheetBody(childName),
           const SizedBox(height: 24),

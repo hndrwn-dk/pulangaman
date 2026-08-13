@@ -236,7 +236,7 @@ async function latestChildLocation(
         };
       }
     }
-  } catch (_) {
+  } catch {
     // Fall through to DB.
   }
 

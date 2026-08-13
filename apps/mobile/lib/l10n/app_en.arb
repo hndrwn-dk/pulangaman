@@ -283,6 +283,8 @@
       }
     }
   },
+  "screenTimeRingLoading": "Loading screen time data",
+  "closeMenuLabel": "Close menu",
   "noRemindersYet": "No reminders yet",
   "sendingAlert": "Sending alert...",
   "panicCooldownMessage": "Panic alert sent. Wait a moment before you can send again.",
@@ -1382,6 +1384,7 @@
       }
     }
   },
+  "guardianLeaveSheetTitle": "Manage guardian access",
   "guardianLeaveNowLabel": "Stop being a guardian now",
   "guardianLeaveNowSubtitle": "Access ends immediately. The parent will be notified.",
   "guardianRequestParentLabel": "Ask parent to remove my access",

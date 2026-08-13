@@ -383,7 +383,7 @@ class _HeroUsageCard extends StatelessWidget {
             height: 148,
             child: Semantics(
               label: loading
-                  ? null
+                  ? l10n.screenTimeRingLoading
                   : l10n.screenTimeRingSummary(
                       formatDurationCompact(totalSeconds),
                       statusLabel,
