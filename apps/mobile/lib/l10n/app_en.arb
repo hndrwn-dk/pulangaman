@@ -267,8 +267,22 @@
   "pointsStreakLabel": "{points} points · {streak}-day streak",
   "screenRulesActive": "Screen rules active",
   "screenPermissionIncomplete": "Screen permission incomplete",
+  "screenPermissionIncompleteHint": "Tap to finish permission setup",
   "alarmPermissionIncomplete": "Alarm permission incomplete",
+  "alarmPermissionIncompleteHint": "Tap to finish alarm permission setup",
+  "reminderActiveHint": "Tap to view reminder list",
   "reminderActiveCount": "Reminders active ({count})",
+  "screenTimeRingSummary": "{duration}, {status}",
+  "@screenTimeRingSummary": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
   "noRemindersYet": "No reminders yet",
   "sendingAlert": "Sending alert...",
   "panicCooldownMessage": "Panic alert sent. Wait a moment before you can send again.",

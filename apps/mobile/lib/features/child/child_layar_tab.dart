@@ -275,34 +275,39 @@ class _PeriodChips extends StatelessWidget {
           return Expanded(
             child: GestureDetector(
               onTap: () => onChanged(p),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? (refresh
-                          ? VisualRefreshColors.anchor
-                          : AppColors.teal)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Text(
-                  p.shortLabel(l10n),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
+              child: Semantics(
+                button: true,
+                selected: selected,
+                label: p.shortLabel(l10n),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
                     color: selected
                         ? (refresh
-                            ? VisualRefreshColors.background
-                            : Colors.white)
-                        : (refresh
-                            ? VisualRefreshColors.textSecondary
-                            : AppColors.inkSoft),
-                    fontFamily: refresh
-                        ? GoogleFonts.plusJakartaSans().fontFamily
-                        : null,
+                            ? VisualRefreshColors.anchor
+                            : AppColors.teal)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Text(
+                    p.shortLabel(l10n),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: selected
+                          ? (refresh
+                              ? VisualRefreshColors.background
+                              : Colors.white)
+                          : (refresh
+                              ? VisualRefreshColors.textSecondary
+                              : AppColors.inkSoft),
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
                   ),
                 ),
               ),
@@ -376,60 +381,70 @@ class _HeroUsageCard extends StatelessWidget {
           SizedBox(
             width: 148,
             height: 148,
-            child: CustomPaint(
-              painter: _RingPainter(
-                progress: loading ? 0 : progress,
-                trackColor: Colors.white.withValues(alpha: 0.18),
-                progressColor: ringColor,
-                strokeWidth: 12,
-              ),
-              child: Center(
-                child: loading
-                    ? const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            formatDurationCompact(totalSeconds),
-                            textAlign: TextAlign.center,
-                            style: refresh
-                                ? GoogleFonts.fraunces(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 28,
-                                    height: 1.05,
-                                    letterSpacing: -0.8,
-                                  )
-                                : const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 28,
-                                    height: 1.05,
-                                    letterSpacing: -0.8,
-                                  ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            statusLabel,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.75),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                              fontFamily: refresh
-                                  ? GoogleFonts.plusJakartaSans().fontFamily
-                                  : null,
+            child: Semantics(
+              label: loading
+                  ? null
+                  : l10n.screenTimeRingSummary(
+                      formatDurationCompact(totalSeconds),
+                      statusLabel,
+                    ),
+              child: ExcludeSemantics(
+                child: CustomPaint(
+                  painter: _RingPainter(
+                    progress: loading ? 0 : progress,
+                    trackColor: Colors.white.withValues(alpha: 0.18),
+                    progressColor: ringColor,
+                    strokeWidth: 12,
+                  ),
+                  child: Center(
+                    child: loading
+                        ? const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
                             ),
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                formatDurationCompact(totalSeconds),
+                                textAlign: TextAlign.center,
+                                style: refresh
+                                    ? GoogleFonts.fraunces(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 28,
+                                        height: 1.05,
+                                        letterSpacing: -0.8,
+                                      )
+                                    : const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 28,
+                                        height: 1.05,
+                                        letterSpacing: -0.8,
+                                      ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                statusLabel,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  fontFamily: refresh
+                                      ? GoogleFonts.plusJakartaSans().fontFamily
+                                      : null,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                  ),
+                ),
               ),
             ),
           ),

@@ -147,32 +147,46 @@ class ChildBerandaTab extends StatelessWidget {
               onTap: usageAccess && accessibility
                   ? null
                   : onOpenScreenPermissionSetup,
-              child: PaStatusPill(
-                label: usageAccess && accessibility
-                    ? l10n.screenRulesActive
-                    : l10n.screenPermissionIncomplete,
-                icon: Icons.hourglass_bottom,
-                color: usageAccess && accessibility
-                    ? AppColors.lavender
-                    : AppColors.amber,
+              child: Semantics(
+                button: !(usageAccess && accessibility),
+                hint: (usageAccess && accessibility)
+                    ? null
+                    : l10n.screenPermissionIncompleteHint,
+                child: PaStatusPill(
+                  label: usageAccess && accessibility
+                      ? l10n.screenRulesActive
+                      : l10n.screenPermissionIncomplete,
+                  icon: Icons.hourglass_bottom,
+                  color: usageAccess && accessibility
+                      ? AppColors.lavender
+                      : AppColors.amber,
+                ),
               ),
             ),
             if (!exactAlarmOk)
               GestureDetector(
                 onTap: onOpenReminderPermissions,
-                child: PaStatusPill(
-                  label: l10n.alarmPermissionIncomplete,
-                  icon: Icons.alarm_rounded,
-                  color: AppColors.amber,
+                child: Semantics(
+                  button: true,
+                  hint: l10n.alarmPermissionIncompleteHint,
+                  child: PaStatusPill(
+                    label: l10n.alarmPermissionIncomplete,
+                    icon: Icons.alarm_rounded,
+                    color: AppColors.amber,
+                  ),
                 ),
               )
             else if (reminderCount > 0)
               GestureDetector(
                 onTap: onOpenRemindersSheet,
-                child: PaStatusPill(
-                  label: l10n.reminderActiveCount(reminderCount),
-                  icon: Icons.alarm_rounded,
-                  color: AppColors.sky,
+                child: Semantics(
+                  button: true,
+                  hint: l10n.reminderActiveHint,
+                  child: PaStatusPill(
+                    label: l10n.reminderActiveCount(reminderCount),
+                    icon: Icons.alarm_rounded,
+                    color: AppColors.sky,
+                  ),
                 ),
               ),
           ],
@@ -400,6 +414,7 @@ class ChildBerandaTab extends StatelessWidget {
                 icon: Icons.hourglass_bottom,
                 warning: true,
                 showChevron: true,
+                hint: l10n.screenPermissionIncompleteHint,
                 onTap: onOpenScreenPermissionSetup,
               )
             else
@@ -413,6 +428,7 @@ class ChildBerandaTab extends StatelessWidget {
                 icon: Icons.alarm_rounded,
                 warning: true,
                 showChevron: true,
+                hint: l10n.alarmPermissionIncompleteHint,
                 onTap: onOpenReminderPermissions,
               )
             else if (reminderCount > 0)
@@ -420,6 +436,7 @@ class ChildBerandaTab extends StatelessWidget {
                 label: l10n.reminderActiveCount(reminderCount),
                 icon: Icons.alarm_rounded,
                 showChevron: true,
+                hint: l10n.reminderActiveHint,
                 onTap: onOpenRemindersSheet,
               ),
           ],
@@ -585,6 +602,7 @@ class _VrStatusPill extends StatelessWidget {
     required this.icon,
     this.warning = false,
     this.showChevron = false,
+    this.hint,
     this.onTap,
   });
 
@@ -592,6 +610,7 @@ class _VrStatusPill extends StatelessWidget {
   final IconData icon;
   final bool warning;
   final bool showChevron;
+  final String? hint;
   final VoidCallback? onTap;
 
   @override
@@ -633,12 +652,16 @@ class _VrStatusPill extends StatelessWidget {
     );
 
     if (onTap == null) return pill;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: pill,
+    return Semantics(
+      button: true,
+      hint: hint,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: pill,
+        ),
       ),
     );
   }

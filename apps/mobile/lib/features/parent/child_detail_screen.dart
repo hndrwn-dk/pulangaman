@@ -1269,12 +1269,15 @@ class _ProfileStatusCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       GestureDetector(
                         onTap: onEditGender,
-                        child: Text(
-                          AppLocalizations.of(context).changeAvatarAction,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.tealDeep,
+                        child: Semantics(
+                          button: true,
+                          child: Text(
+                            AppLocalizations.of(context).changeAvatarAction,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.tealDeep,
+                            ),
                           ),
                         ),
                       ),

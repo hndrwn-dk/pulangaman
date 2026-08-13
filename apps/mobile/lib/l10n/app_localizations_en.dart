@@ -807,11 +807,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get screenPermissionIncomplete => 'Screen permission incomplete';
 
   @override
+  String get screenPermissionIncompleteHint => 'Tap to finish permission setup';
+
+  @override
   String get alarmPermissionIncomplete => 'Alarm permission incomplete';
+
+  @override
+  String get alarmPermissionIncompleteHint =>
+      'Tap to finish alarm permission setup';
+
+  @override
+  String get reminderActiveHint => 'Tap to view reminder list';
 
   @override
   String reminderActiveCount(int count) {
     return 'Reminders active ($count)';
+  }
+
+  @override
+  String screenTimeRingSummary(String duration, String status) {
+    return '$duration, $status';
   }
 
   @override

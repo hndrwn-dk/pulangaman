@@ -1556,17 +1556,41 @@ abstract class AppLocalizations {
   /// **'Izin layar belum lengkap'**
   String get screenPermissionIncomplete;
 
+  /// No description provided for @screenPermissionIncompleteHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk lengkapi izin'**
+  String get screenPermissionIncompleteHint;
+
   /// No description provided for @alarmPermissionIncomplete.
   ///
   /// In id, this message translates to:
   /// **'Izin alarm belum lengkap'**
   String get alarmPermissionIncomplete;
 
+  /// No description provided for @alarmPermissionIncompleteHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk lengkapi izin alarm'**
+  String get alarmPermissionIncompleteHint;
+
+  /// No description provided for @reminderActiveHint.
+  ///
+  /// In id, this message translates to:
+  /// **'Ketuk untuk lihat daftar reminder'**
+  String get reminderActiveHint;
+
   /// No description provided for @reminderActiveCount.
   ///
   /// In id, this message translates to:
   /// **'Pengingat aktif ({count})'**
   String reminderActiveCount(int count);
+
+  /// No description provided for @screenTimeRingSummary.
+  ///
+  /// In id, this message translates to:
+  /// **'{duration}, {status}'**
+  String screenTimeRingSummary(String duration, String status);
 
   /// No description provided for @noRemindersYet.
   ///

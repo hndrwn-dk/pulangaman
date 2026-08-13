@@ -807,11 +807,25 @@ class AppLocalizationsId extends AppLocalizations {
   String get screenPermissionIncomplete => 'Izin layar belum lengkap';
 
   @override
+  String get screenPermissionIncompleteHint => 'Ketuk untuk lengkapi izin';
+
+  @override
   String get alarmPermissionIncomplete => 'Izin alarm belum lengkap';
+
+  @override
+  String get alarmPermissionIncompleteHint => 'Ketuk untuk lengkapi izin alarm';
+
+  @override
+  String get reminderActiveHint => 'Ketuk untuk lihat daftar reminder';
 
   @override
   String reminderActiveCount(int count) {
     return 'Pengingat aktif ($count)';
+  }
+
+  @override
+  String screenTimeRingSummary(String duration, String status) {
+    return '$duration, $status';
   }
 
   @override

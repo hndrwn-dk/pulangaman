@@ -436,8 +436,22 @@
   },
   "screenRulesActive": "Aturan layar aktif",
   "screenPermissionIncomplete": "Izin layar belum lengkap",
+  "screenPermissionIncompleteHint": "Ketuk untuk lengkapi izin",
   "alarmPermissionIncomplete": "Izin alarm belum lengkap",
+  "alarmPermissionIncompleteHint": "Ketuk untuk lengkapi izin alarm",
+  "reminderActiveHint": "Ketuk untuk lihat daftar reminder",
   "reminderActiveCount": "Pengingat aktif ({count})",
+  "screenTimeRingSummary": "{duration}, {status}",
+  "@screenTimeRingSummary": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      }
+    }
+  },
   "@reminderActiveCount": {
     "placeholders": {
       "count": {

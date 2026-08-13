@@ -388,48 +388,58 @@ class _FilterChip extends StatelessWidget {
       final selectedFill = VisualRefreshColors.anchor;
       final selectedFg = VisualRefreshColors.background;
       final unselectedFg = VisualRefreshColors.anchor;
-      return GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? selectedFill : VisualRefreshColors.surface,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: selected
-                ? null
-                : Border.all(color: VisualRefreshColors.border, width: 0.5),
-          ),
-          child: Text(
-            label,
-            style: GoogleFonts.plusJakartaSans(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: selected ? selectedFg : unselectedFg,
+      return Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? selectedFill : VisualRefreshColors.surface,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: selected
+                  ? null
+                  : Border.all(color: VisualRefreshColors.border, width: 0.5),
+            ),
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                color: selected ? selectedFg : unselectedFg,
+              ),
             ),
           ),
         ),
       );
     }
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.teal : Colors.white,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: selected ? AppColors.teal : const Color(0x22075A4F),
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.teal : Colors.white,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(
+              color: selected ? AppColors.teal : const Color(0x22075A4F),
+            ),
           ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: selected ? Colors.white : AppColors.inkSoft,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: selected ? Colors.white : AppColors.inkSoft,
+            ),
           ),
         ),
       ),

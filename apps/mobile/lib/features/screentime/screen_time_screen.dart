@@ -1716,34 +1716,39 @@ class _PeriodToggle extends StatelessWidget {
           return Expanded(
             child: GestureDetector(
               onTap: () => onChanged(p),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? (refresh
-                          ? VisualRefreshColors.anchor
-                          : AppColors.teal)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Text(
-                  p.shortLabel(l10n),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
+              child: Semantics(
+                button: true,
+                selected: selected,
+                label: p.shortLabel(l10n),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
                     color: selected
                         ? (refresh
-                            ? VisualRefreshColors.background
-                            : Colors.white)
-                        : (refresh
-                            ? VisualRefreshColors.textSecondary
-                            : AppColors.inkSoft),
-                    fontFamily: refresh
-                        ? GoogleFonts.plusJakartaSans().fontFamily
-                        : null,
+                            ? VisualRefreshColors.anchor
+                            : AppColors.teal)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                  child: Text(
+                    p.shortLabel(l10n),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: selected
+                          ? (refresh
+                              ? VisualRefreshColors.background
+                              : Colors.white)
+                          : (refresh
+                              ? VisualRefreshColors.textSecondary
+                              : AppColors.inkSoft),
+                      fontFamily: refresh
+                          ? GoogleFonts.plusJakartaSans().fontFamily
+                          : null,
+                    ),
                   ),
                 ),
               ),
