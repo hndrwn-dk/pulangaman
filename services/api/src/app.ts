@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config.js';
 import { healthRouter } from './routes/health.js';
+import { accountDeletionPageRouter } from './routes/accountDeletionPage.js';
 import { authRouter } from './routes/auth.js';
 import { childrenRouter } from './routes/children.js';
 import { childInvitesRouter } from './routes/childInvites.js';
@@ -52,6 +53,7 @@ export function createApp() {
   app.use(morgan(config.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
   app.use(healthRouter);
+  app.use(accountDeletionPageRouter);
   app.use('/api/v1/auth', authRouter);
   app.use('/api/v1/children', childrenRouter);
   app.use('/api/v1/child-invites', childInvitesRouter);

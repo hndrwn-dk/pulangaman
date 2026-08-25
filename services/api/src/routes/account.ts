@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
-import { hasRole, listPrimaryChildren } from '../middleware/roles.js';
+import { hasRole } from '../middleware/roles.js';
 import { deleteFirebaseUser } from '../firebase/admin.js';
 import {
   accountDeletionUserIds,
@@ -28,11 +28,26 @@ accountRouter.delete('/', requireAuth, async (req: AuthedRequest, res, next) => 
       return;
     }
 
-    const primaryChildren = await listPrimaryChildren(userId);
-
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // Lock the parent row first so a concurrent INSERT into
+      // parent_children (FK takes FOR KEY SHARE on users) waits until
+      // this transaction finishes, instead of linking a child that
+      // CASCADE would then orphan when the parent row is deleted.
+      await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [userId]);
+
+      const primaryChildrenResult = await client.query<{ id: string; name: string }>(
+        `SELECT u.id, u.name
+         FROM parent_children pc
+         JOIN users u ON u.id = pc.child_id
+         WHERE pc.parent_id = $1
+         ORDER BY u.name
+         FOR UPDATE OF u`,
+        [userId],
+      );
+      const primaryChildren = primaryChildrenResult.rows;
 
       const idsToDelete = accountDeletionUserIds(userId, primaryChildren);
       const uidRows = await client.query<{ firebase_uid: string }>(
