@@ -35,8 +35,8 @@ describe('GET /account-deletion', () => {
         html,
         /mailto:support@tursinalabs.com\?subject=Permintaan%20Hapus%20Akun%20PulangAman/,
       );
-      assert.match(html, /TODO: replace with this project's Web app config/);
-      assert.match(html, /YOUR_API_KEY/);
+      assert.match(html, /pulangaman-6e0ad\.firebaseapp\.com/);
+      assert.match(html, /1:690043121132:web:b7581a17af238aaa95e4c9/);
     } finally {
       await new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()));

@@ -164,14 +164,13 @@ export const ACCOUNT_DELETION_HTML = `<!doctype html>
       </section>
     </main>
     <script>
-      // TODO: replace with this project's Web app config from Firebase Console
       var firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT.appspot.com",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        apiKey: "AIzaSyD4ny6CuvJnaE1k3d-ofa-TONKqu_sMF08",
+        authDomain: "pulangaman-6e0ad.firebaseapp.com",
+        projectId: "pulangaman-6e0ad",
+        storageBucket: "pulangaman-6e0ad.firebasestorage.app",
+        messagingSenderId: "690043121132",
+        appId: "1:690043121132:web:b7581a17af238aaa95e4c9"
       };
 
       firebase.initializeApp(firebaseConfig);
