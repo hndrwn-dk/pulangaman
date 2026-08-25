@@ -17,8 +17,8 @@ import '../auth/auth_controller.dart';
 class AccountSettingsScreen extends ConsumerStatefulWidget {
   const AccountSettingsScreen({super.key});
 
-  static const _privacyUrl = 'https://www.tursinalabs.com/privacy';
-  static const _termsUrl = 'https://www.tursinalabs.com/terms';
+  static const _privacyUrl = 'https://www.tursinalabs.com/pulangaman/privacy';
+  static const _termsUrl = 'https://www.tursinalabs.com/pulangaman/terms';
   static const _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.tursinalabs.pulangaman';
 
