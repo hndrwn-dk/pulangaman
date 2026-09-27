@@ -725,6 +725,72 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
+  String? _reportId(Map<String, dynamic> r) {
+    final id = r['id']?.toString();
+    if (id == null || id.isEmpty) return null;
+    return id;
+  }
+
+  Future<void> _flagReport(Map<String, dynamic> r) async {
+    final id = _reportId(r);
+    final l10n = AppLocalizations.of(context);
+    if (id == null) return;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/reports/$id/flag');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.reportFlaggedSnack)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.reportActionFailed)),
+      );
+    }
+  }
+
+  Future<void> _hideReport(Map<String, dynamic> r) async {
+    final id = _reportId(r);
+    final l10n = AppLocalizations.of(context);
+    if (id == null) return;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/reports/$id/hide');
+      if (!mounted) return;
+      setState(() {
+        _reports = _reports.where((item) => item['id']?.toString() != id).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.reportHiddenSnack)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.reportActionFailed)),
+      );
+    }
+  }
+
+  Future<void> _removeReport(Map<String, dynamic> r) async {
+    final id = _reportId(r);
+    final l10n = AppLocalizations.of(context);
+    if (id == null) return;
+    try {
+      await ref.read(apiClientProvider).post('/api/v1/reports/$id/remove');
+      if (!mounted) return;
+      setState(() {
+        _reports = _reports.where((item) => item['id']?.toString() != id).toList();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.reportRemovedSnack)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.reportActionFailed)),
+      );
+    }
+  }
+
   Set<Marker> _markers(AppLocalizations l10n) {
     final out = <Marker>{};
     for (final r in _filtered) {
@@ -968,6 +1034,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                   category: r['category']?.toString(),
                                   onStillThere: () => _markStillThere(r),
                                   onFixed: () => _markFixed(r),
+                                  onFlag: () => unawaited(_flagReport(r)),
+                                  onHide: () => unawaited(_hideReport(r)),
+                                  onRemove: () => unawaited(_removeReport(r)),
                                 ),
                               ),
                             ),
@@ -1253,6 +1322,9 @@ class _ReportCard extends StatelessWidget {
     required this.category,
     required this.onStillThere,
     required this.onFixed,
+    required this.onFlag,
+    required this.onHide,
+    required this.onRemove,
   });
 
   final bool refresh;
@@ -1264,6 +1336,9 @@ class _ReportCard extends StatelessWidget {
   final String? category;
   final VoidCallback onStillThere;
   final VoidCallback onFixed;
+  final VoidCallback onFlag;
+  final VoidCallback onHide;
+  final VoidCallback onRemove;
 
   _IconStyle get _iconStyle {
     switch (category) {
@@ -1376,6 +1451,28 @@ class _ReportCard extends StatelessWidget {
                             ),
                           ),
                         ],
+                        PopupMenuButton<String>(
+                          tooltip: l10n.reportFlagAction,
+                          onSelected: (value) {
+                            if (value == 'flag') onFlag();
+                            if (value == 'hide') onHide();
+                            if (value == 'remove') onRemove();
+                          },
+                          itemBuilder: (ctx) => [
+                            PopupMenuItem(
+                              value: 'flag',
+                              child: Text(l10n.reportFlagAction),
+                            ),
+                            PopupMenuItem(
+                              value: 'hide',
+                              child: Text(l10n.reportHideAction),
+                            ),
+                            PopupMenuItem(
+                              value: 'remove',
+                              child: Text(l10n.reportRemoveAction),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),

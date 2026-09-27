@@ -3,12 +3,51 @@ import { pool } from '../db/pool.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { hasRole } from '../middleware/roles.js';
 import { deleteFirebaseUser } from '../firebase/admin.js';
+import { deleteChildLocationCache } from '../redis/client.js';
 import {
   accountDeletionUserIds,
   selfDeletionError,
 } from './accountDeletionLogic.js';
 
 export const accountRouter = Router();
+
+accountRouter.get('/watchers', requireAuth, async (req: AuthedRequest, res, next) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      res.status(403).json({ error: 'user_profile_required' });
+      return;
+    }
+    const isChild = await hasRole(userId, ['child']);
+    if (!isChild) {
+      res.status(403).json({ error: 'child_role_required' });
+      return;
+    }
+
+    const result = await pool.query<{ name: string; kind: 'parent' | 'guardian' }>(
+      `SELECT u.name, 'parent'::text AS kind
+       FROM parent_children pc
+       JOIN users u ON u.id = pc.parent_id
+       WHERE pc.child_id = $1
+       UNION
+       SELECT u.name, 'guardian'::text AS kind
+       FROM child_approved_guardians cag
+       JOIN users u ON u.id = cag.guardian_id
+       WHERE cag.child_id = $1 AND cag.status = 'active'
+       ORDER BY kind, name`,
+      [userId],
+    );
+
+    res.json({
+      watchers: result.rows.map((row) => ({
+        name: row.name,
+        kind: row.kind,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 accountRouter.delete('/', requireAuth, async (req: AuthedRequest, res, next) => {
   try {
@@ -74,6 +113,9 @@ accountRouter.delete('/', requireAuth, async (req: AuthedRequest, res, next) => 
 
       await client.query('COMMIT');
 
+      for (const child of primaryChildren) {
+        await deleteChildLocationCache(child.id);
+      }
       for (const row of uidRows.rows) {
         await deleteFirebaseUser(row.firebase_uid);
       }

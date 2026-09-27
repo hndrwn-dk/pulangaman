@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">PulangAman</string>
-    <string name="accessibility_service_description">Membatasi aplikasi sesuai aturan keluarga sambil selalu mengizinkan PulangAman, telepon, pesan, dan panggilan darurat.</string>
+    <string name="accessibility_service_description">Membatasi aplikasi sesuai aturan keluarga sambil selalu mengizinkan PulangAman, telepon, pesan, dan panggilan darurat. Layanan ini hanya melihat aplikasi yang sedang di depan. Tidak membaca isi layar.</string>
 </resources>

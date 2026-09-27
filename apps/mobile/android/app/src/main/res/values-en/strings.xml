@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PulangAman</string>
+    <string name="accessibility_service_description">Limits apps according to family rules while always allowing PulangAman, phone, messages, and emergency calls. The service only sees which app is in the foreground. It does not read screen content.</string>
+</resources>

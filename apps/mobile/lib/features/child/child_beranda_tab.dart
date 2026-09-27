@@ -49,6 +49,9 @@ class ChildBerandaTab extends StatelessWidget {
     this.empPlaceName,
     this.empNote,
     this.onOpenEmp,
+    this.needsAlwaysLocation = false,
+    this.sharedWithLabel,
+    this.onRequestAlwaysLocation,
   });
 
   final String childName;
@@ -91,6 +94,9 @@ class ChildBerandaTab extends StatelessWidget {
   final String? empPlaceName;
   final String? empNote;
   final VoidCallback? onOpenEmp;
+  final bool needsAlwaysLocation;
+  final String? sharedWithLabel;
+  final VoidCallback? onRequestAlwaysLocation;
 
   String _timeGreeting(AppLocalizations l10n) =>
       dayPeriodFor().shortLabel(l10n);
@@ -133,6 +139,13 @@ class ChildBerandaTab extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(l10n.homeSubtitleTagline),
+        if (sharedWithLabel != null && sharedWithLabel!.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            sharedWithLabel!,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
         const SizedBox(height: AppSpacing.md),
         Wrap(
           spacing: 8,
@@ -192,6 +205,13 @@ class ChildBerandaTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: AppSpacing.md),
+        if (needsAlwaysLocation) ...[
+          _ZonesNeedAlwaysCard(
+            refresh: false,
+            onAllow: onRequestAlwaysLocation,
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         _QuickStatsRow(
           todayUsageSeconds: todayUsageSeconds,
           points: points,
@@ -394,6 +414,20 @@ class ChildBerandaTab extends StatelessWidget {
                       color: VisualRefreshColors.textSecondary,
                     ),
                   ),
+                  if (sharedWithLabel != null &&
+                      sharedWithLabel!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      sharedWithLabel!,
+                      style: TextStyle(
+                        fontFamily: jakarta,
+                        fontSize: 13,
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                        color: VisualRefreshColors.textPrimary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -442,6 +476,13 @@ class ChildBerandaTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        if (needsAlwaysLocation) ...[
+          _ZonesNeedAlwaysCard(
+            refresh: true,
+            onAllow: onRequestAlwaysLocation,
+          ),
+          const SizedBox(height: 14),
+        ],
         _QuickStatsRow(
           todayUsageSeconds: todayUsageSeconds,
           points: points,
@@ -1543,6 +1584,65 @@ class _VrStatTile extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ZonesNeedAlwaysCard extends StatelessWidget {
+  const _ZonesNeedAlwaysCard({
+    required this.refresh,
+    this.onAllow,
+  });
+
+  final bool refresh;
+  final VoidCallback? onAllow;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final jakarta = GoogleFonts.plusJakartaSans().fontFamily;
+    return Material(
+      color: refresh
+          ? VisualRefreshColors.routeTint
+          : AppColors.amber.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(
+        refresh ? AppRadius.vrCard : 16,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.zonesNeedAlwaysTitle,
+              style: refresh
+                  ? TextStyle(
+                      fontFamily: jakarta,
+                      fontWeight: FontWeight.w800,
+                      color: VisualRefreshColors.textPrimary,
+                    )
+                  : const TextStyle(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.zonesNeedAlwaysBody,
+              style: refresh
+                  ? TextStyle(
+                      fontFamily: jakarta,
+                      color: VisualRefreshColors.textSecondary,
+                    )
+                  : TextStyle(color: AppColors.inkSoft, height: 1.35),
+            ),
+            if (onAllow != null) ...[
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: onAllow,
+                child: Text(l10n.zonesNeedAlwaysAction),
+              ),
+            ],
+          ],
         ),
       ),
     );

@@ -1178,11 +1178,107 @@ abstract class AppLocalizations {
   /// **'Biar orang tua bisa lihat lokasi kamu dan dapat kabar zona aman meskipun aplikasi ditutup.'**
   String get bgLocationDisclosureBody;
 
+  /// No description provided for @bgLocationDisclosureWhat.
+  ///
+  /// In id, this message translates to:
+  /// **'Apa: lokasi presisi HP kamu, termasuk saat aplikasi ditutup.'**
+  String get bgLocationDisclosureWhat;
+
+  /// No description provided for @bgLocationDisclosureWhy.
+  ///
+  /// In id, this message translates to:
+  /// **'Mengapa: zona aman, Jam Pulang Aman, dan peringatan panik tetap jalan meskipun aplikasi tidak dibuka.'**
+  String get bgLocationDisclosureWhy;
+
+  /// No description provided for @bgLocationDisclosureWho.
+  ///
+  /// In id, this message translates to:
+  /// **'Siapa yang melihat: orang tua dan wali yang sudah disetujui. Bukan orang asing.'**
+  String get bgLocationDisclosureWho;
+
+  /// No description provided for @bgLocationDisclosureSemantics.
+  ///
+  /// In id, this message translates to:
+  /// **'Penjelasan izin lokasi selalu aktif'**
+  String get bgLocationDisclosureSemantics;
+
   /// No description provided for @bgLocationDisclosureContinue.
   ///
   /// In id, this message translates to:
   /// **'Lanjutkan'**
   String get bgLocationDisclosureContinue;
+
+  /// No description provided for @zonesNeedAlwaysTitle.
+  ///
+  /// In id, this message translates to:
+  /// **'Zona aman belum aktif'**
+  String get zonesNeedAlwaysTitle;
+
+  /// No description provided for @zonesNeedAlwaysBody.
+  ///
+  /// In id, this message translates to:
+  /// **'Izinkan lokasi \"Selalu\" supaya zona rumah dan sekolah tetap jalan saat aplikasi ditutup.'**
+  String get zonesNeedAlwaysBody;
+
+  /// No description provided for @zonesNeedAlwaysAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Izinkan selalu'**
+  String get zonesNeedAlwaysAction;
+
+  /// No description provided for @locationSharedWith.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi dibagikan ke {names}'**
+  String locationSharedWith(String names);
+
+  /// No description provided for @locationSharedWithFamily.
+  ///
+  /// In id, this message translates to:
+  /// **'Lokasi dibagikan ke keluarga'**
+  String get locationSharedWithFamily;
+
+  /// No description provided for @reportFlagAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporkan'**
+  String get reportFlagAction;
+
+  /// No description provided for @reportHideAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Sembunyikan'**
+  String get reportHideAction;
+
+  /// No description provided for @reportRemoveAction.
+  ///
+  /// In id, this message translates to:
+  /// **'Hapus laporan'**
+  String get reportRemoveAction;
+
+  /// No description provided for @reportFlaggedSnack.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan ditandai. Terima kasih.'**
+  String get reportFlaggedSnack;
+
+  /// No description provided for @reportHiddenSnack.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan disembunyikan.'**
+  String get reportHiddenSnack;
+
+  /// No description provided for @reportRemovedSnack.
+  ///
+  /// In id, this message translates to:
+  /// **'Laporan dihapus.'**
+  String get reportRemovedSnack;
+
+  /// No description provided for @reportActionFailed.
+  ///
+  /// In id, this message translates to:
+  /// **'Tidak bisa memproses laporan. Coba lagi.'**
+  String get reportActionFailed;
 
   /// No description provided for @trackingOff.
   ///

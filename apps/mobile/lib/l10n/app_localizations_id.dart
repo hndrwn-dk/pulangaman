@@ -593,7 +593,62 @@ class AppLocalizationsId extends AppLocalizations {
       'Biar orang tua bisa lihat lokasi kamu dan dapat kabar zona aman meskipun aplikasi ditutup.';
 
   @override
+  String get bgLocationDisclosureWhat =>
+      'Apa: lokasi presisi HP kamu, termasuk saat aplikasi ditutup.';
+
+  @override
+  String get bgLocationDisclosureWhy =>
+      'Mengapa: zona aman, Jam Pulang Aman, dan peringatan panik tetap jalan meskipun aplikasi tidak dibuka.';
+
+  @override
+  String get bgLocationDisclosureWho =>
+      'Siapa yang melihat: orang tua dan wali yang sudah disetujui. Bukan orang asing.';
+
+  @override
+  String get bgLocationDisclosureSemantics =>
+      'Penjelasan izin lokasi selalu aktif';
+
+  @override
   String get bgLocationDisclosureContinue => 'Lanjutkan';
+
+  @override
+  String get zonesNeedAlwaysTitle => 'Zona aman belum aktif';
+
+  @override
+  String get zonesNeedAlwaysBody =>
+      'Izinkan lokasi \"Selalu\" supaya zona rumah dan sekolah tetap jalan saat aplikasi ditutup.';
+
+  @override
+  String get zonesNeedAlwaysAction => 'Izinkan selalu';
+
+  @override
+  String locationSharedWith(String names) {
+    return 'Lokasi dibagikan ke $names';
+  }
+
+  @override
+  String get locationSharedWithFamily => 'Lokasi dibagikan ke keluarga';
+
+  @override
+  String get reportFlagAction => 'Laporkan';
+
+  @override
+  String get reportHideAction => 'Sembunyikan';
+
+  @override
+  String get reportRemoveAction => 'Hapus laporan';
+
+  @override
+  String get reportFlaggedSnack => 'Laporan ditandai. Terima kasih.';
+
+  @override
+  String get reportHiddenSnack => 'Laporan disembunyikan.';
+
+  @override
+  String get reportRemovedSnack => 'Laporan dihapus.';
+
+  @override
+  String get reportActionFailed => 'Tidak bisa memproses laporan. Coba lagi.';
 
   @override
   String get trackingOff => 'Pelacakan berhenti';

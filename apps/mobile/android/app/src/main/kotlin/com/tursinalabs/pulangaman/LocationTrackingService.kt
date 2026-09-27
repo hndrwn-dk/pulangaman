@@ -272,13 +272,13 @@ class LocationTrackingService : Service(), LocationListener {
     private fun buildNotification(panic: Boolean) =
         NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(
-                if (panic) "Mode panik aktif" else "PulangAman membagikan lokasi",
+                if (panic) "Mode panik aktif" else "PulangAman aktif — lokasi dibagikan ke keluarga",
             )
             .setContentText(
                 if (panic) {
-                    "Lokasi dikirim lebih sering agar orang tua bisa memantau"
+                    "Lokasi dikirim lebih sering agar orang tua dan wali bisa memantau"
                 } else {
-                    "Orang tua dapat melihat posisi kamu secara langsung"
+                    "Orang tua dan wali yang disetujui dapat melihat posisi kamu"
                 },
             )
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)

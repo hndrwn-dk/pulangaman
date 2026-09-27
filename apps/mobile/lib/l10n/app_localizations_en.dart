@@ -593,7 +593,62 @@ class AppLocalizationsEn extends AppLocalizations {
       'So parents can see your live location and get safe-zone alerts even when the app is closed.';
 
   @override
+  String get bgLocationDisclosureWhat =>
+      'What: precise location from this phone, including when the app is closed.';
+
+  @override
+  String get bgLocationDisclosureWhy =>
+      'Why: safe zones, Safe Home Time, and panic alerts still work when the app is not open.';
+
+  @override
+  String get bgLocationDisclosureWho =>
+      'Who sees it: your parent and approved guardians. Not strangers.';
+
+  @override
+  String get bgLocationDisclosureSemantics =>
+      'Explanation of allow-all-the-time location access';
+
+  @override
   String get bgLocationDisclosureContinue => 'Continue';
+
+  @override
+  String get zonesNeedAlwaysTitle => 'Safe zones are not active yet';
+
+  @override
+  String get zonesNeedAlwaysBody =>
+      'Allow location \"All the time\" so home and school zones still work when the app is closed.';
+
+  @override
+  String get zonesNeedAlwaysAction => 'Allow all the time';
+
+  @override
+  String locationSharedWith(String names) {
+    return 'Location is shared with $names';
+  }
+
+  @override
+  String get locationSharedWithFamily => 'Location is shared with your family';
+
+  @override
+  String get reportFlagAction => 'Report';
+
+  @override
+  String get reportHideAction => 'Hide';
+
+  @override
+  String get reportRemoveAction => 'Remove report';
+
+  @override
+  String get reportFlaggedSnack => 'Report flagged. Thank you.';
+
+  @override
+  String get reportHiddenSnack => 'Report hidden.';
+
+  @override
+  String get reportRemovedSnack => 'Report removed.';
+
+  @override
+  String get reportActionFailed => 'Could not update that report. Try again.';
 
   @override
   String get trackingOff => 'Tracking off';

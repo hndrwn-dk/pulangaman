@@ -311,7 +311,28 @@
   "trackingOn": "Pelacakan aktif",
   "bgLocationDisclosureTitle": "Kenapa butuh akses lokasi selalu?",
   "bgLocationDisclosureBody": "Biar orang tua bisa lihat lokasi kamu dan dapat kabar zona aman meskipun aplikasi ditutup.",
+  "bgLocationDisclosureWhat": "Apa: lokasi presisi HP kamu, termasuk saat aplikasi ditutup.",
+  "bgLocationDisclosureWhy": "Mengapa: zona aman, Jam Pulang Aman, dan peringatan panik tetap jalan meskipun aplikasi tidak dibuka.",
+  "bgLocationDisclosureWho": "Siapa yang melihat: orang tua dan wali yang sudah disetujui. Bukan orang asing.",
+  "bgLocationDisclosureSemantics": "Penjelasan izin lokasi selalu aktif",
   "bgLocationDisclosureContinue": "Lanjutkan",
+  "zonesNeedAlwaysTitle": "Zona aman belum aktif",
+  "zonesNeedAlwaysBody": "Izinkan lokasi \"Selalu\" supaya zona rumah dan sekolah tetap jalan saat aplikasi ditutup.",
+  "zonesNeedAlwaysAction": "Izinkan selalu",
+  "locationSharedWith": "Lokasi dibagikan ke {names}",
+  "@locationSharedWith": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
+  "locationSharedWithFamily": "Lokasi dibagikan ke keluarga",
+  "reportFlagAction": "Laporkan",
+  "reportHideAction": "Sembunyikan",
+  "reportRemoveAction": "Hapus laporan",
+  "reportFlaggedSnack": "Laporan ditandai. Terima kasih.",
+  "reportHiddenSnack": "Laporan disembunyikan.",
+  "reportRemovedSnack": "Laporan dihapus.",
+  "reportActionFailed": "Tidak bisa memproses laporan. Coba lagi.",
   "trackingOff": "Pelacakan berhenti",
   "staleLocation": "Lokasi anak tidak diperbarui",
   "ackAlert": "Saya sudah merespons",

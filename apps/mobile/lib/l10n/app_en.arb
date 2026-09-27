@@ -249,7 +249,28 @@
   "locationSendFailed": "Failed to send location",
   "bgLocationDisclosureTitle": "Why do we need location all the time?",
   "bgLocationDisclosureBody": "So parents can see your live location and get safe-zone alerts even when the app is closed.",
+  "bgLocationDisclosureWhat": "What: precise location from this phone, including when the app is closed.",
+  "bgLocationDisclosureWhy": "Why: safe zones, Safe Home Time, and panic alerts still work when the app is not open.",
+  "bgLocationDisclosureWho": "Who sees it: your parent and approved guardians. Not strangers.",
+  "bgLocationDisclosureSemantics": "Explanation of allow-all-the-time location access",
   "bgLocationDisclosureContinue": "Continue",
+  "zonesNeedAlwaysTitle": "Safe zones are not active yet",
+  "zonesNeedAlwaysBody": "Allow location \"All the time\" so home and school zones still work when the app is closed.",
+  "zonesNeedAlwaysAction": "Allow all the time",
+  "locationSharedWith": "Location is shared with {names}",
+  "@locationSharedWith": {
+    "placeholders": {
+      "names": { "type": "String" }
+    }
+  },
+  "locationSharedWithFamily": "Location is shared with your family",
+  "reportFlagAction": "Report",
+  "reportHideAction": "Hide",
+  "reportRemoveAction": "Remove report",
+  "reportFlaggedSnack": "Report flagged. Thank you.",
+  "reportHiddenSnack": "Report hidden.",
+  "reportRemovedSnack": "Report removed.",
+  "reportActionFailed": "Could not update that report. Try again.",
   "locationPermissionDenied": "Location permission denied",
   "sessionNotReady": "Session not ready",
   "allowExactAlarmMessage": "Allow exact alarms so your parent's reminders show up.",

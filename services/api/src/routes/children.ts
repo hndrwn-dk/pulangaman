@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../db/pool.js';
-import { childLocationKey, getRedis } from '../redis/client.js';
+import { childLocationKey, deleteChildLocationCache, getRedis } from '../redis/client.js';
 import { config } from '../config.js';
 import { requireAuth, type AuthedRequest } from '../middleware/auth.js';
 import { rateLimit } from '../middleware/rateLimit.js';
@@ -516,6 +516,7 @@ childrenRouter.delete('/:id/data', async (req: AuthedRequest, res, next) => {
       [parentId, childId],
     );
     await pool.query('DELETE FROM users WHERE id = $1', [childId]);
+    await deleteChildLocationCache(childId);
 
     if (uidRow.rows[0]) {
       const { deleteFirebaseUser } = await import('../firebase/admin.js');

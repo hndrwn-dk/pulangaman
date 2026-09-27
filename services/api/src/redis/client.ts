@@ -29,3 +29,15 @@ export function childLocationKey(childId: string): string {
 export function guardianPresenceKey(guardianId: string): string {
   return `presence:guardian:${guardianId}`;
 }
+
+export async function deleteChildLocationCache(childId: string): Promise<void> {
+  try {
+    const redis = getRedis();
+    if (redis.status !== 'ready') {
+      await redis.connect();
+    }
+    await redis.del(childLocationKey(childId));
+  } catch {
+    // Best-effort — TTL still expires the key.
+  }
+}

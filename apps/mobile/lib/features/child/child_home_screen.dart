@@ -45,6 +45,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   final _ws = WsClient();
   bool _tracking = false;
+  bool _alwaysGranted = false;
+  String? _sharedWithLabel;
   bool _panicMode = false;
   bool _panicInFlight = false;
   final PanicTapCounter _panicTapCounter = PanicTapCounter();
@@ -89,6 +91,8 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(_startTracking);
+    Future.microtask(_refreshAlwaysLocationStatus);
+    Future.microtask(_loadWatchers);
     Future.microtask(_setupScreenTimeAndRewards);
     Future.microtask(_syncReminders);
     Future.microtask(_connectReminderWs);
@@ -126,6 +130,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshScreenTimeAndRewards());
       unawaited(_ensureNativeTracking());
+      unawaited(_refreshAlwaysLocationStatus());
       unawaited(_syncZoneGeofences());
       unawaited(_syncReminders());
       unawaited(_connectReminderWs(force: true));
@@ -1436,6 +1441,7 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
       if (!mounted) return;
       setState(() {
         _tracking = true;
+        _alwaysGranted = always.isGranted;
         _status = always.isGranted
             ? AppLocalizations.of(context).trackingOn
             : AppLocalizations.of(context).trackingOnNeedsAlways;
@@ -1446,7 +1452,54 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
     }
   }
 
+  Future<void> _refreshAlwaysLocationStatus() async {
+    final always = await Permission.locationAlways.status;
+    if (!mounted) return;
+    setState(() => _alwaysGranted = always.isGranted);
+  }
+
+  Future<void> _loadWatchers() async {
+    try {
+      final data = await ref.read(apiClientProvider).get('/api/v1/account/watchers');
+      final raw = (data['watchers'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map((w) => w['name']?.toString().trim() ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      setState(() {
+        _sharedWithLabel = raw.isEmpty
+            ? l10n.locationSharedWithFamily
+            : l10n.locationSharedWith(raw.join(', '));
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _sharedWithLabel = AppLocalizations.of(context).locationSharedWithFamily;
+      });
+    }
+  }
+
+  Future<void> _requestAlwaysLocation() async {
+    if (!mounted) return;
+    final proceed = await showBackgroundLocationDisclosure(context);
+    if (!proceed || !mounted) return;
+    final always = await Permission.locationAlways.request();
+    if (!mounted) return;
+    setState(() => _alwaysGranted = always.isGranted);
+    if (always.isGranted) {
+      unawaited(_syncZoneGeofences());
+    }
+  }
+
   Future<void> _syncZoneGeofences() async {
+    final always = await Permission.locationAlways.status;
+    if (!always.isGranted) {
+      if (mounted) setState(() => _alwaysGranted = false);
+      return;
+    }
+    if (mounted) setState(() => _alwaysGranted = true);
     try {
       final data = await ref.read(apiClientProvider).get('/api/v1/zones');
       final zones = (data['zones'] as List<dynamic>? ?? [])
@@ -1918,6 +1971,9 @@ class _ChildHomeScreenState extends ConsumerState<ChildHomeScreen>
           ChildBerandaTab(
             childName: childName,
             tracking: _tracking,
+            needsAlwaysLocation: _tracking && !_alwaysGranted,
+            sharedWithLabel: _sharedWithLabel,
+            onRequestAlwaysLocation: () => unawaited(_requestAlwaysLocation()),
             points: _points,
             streak: _streak,
             usageAccess: _usageAccess,

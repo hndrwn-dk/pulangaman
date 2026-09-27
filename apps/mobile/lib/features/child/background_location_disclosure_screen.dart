@@ -39,8 +39,14 @@ class BackgroundLocationDisclosureScreen extends StatelessWidget {
           );
     final bodyColor =
         refresh ? VisualRefreshColors.textSecondary : AppColors.inkSoft;
-    final buttonBg =
-        refresh ? VisualRefreshColors.anchor : AppColors.teal;
+    final buttonBg = refresh ? VisualRefreshColors.anchor : AppColors.teal;
+    final bodyStyle = TextStyle(
+      fontSize: 16,
+      height: 1.45,
+      color: bodyColor,
+      fontWeight: FontWeight.w500,
+      fontFamily: refresh ? GoogleFonts.plusJakartaSans().fontFamily : null,
+    );
 
     return Scaffold(
       backgroundColor: bg,
@@ -57,59 +63,63 @@ class BackgroundLocationDisclosureScreen extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: refresh
-                        ? VisualRefreshColors.accentTint
-                        : AppColors.teal.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    Icons.location_on_rounded,
-                    color: refresh
-                        ? VisualRefreshColors.accent
-                        : AppColors.teal,
-                    size: 28,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(l10n.bgLocationDisclosureTitle, style: titleStyle),
-              const SizedBox(height: 14),
-              Text(
-                l10n.bgLocationDisclosureBody,
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.45,
-                  color: bodyColor,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: FilledButton.styleFrom(
-                  backgroundColor: buttonBg,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(56),
-                  shape: const StadiumBorder(),
-                ),
-                child: Text(
-                  l10n.bgLocationDisclosureContinue,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
+          child: Semantics(
+            container: true,
+            label: l10n.bgLocationDisclosureSemantics,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: refresh
+                          ? VisualRefreshColors.accentTint
+                          : AppColors.teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Icons.location_on_rounded,
+                      color: refresh
+                          ? VisualRefreshColors.accent
+                          : AppColors.teal,
+                      size: 28,
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Text(l10n.bgLocationDisclosureTitle, style: titleStyle),
+                const SizedBox(height: 14),
+                Text(l10n.bgLocationDisclosureWhat, style: bodyStyle),
+                const SizedBox(height: 10),
+                Text(l10n.bgLocationDisclosureWhy, style: bodyStyle),
+                const SizedBox(height: 10),
+                Text(l10n.bgLocationDisclosureWho, style: bodyStyle),
+                const Spacer(),
+                Semantics(
+                  button: true,
+                  label: l10n.bgLocationDisclosureContinue,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: buttonBg,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(
+                      l10n.bgLocationDisclosureContinue,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
