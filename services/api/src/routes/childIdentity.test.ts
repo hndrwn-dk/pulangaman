@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { mintChildFirebaseUid } from './childIdentity.js';
+import { childFirebaseAuthPhone, mintChildFirebaseUid } from './childIdentity.js';
 
 describe('mintChildFirebaseUid', () => {
   it('mints unguessable child_* UIDs (not phone-derived)', () => {
@@ -12,6 +12,14 @@ describe('mintChildFirebaseUid', () => {
     assert.notEqual(a, b);
     assert.notEqual(a, `child_${phoneDigits}`);
     assert.notEqual(b, `child_${phoneDigits}`);
+  });
+});
+
+describe('childFirebaseAuthPhone', () => {
+  it('never returns a contact phone for Firebase Auth (blocks OTP takeover)', () => {
+    assert.equal(childFirebaseAuthPhone('+6281234567890'), undefined);
+    assert.equal(childFirebaseAuthPhone('081234567890'), undefined);
+    assert.equal(childFirebaseAuthPhone(undefined), undefined);
   });
 });
 
@@ -30,5 +38,13 @@ describe('child create identity hijack policy', () => {
       // Server mint is random hex, not equal to a phone digit string.
       assert.doesNotMatch(minted, /^child_\d+$/);
     }
+  });
+
+  it('E.164 contact phones must not be provisioned onto child Firebase users', () => {
+    // Attack: parent creates child with +62… → Firebase user gets phoneNumber →
+    // anyone completing phone OTP for that number authenticates as the child UID.
+    const contactPhone = '+6281234567890';
+    assert.equal(childFirebaseAuthPhone(contactPhone), undefined);
+    assert.notEqual(childFirebaseAuthPhone(contactPhone), contactPhone);
   });
 });
