@@ -18,7 +18,7 @@ import {
   type ActivityPoint,
   type ActivityZone,
 } from '../services/activityTimeline.js';
-import { mintChildFirebaseUid } from './childIdentity.js';
+import { childFirebaseAuthPhone, mintChildFirebaseUid } from './childIdentity.js';
 
 export const childrenRouter = Router();
 
@@ -151,7 +151,8 @@ childrenRouter.post('/', async (req: AuthedRequest, res, next) => {
 
     await ensureFirebaseUser({
       uid: firebaseUid,
-      phone: body.phone.startsWith('+') ? body.phone : undefined,
+      // Never bind the child's contact phone to Firebase Auth (OTP takeover).
+      phone: childFirebaseAuthPhone(body.phone),
       displayName: responseName,
     });
     const tokenResult = await createChildCustomToken(firebaseUid);
