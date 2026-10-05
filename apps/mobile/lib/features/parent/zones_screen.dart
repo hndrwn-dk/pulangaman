@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -2067,16 +2068,31 @@ class PlaceSearchSheetState extends ConsumerState<PlaceSearchSheet> {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context);
       final raw = e.toString();
+      final code = e is ApiException ? e.errorCode : null;
       String msg =
           'Pencarian gagal. Key Google Maps di server belum bisa dipakai untuk cari lokasi.';
-      if (raw.contains('maps_key_missing')) {
+      if (e is ApiException && e.isRateLimited) {
+        msg = l10n.rateLimitedTryAgain;
+      } else if (code == 'maps_key_missing' || raw.contains('maps_key_missing')) {
         msg = 'GOOGLE_MAPS_API_KEY belum diisi di Render.';
-      } else if (raw.contains('maps_key_restricted') ||
+      } else if (code == 'maps_key_restricted' ||
+          raw.contains('maps_key_restricted') ||
           raw.contains('not authorized') ||
           raw.contains('REQUEST_DENIED')) {
-        msg =
-            'Key Maps di server diblokir Google (biasanya key khusus Android). '
-            '${l10n.placesApiKeyHint}';
+        // Prefer Google's own error text when present (IP mismatch, billing, etc.).
+        String? googleMsg;
+        if (e is ApiException) {
+          try {
+            final decoded = jsonDecode(e.body);
+            if (decoded is Map && decoded['message'] is String) {
+              final m = (decoded['message'] as String).trim();
+              if (m.isNotEmpty && m != 'REQUEST_DENIED') googleMsg = m;
+            }
+          } catch (_) {}
+        }
+        msg = googleMsg ??
+            ('Key Maps di server diblokir Google. '
+                '${l10n.placesApiKeyHint}');
       }
       setState(() {
         _loading = false;

@@ -51,12 +51,14 @@ placesRouter.get('/search', async (req: AuthedRequest, res, next) => {
       const denied =
         data.status === 'REQUEST_DENIED' ||
         (data.error_message ?? '').toLowerCase().includes('not authorized');
+      // Surface Google's error_message so IP / billing / enablement issues are visible.
       res.status(502).json({
         error: denied ? 'maps_key_restricted' : 'places_upstream',
         status: data.status,
-        message: denied
-          ? 'Key Google Maps di server kena batasan (Android/HTTP). Buat key terpisah untuk server: API restriction Places + Geocoding, tanpa batasan aplikasi Android.'
-          : (data.error_message ?? data.status),
+        message: data.error_message ?? data.status,
+        hint: denied
+          ? 'Server key rejected by Google. Prefer Application restriction None + API restriction Places/Geocoding; Render free outbound IPs are shared and may not match the allowlist.'
+          : undefined,
       });
       return;
     }

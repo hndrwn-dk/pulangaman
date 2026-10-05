@@ -281,6 +281,8 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   bool _showAllApps = false;
   _ScreenTimeInsight? _insight;
   bool _insightLoading = false;
+  bool _selectionRepairScheduled = false;
+  int _loadGeneration = 0;
 
   bool get _childLocked => widget.lockedChild != null;
 
@@ -293,20 +295,54 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
     }
     Future.microtask(() async {
       await ref.read(childrenControllerProvider.notifier).bootstrap();
-      await _ensureSelectionAndLoad();
+      await _ensureSelectionAndLoad(forceReload: true);
     });
   }
 
-  Future<void> _ensureSelectionAndLoad() async {
+  String? _resolveChildId(List<ChildSummary> items) {
+    if (items.isEmpty) return null;
+    final locked = widget.lockedChild;
+    if (locked != null) return locked.id;
+    final ids = {for (final c in items) c.id};
+    final current = _selectedChildId;
+    if (current != null && ids.contains(current)) return current;
+    return items.first.id;
+  }
+
+  Future<void> _ensureSelectionAndLoad({bool forceReload = false}) async {
     final items = ref.read(childrenControllerProvider).items;
-    if (items.isEmpty) {
-      if (mounted) setState(() => _loading = false);
+    final id = _resolveChildId(items);
+    if (id == null) {
+      if (mounted) {
+        setState(() {
+          _selectedChildId = null;
+          _loading = false;
+          _apps = [];
+          _history = [];
+          _insight = null;
+          _insightLoading = false;
+        });
+      }
       return;
     }
-    final locked = widget.lockedChild;
-    final id = locked?.id ?? _selectedChildId ?? items.first.id;
-    if (_selectedChildId != id) {
-      setState(() => _selectedChildId = id);
+
+    final previous = _selectedChildId;
+    final selectionChanged = previous != id;
+    if (selectionChanged) {
+      if (mounted) {
+        setState(() {
+          _selectedChildId = id;
+          _showAllApps = false;
+        });
+      } else {
+        _selectedChildId = id;
+      }
+    }
+
+    // Previously, a deleted/unlinked child id stayed selected and every rebuild
+    // called _loadFor again — UI looked like it was being tapped nonstop.
+    if (!forceReload && !selectionChanged && previous != null) {
+      return;
     }
     await _loadFor(id);
   }
@@ -382,6 +418,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
   }
 
   Future<void> _loadFor(String childId) async {
+    final generation = ++_loadGeneration;
     setState(() {
       _loading = true;
       _insightLoading = true;
@@ -405,7 +442,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
       final apps = await _fetchPeriodApps(childId, _period);
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _applyPolicyToState(current);
         _apps = apps;
@@ -415,7 +452,7 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
       unawaited(_loadInsight(childId, history: history, apps: apps));
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _apps = [];
         _history = [];
@@ -678,11 +715,15 @@ class _ScreenTimeScreenState extends ConsumerState<ScreenTimeScreen> {
 
     if (items.isNotEmpty) {
       final ids = items.map((c) => c.id).toSet();
-      if (_selectedChildId == null || !ids.contains(_selectedChildId)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          unawaited(_ensureSelectionAndLoad());
-        });
+      if (_selectedChildId == null || !ids.contains(_selectedChildId!)) {
+        if (!_selectionRepairScheduled) {
+          _selectionRepairScheduled = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _selectionRepairScheduled = false;
+            if (!mounted) return;
+            unawaited(_ensureSelectionAndLoad());
+          });
+        }
       }
     }
 

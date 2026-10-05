@@ -76,3 +76,9 @@ flutter_*.png
 # Coverage / symbols
 coverage/
 app.*.symbols
+
+# Local debug dumps / adb captures (do not commit)
+firebase-debug.log
+ui_*.xml
+screentime_glitch.png
+st_frame_*.png
