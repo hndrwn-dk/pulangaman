@@ -1095,6 +1095,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get rateLimitedTryAgain =>
+      'Too many requests. Wait a moment, then try again.';
+
+  @override
   String saveFailedWithDetail(String error) {
     return 'Failed to save: $error';
   }

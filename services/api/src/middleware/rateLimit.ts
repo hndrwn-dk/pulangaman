@@ -1,12 +1,18 @@
 import type { NextFunction, Response } from 'express';
 import { config } from '../config.js';
 import type { AuthedRequest } from './auth.js';
+import { shouldBypassRateLimit } from './rateLimitLogic.js';
 
 type Bucket = { count: number; resetAt: number };
 
 const buckets = new Map<string, Bucket>();
 
 export function rateLimit(req: AuthedRequest, res: Response, next: NextFunction): void {
+  if (shouldBypassRateLimit(req.method)) {
+    next();
+    return;
+  }
+
   const key = req.auth?.userId ?? req.auth?.firebaseUid ?? req.ip ?? 'anon';
   const now = Date.now();
   const windowMs = 60_000;

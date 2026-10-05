@@ -2066,6 +2066,12 @@ abstract class AppLocalizations {
   /// **'Gagal hapus: {error}'**
   String deleteFailedWithDetail(String error);
 
+  /// No description provided for @rateLimitedTryAgain.
+  ///
+  /// In id, this message translates to:
+  /// **'Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi.'**
+  String get rateLimitedTryAgain;
+
   /// No description provided for @saveFailedWithDetail.
   ///
   /// In id, this message translates to:

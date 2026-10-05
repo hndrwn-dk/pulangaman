@@ -1093,6 +1093,10 @@ class AppLocalizationsId extends AppLocalizations {
   }
 
   @override
+  String get rateLimitedTryAgain =>
+      'Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi.';
+
+  @override
   String saveFailedWithDetail(String error) {
     return 'Gagal menyimpan: $error';
   }

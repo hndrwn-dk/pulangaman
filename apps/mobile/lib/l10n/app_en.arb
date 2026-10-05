@@ -381,6 +381,7 @@
   "addChildFirstMessage": "Add a child first from the Children tab.",
   "reloadTooltip": "Reload",
   "deleteFailedWithDetail": "Failed to delete: {error}",
+  "rateLimitedTryAgain": "Too many requests. Wait a moment, then try again.",
   "saveFailedWithDetail": "Failed to save: {error}",
   "markAllReadAction": "Mark all as read",
   "markReadAction": "Mark as read",

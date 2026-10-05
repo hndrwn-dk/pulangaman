@@ -12,7 +12,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('*'),
   LOCATION_TTL_SECONDS: z.coerce.number().default(900),
   STALE_LOCATION_SECONDS: z.coerce.number().default(120),
-  RATE_LIMIT_PER_MINUTE: z.coerce.number().default(100),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().default(400),
   CHILD_INVITE_TTL_MINUTES: z.coerce.number().int().min(5).default(30),
   INVITE_ATTEMPT_MAX: z.coerce.number().int().min(1).default(5),
   INVITE_ATTEMPT_WINDOW_MS: z.coerce.number().default(900_000), // 15 min

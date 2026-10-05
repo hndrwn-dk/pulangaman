@@ -41,3 +41,5 @@ services:
       # Keep enough usage history for month heatmap + weekday insights
       - key: USAGE_RETENTION_DAYS
         value: "42"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "400"

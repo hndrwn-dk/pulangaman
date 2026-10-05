@@ -578,6 +578,7 @@
       }
     }
   },
+  "rateLimitedTryAgain": "Terlalu banyak permintaan. Tunggu sebentar, lalu coba lagi.",
   "saveFailedWithDetail": "Gagal menyimpan: {error}",
   "@saveFailedWithDetail": {
     "placeholders": {

@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/day_period.dart';
 import '../../core/locale_controller.dart';
+import '../../core/network/api_client.dart';
 import '../../core/network/ws_client.dart';
 import '../../core/theme.dart';
 import '../../core/widgets/pa_widgets.dart';
@@ -1157,7 +1158,7 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         } catch (e) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.deleteFailedWithDetail('$e'))),
+            SnackBar(content: Text(_removeChildError(l10n, e))),
           );
         }
         return;
@@ -1194,10 +1195,17 @@ class _ParentHomeScreenState extends ConsumerState<ParentHomeScreen>
         } catch (e) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.deleteFailedWithDetail('$e'))),
+            SnackBar(content: Text(_removeChildError(l10n, e))),
           );
         }
     }
+  }
+
+  String _removeChildError(AppLocalizations l10n, Object error) {
+    if (error is ApiException && error.isRateLimited) {
+      return l10n.rateLimitedTryAgain;
+    }
+    return l10n.deleteFailedWithDetail('$error');
   }
 
   Future<void> _showCreateInvite(BuildContext context) async {
